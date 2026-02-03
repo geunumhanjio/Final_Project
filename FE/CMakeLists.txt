@@ -14,7 +14,7 @@ find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
 # -------------------------------------------------------------------------
-# 2. [수동 연결] GStreamer MinGW 라이브러리 직접 지정 (가장 확실한 방법)
+# 2. [수동 연결] GStreamer MinGW 라이브러리 직접 지정
 # -------------------------------------------------------------------------
 
 # 사용자 설치 경로 (정확해야 합니다!)
@@ -32,7 +32,7 @@ add_compile_definitions(GST_BIN_PATH="${GST_ROOT}/bin")
 
 # -------------------------------------------------------------------------
 
-# 3. 프로젝트 소스 파일
+# 3. 프로젝트 소스 파일 (상대 경로 - FE 디렉터리 기준)
 set(PROJECT_SOURCES
         main.cpp
         mainwindow.cpp mainwindow.h mainwindow.ui

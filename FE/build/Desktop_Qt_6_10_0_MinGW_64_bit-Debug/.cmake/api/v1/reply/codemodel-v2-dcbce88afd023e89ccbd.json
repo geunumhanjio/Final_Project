@@ -1,0 +1,79 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"hasInstallRule" : true,
+					"jsonFile" : "directory-.-Debug-a4f4b7de4d500aca9620.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.16"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "VEDA_QT_1",
+					"targetIndexes" : 
+					[
+						0,
+						1,
+						2
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "VEDA_QT_1::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-VEDA_QT_1-Debug-4b8ba0eaf9c4cb0f48af.json",
+					"name" : "VEDA_QT_1",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "VEDA_QT_1_autogen::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-VEDA_QT_1_autogen-Debug-f3d5225e2b8caa2be813.json",
+					"name" : "VEDA_QT_1_autogen",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "VEDA_QT_1_autogen_timestamp_deps::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-VEDA_QT_1_autogen_timestamp_deps-Debug-0a4f7532653c77e3fe1f.json",
+					"name" : "VEDA_QT_1_autogen_timestamp_deps",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "D:/work/QT_prac/VEDA_QT_1/FE/build/Desktop_Qt_6_10_0_MinGW_64_bit-Debug",
+		"source" : "D:/work/QT_prac/VEDA_QT_1/FE"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 7
+	}
+}
