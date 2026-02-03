@@ -24,5 +24,6 @@ __pycache__/
 *.bag
 *.db3
 
+.*
 .env
 local_settings.yaml
