@@ -46,7 +46,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static uint8_t test_phase = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -107,45 +107,131 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // Forward
-    printf("Forward 50%%...\r\n");
-    Motor_Forward(50);
-    HAL_Delay(2000);
+    switch (test_phase) {
+    case 0:
+        // 전진: 양쪽 300 mm/s
+        printf("[Test 1] Forward 300 mm/s\r\n");
+        Motor_SetVelocity(300, 300);
+        HAL_Delay(2000);
+        test_phase++;
+        break;
 
-    // Stop
-    printf("Stop...\r\n");
-    Motor_Stop();
-    HAL_Delay(1000);
+    case 1:
+        // 부드러운 정지 (Coast)
+        printf("[Test 2] SoftStop\r\n");
+        Motor_SoftStop();
+        HAL_Delay(1000);
+        test_phase++;
+        break;
 
-    // Backward
-    printf("Backward 30%%...\r\n");
-    Motor_Backward(30);
-    HAL_Delay(2000);
+    case 2:
+        // 후진: 양쪽 -200 mm/s
+        printf("[Test 3] Backward 200 mm/s\r\n");
+        Motor_SetVelocity(-200, -200);
+        HAL_Delay(2000);
+        test_phase++;
+        break;
 
-    // Stop
-    printf("Stop...\r\n");
-    Motor_Stop();
-    HAL_Delay(1000);
+    case 3:
+        // 비상 정지 (Brake)
+        printf("[Test 4] EmergencyStop\r\n");
+        Motor_EmergencyStop();
+        HAL_Delay(1000);
+        test_phase++;
+        break;
 
-    // Turn left
-    printf("Turn Left 40%%...\r\n");
-    Motor_TurnLeft(40);
-    HAL_Delay(1000);
+    case 4:
+        // 비상 정지 해제
+        printf("[Test 5] ReleaseEmergency\r\n");
+        Motor_ReleaseEmergency();
+        HAL_Delay(500);
+        test_phase++;
+        break;
 
-    // Stop
-    printf("Stop...\r\n");
-    Motor_Stop();
-    HAL_Delay(1000);
+    case 5:
+        // 제자리 좌회전: 왼쪽 후진, 오른쪽 전진
+        printf("[Test 6] TurnLeft (L=-250, R=+250)\r\n");
+        Motor_SetVelocity(-250, 250);
+        HAL_Delay(1500);
+        test_phase++;
+        break;
 
-    // Turn right
-    printf("Turn Right 40%%...\r\n");
-    Motor_TurnRight(40);
-    HAL_Delay(1000);
+    case 6:
+        printf("[Test 6-1] SoftStop\r\n");
+        Motor_SoftStop();
+        HAL_Delay(1000);
+        test_phase++;
+        break;
 
-    // Coast stop
-    printf("Coast stop...\r\n");
-    Motor_Coast();
-    HAL_Delay(3000);
+    case 7:
+        // 제자리 우회전: 왼쪽 전진, 오른쪽 후진
+        printf("[Test 7] TurnRight (L=+250, R=-250)\r\n");
+        Motor_SetVelocity(250, -250);
+        HAL_Delay(1500);
+        test_phase++;
+        break;
+
+    case 8:
+        printf("[Test 7-1] SoftStop\r\n");
+        Motor_SoftStop();
+        HAL_Delay(1000);
+        test_phase++;
+        break;
+
+    case 9:
+        // 좌 완만 커브: 왼쪽 느리게, 오른쪽 빠르게
+        printf("[Test 8] Curve Left (L=150, R=400)\r\n");
+        Motor_SetVelocity(150, 400);
+        HAL_Delay(2000);
+        test_phase++;
+        break;
+
+    case 10:
+        printf("[Test 8-1] SoftStop\r\n");
+        Motor_SoftStop();
+        HAL_Delay(1000);
+        test_phase++;
+        break;
+
+    case 11:
+        // 최대 속도 테스트
+        printf("[Test 9] Max speed 600 mm/s\r\n");
+        Motor_SetVelocity(600, 600);
+        HAL_Delay(2000);
+        test_phase++;
+        break;
+
+    case 12:
+        // 비상 정지로 최대 속도에서 즉시 정지
+        printf("[Test 10] EmergencyStop from max speed\r\n");
+        Motor_EmergencyStop();
+        HAL_Delay(1000);
+        Motor_ReleaseEmergency();
+        HAL_Delay(500);
+        test_phase++;
+        break;
+
+    case 13:
+        // 타임아웃 테스트: 명령 후 500ms 이상 대기
+        printf("[Test 11] Timeout test - driving then waiting 700ms\r\n");
+        Motor_SetVelocity(300, 300);
+        HAL_Delay(700);
+        if (Motor_CheckTimeout()) {
+            printf("  -> Timeout triggered, auto-stopped!\r\n");
+        } else {
+            printf("  -> No timeout (unexpected)\r\n");
+        }
+        HAL_Delay(1000);
+        test_phase++;
+        break;
+
+    default:
+        // 전체 테스트 완료 → 처음부터 반복
+        printf("=== All tests done. Restarting... ===\r\n\r\n");
+        HAL_Delay(3000);
+        test_phase = 0;
+        break;
+    }
   }
   /* USER CODE END 3 */
 }

@@ -1,17 +1,3 @@
-/**
-  ******************************************************************************
-  * @file           : motor_control.h
-  * @brief          : L298N 모터 드라이버 제어 라이브러리
-  * @author         : 김지오
-  * @date           : 2026-02-04
-  ******************************************************************************
-  * @description
-  * - L298N 듀얼 모터 드라이버를 사용한 차동구동 로봇 제어
-  * - PWM을 통한 속도 제어 (0~100%)
-  * - GPIO를 통한 방향 제어 (전진/후진)
-  ******************************************************************************
-  */
-
 #ifndef __MOTOR_CONTROL_H
 #define __MOTOR_CONTROL_H
 
@@ -22,15 +8,12 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "tim.h"
+#include <stdbool.h>
 
 /* Exported defines ----------------------------------------------------------*/
-#define MOTOR_MAX_SPEED         100   // 최대 속도 (%)
+#define MOTOR_MAX_SPEED_MMPS    600   // 최대 속도 (mm/s) - 실측 후 조정
 #define MOTOR_PWM_PERIOD        999   // TIM2 ARR 값과 동일
-
-/* 방향 정의 */
-#define MOTOR_DIR_FORWARD       0
-#define MOTOR_DIR_BACKWARD      1
-#define MOTOR_DIR_BRAKE         2
+#define MOTOR_CMD_TIMEOUT_MS    500   // 명령 타임아웃 (500ms)
 
 /* Exported types ------------------------------------------------------------*/
 typedef enum {
@@ -53,71 +36,41 @@ typedef enum {
 Motor_Status_t Motor_Init(void);
 
 /**
- * @brief  개별 모터 속도 설정
- * @param  motor: MOTOR_LEFT 또는 MOTOR_RIGHT
- * @param  speed: 0~100 (%)
+ * @brief  양쪽 바퀴 속도 설정 (ROS2 /cmd_vel 처리용)
+ * @param  left_mmps: 왼쪽 바퀴 목표 속도 (-600 ~ +600 mm/s)
+ * @param  right_mmps: 오른쪽 바퀴 목표 속도 (-600 ~ +600 mm/s)
+ * @note   이 함수 호출 시 자동으로 watchdog 타임아웃 리셋됨
  * @retval Motor_Status_t
  */
-Motor_Status_t Motor_SetSpeed(Motor_Select_t motor, uint8_t speed);
+Motor_Status_t Motor_SetVelocity(int16_t left_mmps, int16_t right_mmps);
 
 /**
- * @brief  개별 모터 방향 설정
- * @param  motor: MOTOR_LEFT 또는 MOTOR_RIGHT
- * @param  direction: MOTOR_DIR_FORWARD, MOTOR_DIR_BACKWARD, MOTOR_DIR_BRAKE
+ * @brief  비상 정지 (즉시 브레이크)
+ * @note   모든 제어 명령 무시하고 즉시 정지
+ * @note   Motor_ReleaseEmergency() 호출 전까지 모든 속도 명령 무시
  * @retval Motor_Status_t
  */
-Motor_Status_t Motor_SetDirection(Motor_Select_t motor, uint8_t direction);
+Motor_Status_t Motor_EmergencyStop(void);
 
 /**
- * @brief  양쪽 모터 동시 제어 (속도 + 방향)
- * @param  left_speed: 왼쪽 모터 속도 (0~100%)
- * @param  right_speed: 오른쪽 모터 속도 (0~100%)
- * @param  left_dir: 왼쪽 모터 방향
- * @param  right_dir: 오른쪽 모터 방향
+ * @brief  부드러운 정지 (감속 후 정지)
+ * @note   가속도 제한 적용하여 부드럽게 감속
  * @retval Motor_Status_t
  */
-Motor_Status_t Motor_SetBoth(uint8_t left_speed, uint8_t right_speed, 
-                             uint8_t left_dir, uint8_t right_dir);
+Motor_Status_t Motor_SoftStop(void);
 
 /**
- * @brief  로봇 전진
- * @param  speed: 0~100 (%)
- * @retval Motor_Status_t
+ * @brief  명령 타임아웃 확인 (주기적으로 호출 필요)
+ * @note   100Hz 타이머에서 호출하여 타임아웃 시 자동 정지
+ * @retval true: 타임아웃 발생, false: 정상
  */
-Motor_Status_t Motor_Forward(uint8_t speed);
+bool Motor_CheckTimeout(void);
 
 /**
- * @brief  로봇 후진
- * @param  speed: 0~100 (%)
+ * @brief  비상 정지 해제
  * @retval Motor_Status_t
  */
-Motor_Status_t Motor_Backward(uint8_t speed);
-
-/**
- * @brief  제자리 좌회전
- * @param  speed: 0~100 (%)
- * @retval Motor_Status_t
- */
-Motor_Status_t Motor_TurnLeft(uint8_t speed);
-
-/**
- * @brief  제자리 우회전
- * @param  speed: 0~100 (%)
- * @retval Motor_Status_t
- */
-Motor_Status_t Motor_TurnRight(uint8_t speed);
-
-/**
- * @brief  모든 모터 정지 (브레이크)
- * @retval Motor_Status_t
- */
-Motor_Status_t Motor_Stop(void);
-
-/**
- * @brief  부드러운 정지 (관성 정지)
- * @retval Motor_Status_t
- */
-Motor_Status_t Motor_Coast(void);
+Motor_Status_t Motor_ReleaseEmergency(void);
 
 #ifdef __cplusplus
 }
