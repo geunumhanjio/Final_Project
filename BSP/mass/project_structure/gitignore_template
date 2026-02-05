@@ -1,0 +1,121 @@
+# STM32 / Embedded
+*.o
+*.elf
+*.hex
+*.bin
+*.map
+*.list
+*.su
+*.d
+Debug/
+Release/
+.settings/
+*.launch
+*.ld
+*.axf
+
+# CubeMX 생성 파일 중 용량 큰 것들
+**/Drivers/CMSIS/
+**/Drivers/STM32F4xx_HAL_Driver/
+**/.mxproject
+
+# Eclipse / STM32CubeIDE
+.metadata/
+.project
+.cproject
+.classpath
+*.prefs
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+
+# OS 관련
+.DS_Store
+Thumbs.db
+desktop.ini
+*.bak
+
+# ROS 관련
+ros_workspace/build/
+ros_workspace/devel/
+ros_workspace/install/
+ros_workspace/log/
+*.pyc
+__pycache__/
+*.egg-info/
+
+# Python
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+pip-log.txt
+.pytest_cache/
+
+# Qt
+*.pro.user
+*.autosave
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+
+# Build artifacts
+*.a
+*.so
+*.lib
+*.dll
+*.dylib
+*.exe
+*.out
+*.app
+
+# 로그 및 임시 파일
+*.log
+*.tmp
+*.temp
+*.cache
+
+# 테스트 데이터 (대용량)
+test_data/*.bin
+test_data/*.csv
+videos/*.mp4
+videos/*.avi
+
+# 문서 백업
+*~
+*.bak
+*.orig
+
+# 데이터시트는 용량이 크므로 선택적 추가
+# docs/hardware/datasheets/*.pdf
+
+# 컴파일된 Python
+*.pyo
+*.pyd
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# 환경 설정 파일 (개인별로 다를 수 있음)
+.env
+config.local.yaml
+
+# 성능 측정 결과 (선택적)
+# performance_data/*.csv
+
+# Node.js (혹시 서버에서 사용할 경우)
+node_modules/
+npm-debug.log
+yarn-error.log
