@@ -66,42 +66,12 @@ Core/Src/motor_control.c  ← 추가
 
 ### 3.2 main.c 수정
 
-**1) Include 추가 (상단)**
+**Include 추가 (상단)**
 ```c
 /* USER CODE BEGIN Includes */
 #include "motor_control.h"
 #include <stdio.h>
 /* USER CODE END Includes */
-```
-
-**2) 초기화 코드 (main 함수 내)**
-```c
-/* USER CODE BEGIN 2 */
-if (Motor_Init() == MOTOR_OK) {
-    printf("Motor OK!\r\n");
-}
-/* USER CODE END 2 */
-```
-
-**3) 메인 루프 (테스트 코드)**
-```c
-/* USER CODE BEGIN 3 */
-while (1)
-{
-    // 예제: 2초 전진 → 1초 정지 → 2초 후진 → 1초 정지
-    Motor_Forward(50);
-    HAL_Delay(2000);
-    
-    Motor_Stop();
-    HAL_Delay(1000);
-    
-    Motor_Backward(50);
-    HAL_Delay(2000);
-    
-    Motor_Stop();
-    HAL_Delay(1000);
-}
-/* USER CODE END 3 */
 ```
 
 ---
@@ -133,64 +103,6 @@ st-flash --version
 ### 로드 
 ```
 st-flash write build/[바이너리_이미지_이름].bin 0x8000000
-```
-
----
-
-## 5. 기본 동작 확인
-
-### 5.1 전진: 방향과 속도 체크
-
-```c
-// 테스트 1: 전진 50% 속도
-Motor_Forward(50);
-HAL_Delay(2000);
-Motor_Stop();
-```
-
-**확인 사항:**
-- ☑️ 모터 2개가 같은 방향으로 회전
-- ☑️ 로봇이 직진 (또는 모터 단독 회전)
-- ☑️ 속도 변화 시 모터 속도 변화
-
-### 5.2 방향 테스트: 전진, 후진, 좌회전, 우회전
-
-```c
-// 전진
-Motor_Forward(50);
-HAL_Delay(1000);
-Motor_Stop();
-
-// 후진
-Motor_Backward(50);
-HAL_Delay(1000);
-Motor_Stop();
-
-// 좌회전
-Motor_TurnLeft(40);
-HAL_Delay(1000);
-Motor_Stop();
-
-// 우회전
-Motor_TurnRight(40);
-HAL_Delay(1000);
-Motor_Stop();
-```
-
-### 5.3 시리얼 모니터 확인
-
-(⚠️ printf 리다이렉션 설정 필요)
-
-**PC 연결:**
-- PC에서 시리얼 터미널 열기 
-- 115200 baud로 설정
-
-**출력 예:**
-```
-Motor OK!
-Forward 50%...
-Stop...
-Backward 30%...
 ```
 
 ---
