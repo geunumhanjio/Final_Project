@@ -1,7 +1,3 @@
-/**
- * @file liveview.cpp
- * @brief 화면 배치 및 RTSP 주소 연결 구현
- */
 #include "liveview.h"
 #include <QDebug>
 #include <QTimer>
@@ -15,19 +11,14 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     gridLayout->setSpacing(5);
     gridLayout->setContentsMargins(5, 5, 5, 5);
 
-    // 1. CCTV 4개 생성 및 배치
     for(int i = 0; i < 4; i++) {
         cctvWidgets[i] = new VideoWidget(this);
         cctvWidgets[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         cctvWidgets[i]->setMinimumSize(320, 240);
         cctvWidgets[i]->installEventFilter(this);
-
-        int row = i / 2;
-        int col = i % 2;
-        gridLayout->addWidget(cctvWidgets[i], row, col);
+        gridLayout->addWidget(cctvWidgets[i], i / 2, i % 2);
     }
 
-    // 2. 센서 화면 2개 생성
     for(int i = 0; i < 2; i++) {
         QString name = (i == 0) ? "RC Car Camera" : "LiDAR SLAM Map";
         sensorWidgets[i] = new QLabel(name, this);
@@ -35,76 +26,67 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
         sensorWidgets[i]->setStyleSheet("QLabel { border: 2px solid #00FFFF; color: white; background-color: #111; font-size: 20px; }");
         sensorWidgets[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         sensorWidgets[i]->installEventFilter(this);
-
         gridLayout->addWidget(sensorWidgets[i], i, 2);
     }
 
-    // GStreamer 초기화
-    if (!gst_is_initialized()) {
-        qDebug() << "[LiveView] Initializing GStreamer...";
-        gst_init(nullptr, nullptr);
-
-        guint major, minor, micro, nano;
-        gst_version(&major, &minor, &micro, &nano);
-        qDebug() << "[LiveView] GStreamer version:" << major << "." << minor << "." << micro;
-    }
-
+    if (!gst_is_initialized()) gst_init(nullptr, nullptr);
     streamStarted = false;
 }
 
 void LiveView::showEvent(QShowEvent *event)
 {
     QWidget::showEvent(event);
-
     if (!streamStarted) {
-        qDebug() << "[LiveView] Widget visible, starting streams in 1 second...";
-
-        QTimer::singleShot(1000, this, [this]() {
-            initCCTVStreams();
-        });
-
+        QTimer::singleShot(500, this, [this]() { initCCTVStreams(); });
         streamStarted = true;
     }
 }
 
 void LiveView::initCCTVStreams()
 {
-    qDebug() << "[LiveView] ========================================";
     qDebug() << "[LiveView] Initializing RTSP connections...";
 
-    QString ip = "192.168.0.82";
+    lowQualityUrls.clear();
+    highQualityUrls.clear();
+
+    // =================================================================
+    // [옵션 A] 라즈베리파이 / 내 서버 (주석 처리됨)
+    // =================================================================
+    /*
+    QString ip = "192.168.0.38";
     QString port = "8554";
-
-    // WinId 확인
-    for(int i = 0; i < 4; i++) {
-        WId winId = cctvWidgets[i]->winId();
-        qDebug() << "[LiveView] Channel" << (i+1) << "WinId:" << winId;
-    }
-
-    // 각 채널을 5초 간격으로 연결 (더 여유있게)
     for(int i = 0; i < 4; i++) {
         QString url = QString("rtsp://%1:%2/ch%3").arg(ip, port).arg(i+1);
-        int delay = i * 5000; // 5초 간격
+        lowQualityUrls << url;
+        highQualityUrls << url;
+    }
+    qDebug() << "[Mode] Raspberry Pi Server Selected";
+    */
 
-        qDebug() << "[LiveView] Channel" << (i+1) << "scheduled at" << delay << "ms";
+    // =================================================================
+    // [옵션 B] 상용 CCTV (한화) - 듀얼 스트림 사용 (현재 활성화)
+    // =================================================================
+    //
+    QString baseUrl = "rtsp://admin:5hanwha!@192.168.0.16:554";
+    for(int i = 0; i < 4; i++) {
+        // 저화질 (MOBILE) -> 4분할 화면용
+        lowQualityUrls << QString("%1/%2/MOBILE/media.smp").arg(baseUrl).arg(i);
+        // 고화질 (H.264) -> 전체 화면용
+        highQualityUrls << QString("%1/%2/H.264/media.smp").arg(baseUrl).arg(i);
+    }
+    qDebug() << "[Mode] Commercial CCTV Selected (Dual Stream)";
+    //
+
+    for(int i = 0; i < 4; i++) {
+        if (i >= lowQualityUrls.size()) break;
+        QString url = lowQualityUrls[i];
+        int delay = i * 100;
 
         QTimer::singleShot(delay, this, [this, i, url]() {
-            qDebug() << "";
-            qDebug() << "[LiveView] ===== Connecting Channel" << (i+1) << "=====";
-            qDebug() << "[LiveView] URL:" << url;
-            cctvWidgets[i]->playUrl(url);
+            if(cctvWidgets[i]) {
+                cctvWidgets[i]->playUrl(url, 200);
+            }
         });
-    }
-
-    qDebug() << "[LiveView] All channels scheduled";
-    qDebug() << "[LiveView] ========================================";
-}
-
-void LiveView::setChannelVisible(int index, bool visible) {
-    if (index < 4) {
-        cctvWidgets[index]->setVisible(visible);
-    } else if (index < 6) {
-        sensorWidgets[index - 4]->setVisible(visible);
     }
 }
 
@@ -112,16 +94,27 @@ bool LiveView::eventFilter(QObject *obj, QEvent *event) {
     if (event->type() == QEvent::MouseButtonDblClick) {
         for (int i = 0; i < 4; i++) {
             if (obj == cctvWidgets[i]) {
-                emit requestFullScreen(i);
+                QString url = "";
+                if (i < highQualityUrls.size()) url = highQualityUrls[i];
+                emit requestFullScreen(i, url);
                 return true;
             }
         }
         for (int i = 0; i < 2; i++) {
             if (obj == sensorWidgets[i]) {
-                emit requestFullScreen(i + 4);
+                emit requestFullScreen(i + 4, "");
                 return true;
             }
         }
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void LiveView::setChannelVisible(int index, bool visible) {
+    if (index < 4) cctvWidgets[index]->setVisible(visible);
+    else if (index < 6) sensorWidgets[index - 4]->setVisible(visible);
+}
+
+void LiveView::stopAll() {
+    for(int i = 0; i < 4; i++) if (cctvWidgets[i]) cctvWidgets[i]->stop();
 }
