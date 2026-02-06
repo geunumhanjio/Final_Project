@@ -50,19 +50,24 @@ void LiveView::initCCTVStreams()
     highQualityUrls.clear();
 
     // =================================================================
-    // [옵션 A] 라즈베리파이 / 내 서버 (주석 처리됨)
+    // [옵션 A] 라즈베리파이 / 내 서버 (활성화됨)
     // =================================================================
-    /*
+
     QString ip = "192.168.0.38";
     QString port = "8554";
-    for(int i = 0; i < 4; i++) {
-        QString url = QString("rtsp://%1:%2/ch%3").arg(ip, port).arg(i+1);
-        lowQualityUrls << url;
-        highQualityUrls << url;
-    }
-    qDebug() << "[Mode] Raspberry Pi Server Selected";
-    */
 
+    for(int i = 0; i < 4; i++) {
+        // 1. 저화질 (4분할 그리드용): ch1, ch2, ch3...
+        QString lowUrl = QString("rtsp://%1:%2/ch%3").arg(ip, port).arg(i+1);
+        lowQualityUrls << lowUrl;
+
+        // 2. 고화질 (전체화면용): ch1_fhd, ch2_fhd...
+        QString highUrl = QString("rtsp://%1:%2/ch%3_fhd").arg(ip, port).arg(i+1);
+        highQualityUrls << highUrl;
+    }
+    qDebug() << "[Mode] Raspberry Pi Server Selected (Dual Stream: Normal/FHD)";
+
+    /*
     // =================================================================
     // [옵션 B] 상용 CCTV (한화) - 듀얼 스트림 사용 (현재 활성화)
     // =================================================================
@@ -76,6 +81,7 @@ void LiveView::initCCTVStreams()
     }
     qDebug() << "[Mode] Commercial CCTV Selected (Dual Stream)";
     //
+    */
 
     for(int i = 0; i < 4; i++) {
         if (i >= lowQualityUrls.size()) break;
