@@ -1,3 +1,7 @@
+# ROS2 build
 install/
 build/
 log/
+
+# Docker
+docker/.env
