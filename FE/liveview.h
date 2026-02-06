@@ -1,7 +1,3 @@
-/**
- * @file liveview.h
- * @brief 4분할 CCTV + 2개 센서 화면을 표시하는 위젯 헤더
- */
 #ifndef LIVEVIEW_H
 #define LIVEVIEW_H
 
@@ -17,11 +13,11 @@ class LiveView : public QWidget
     Q_OBJECT
 public:
     explicit LiveView(QWidget *parent = nullptr);
-
     void setChannelVisible(int index, bool visible);
+    void stopAll();
 
 signals:
-    void requestFullScreen(int index);
+    void requestFullScreen(int index, QString url);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -32,6 +28,9 @@ private:
     VideoWidget *cctvWidgets[4];
     QLabel *sensorWidgets[2];
     bool streamStarted;
+
+    QStringList lowQualityUrls;
+    QStringList highQualityUrls;
 
     void initCCTVStreams();
 };

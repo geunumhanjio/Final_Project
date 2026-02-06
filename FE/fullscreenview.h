@@ -1,32 +1,58 @@
-/**
- * @file fullscreenview.h
- * @brief 전체 화면 확대 뷰 헤더
- */
 #ifndef FULLSCREENVIEW_H
 #define FULLSCREENVIEW_H
 
 #include <QWidget>
 #include <QLabel>
 #include <QPushButton>
-#include <QGridLayout>
+#include <QVBoxLayout>
+#include <QMouseEvent>
+#include <QStack>
+// [수정] QRubberBand 대신 QWidget 사용 (커스텀 스타일링을 위해)
+// #include <QRubberBand>
+#include "videowidget.h"
+#include "full_underbar.h"
 
 class FullScreenView : public QWidget
 {
     Q_OBJECT
 public:
     explicit FullScreenView(QWidget *parent = nullptr);
-    void setContent(int index); // 채널 내용 설정
+    void play(const QString &url, int index);
+    void stop();
 
 signals:
-    void closeRequested(); // 닫기 요청 시그널
+    void closeRequested();
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
 
+private slots:
+    void onZoomIn();
+    void onZoomOut();
+    void onRectZoomToggled(bool checked);
+    void onResetZoom();
+
 private:
-    QLabel *screenLabel;
+    VideoWidget *videoWidget;
+    FullUnderBar *underBar;
+    QLabel *titleLabel;
     QPushButton *btnClose;
+
+    // [수정] QRubberBand* -> QWidget* 으로 변경
+    QWidget *rubberBand;
+
+    QPoint originPoint;
+    bool isDrawing;
+
+    QPoint lastDragPos;
+    bool isPanning;
+
+    QStack<QRectF> zoomHistory;
+    enum Mode { Normal, Drawing, Zoomed };
+    Mode currentMode;
+
     QString getChannelName(int index);
+    void setMode(Mode mode);
 };
 
 #endif // FULLSCREENVIEW_H
