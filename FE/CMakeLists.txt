@@ -41,6 +41,7 @@ set(PROJECT_SOURCES
         liveview.h liveview.cpp
         fullscreenview.h fullscreenview.cpp
         videowidget.h videowidget.cpp
+        videocard.h videocard.cpp
 )
 
 # 4. 실행 파일 생성

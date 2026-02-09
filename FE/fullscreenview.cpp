@@ -51,33 +51,61 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
 
-    // 영상 컨테이너
+    // 영상 컨테이너 (그대로 유지)
     QWidget *videoContainer = new QWidget(this);
     videoContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    
+    // Use Stacked Layout equivalent by putting everything in cell (0,0) of a Grid
     QGridLayout *videoLayout = new QGridLayout(videoContainer);
     videoLayout->setContentsMargins(0, 0, 0, 0);
 
+    // 1. Video Layer (Bottom)
     videoWidget = new VideoWidget(videoContainer);
     videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     videoWidget->installEventFilter(this);
     videoLayout->addWidget(videoWidget, 0, 0);
 
-    titleLabel = new QLabel(videoContainer);
-    titleLabel->setStyleSheet("color: #FFA500; font-weight: bold; font-size: 20px; background-color: rgba(0,0,0,100); padding: 5px;");
-    titleLabel->hide();
-    videoLayout->addWidget(titleLabel, 0, 0, Qt::AlignTop | Qt::AlignLeft);
+    // 2. Top Info Bar (Overlay Top)
+    topBar = new QWidget(videoContainer);
+    topBar->setFixedHeight(80);
+    // Initial Theme (matches updateTheme(true))
+    
+    QHBoxLayout *topLayout = new QHBoxLayout(topBar);
+    topLayout->setContentsMargins(20, 10, 20, 30); // Extra bottom margin for fade
+    
+    titleLabel = new QLabel("CCTV Camera", topBar);
+    // Initial Style set in updateTheme
+    
+    liveBadge = new QLabel("LIVE", topBar);
+    // Initial Style set in updateTheme
+    
+    btnClose = new QPushButton("✕", topBar);
+    btnClose->setFixedSize(36, 36);
+    btnClose->setCursor(Qt::PointingHandCursor);
+    // Initial Style set in updateTheme
 
-    btnClose = new QPushButton("X", videoContainer);
-    btnClose->setFixedSize(50, 50);
-    btnClose->setStyleSheet("QPushButton { background-color: red; color: white; border: none; font-size: 20px; } QPushButton:hover { background-color: #FF5555; }");
     connect(btnClose, &QPushButton::clicked, this, &FullScreenView::closeRequested);
-    videoLayout->addWidget(btnClose, 0, 0, Qt::AlignTop | Qt::AlignRight);
+
+    topLayout->addWidget(titleLabel);
+    topLayout->addSpacing(10);
+    topLayout->addWidget(liveBadge);
+    topLayout->addStretch();
+    topLayout->addWidget(btnClose);
+
+    // Add TopBar to Grid (0,0, AlignTop)
+    videoLayout->addWidget(topBar, 0, 0, Qt::AlignTop);
+
+    // 3. Bottom Control Bar (Overlay Bottom)
+    underBar = new FullUnderBar(videoContainer);
+    
+    QWidget *bottomWrapper = new QWidget(videoContainer);
+    bottomWrapper->setAttribute(Qt::WA_TranslucentBackground);
+    QVBoxLayout *bwLayout = new QVBoxLayout(bottomWrapper);
+    bwLayout->setContentsMargins(0, 0, 0, 40); // 40px margin from bottom
+    bwLayout->addWidget(underBar, 0, Qt::AlignHCenter);
+    videoLayout->addWidget(bottomWrapper, 0, 0, Qt::AlignBottom);
 
     mainLayout->addWidget(videoContainer);
-
-    // 하단 컨트롤 바
-    underBar = new FullUnderBar(this);
-    mainLayout->addWidget(underBar);
 
     connect(underBar, &FullUnderBar::reqZoomIn, this, &FullScreenView::onZoomIn);
     connect(underBar, &FullUnderBar::reqZoomOut, this, &FullScreenView::onZoomOut);
@@ -96,15 +124,15 @@ void FullScreenView::play(const QString &url, int index)
     setMode(Normal);
 
     QString name = getChannelName(index);
-    titleLabel->setText(QString("%1 (Full Screen)").arg(name));
-    titleLabel->show();
+    titleLabel->setText(name); // Label itself has style
+    // titleLabel->show(); // Always visible in topBar
     videoWidget->playUrl(url, 0);
 }
 
 void FullScreenView::stop()
 {
     videoWidget->stop();
-    titleLabel->hide();
+    // titleLabel->hide(); // Preserved part of layout
     zoomHistory.clear();
     setMode(Normal);
 }
@@ -121,20 +149,20 @@ void FullScreenView::setMode(Mode mode)
         videoWidget->setCursor(Qt::ArrowCursor);
         videoWidget->resetCrop();
         underBar->setRectButtonMode(0);
-        btnClose->show();
+        // btnClose->show(); // Always visible 
         zoomHistory.clear();
         break;
 
     case Drawing:
         videoWidget->setCursor(Qt::CrossCursor);
         underBar->setRectButtonMode(1);
-        btnClose->show();
+        // btnClose->show();
         break;
 
     case Zoomed:
         videoWidget->setCursor(Qt::OpenHandCursor);
         underBar->setRectButtonMode(2);
-        btnClose->hide();
+        // btnClose->hide(); // Can keep visible if overlay
         break;
     }
 }
@@ -158,7 +186,7 @@ void FullScreenView::onZoomIn() {
     currentMode = Zoomed;
     videoWidget->setCursor(Qt::OpenHandCursor);
     underBar->setRectButtonMode(2);
-    btnClose->hide();
+    // btnClose->hide();
 }
 
 void FullScreenView::onZoomOut() {
@@ -176,7 +204,7 @@ void FullScreenView::onZoomOut() {
         currentMode = Zoomed;
         videoWidget->setCursor(Qt::OpenHandCursor);
         underBar->setRectButtonMode(2);
-        btnClose->hide();
+        // btnClose->hide();
     }
 }
 
@@ -256,10 +284,11 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
                     zoomHistory.push(currentCrop);
                     videoWidget->applyCrop(QRectF(targetX, targetY, targetW, targetH));
 
-                    currentMode = Zoomed;
-                    videoWidget->setCursor(Qt::OpenHandCursor);
-                    underBar->setRectButtonMode(2);
-                    btnClose->hide();
+            currentMode = Zoomed;
+            videoWidget->setCursor(Qt::OpenHandCursor);
+            underBar->setRectButtonMode(2);
+            isDrawing = false;
+            // btnClose->hide();
                 }
                 return true;
             }
@@ -286,4 +315,38 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
         }
     }
     return QWidget::eventFilter(obj, event);
+}
+
+void FullScreenView::updateTheme(bool isDark)
+{
+    underBar->updateTheme(isDark);
+
+    if (isDark) {
+        // Dark Theme Top Bar
+        topBar->setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0,0,0,200), stop:1 transparent);");
+        
+        // Title Text: Yellow with Dark Box
+        titleLabel->setStyleSheet("color: #EAB308; font-weight: bold; font-size: 18px; background-color: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, 0.1);");
+        
+        liveBadge->setStyleSheet("color: #EF4444; font-weight: bold; font-size: 11px; border: 1px solid rgba(239, 68, 68, 0.5); background-color: rgba(220, 38, 38, 0.1); padding: 2px 6px; border-radius: 4px;");
+        btnClose->setStyleSheet(
+            "QPushButton { background-color: rgba(30, 41, 59, 0.5); color: #CBD5E1; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 8px; font-size: 16px; }"
+            "QPushButton:hover { background-color: rgba(220, 38, 38, 0.9); color: white; border-color: #EF4444; }"
+        );
+    } else {
+        // Light Theme Top Bar (White/Orange)
+        topBar->setStyleSheet("background: transparent;");
+        
+        // Title Text: Dark Gray
+        titleLabel->setStyleSheet("color: #111827; font-weight: bold; font-size: 18px; background-color: rgba(255,255,255,0.8); border-radius: 8px; padding: 4px 12px; border: 1px solid rgba(255,255,255,0.6);"); 
+        
+        // Live Badge: Primary (Orange)
+        liveBadge->setStyleSheet("color: #F98006; font-weight: bold; font-size: 11px; border: 1px solid rgba(249, 128, 6, 0.3); background-color: rgba(249, 128, 6, 0.1); padding: 2px 6px; border-radius: 4px;");
+        
+        // Close Button: White Circle look
+        btnClose->setStyleSheet(
+            "QPushButton { background-color: rgba(255, 255, 255, 0.9); color: #374151; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 18px; font-size: 16px; }"
+            "QPushButton:hover { background-color: #FFFFFF; color: #111827; transform: scale(1.05); }"
+        );
+    }
 }

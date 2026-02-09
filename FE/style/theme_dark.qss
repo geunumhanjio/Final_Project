@@ -1,0 +1,179 @@
+/* Global Dark Theme */
+QMainWindow, QWidget {
+    background-color: #101622;
+    color: #f1f5f9;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Scrollbar */
+QScrollBar:vertical {
+    border: none;
+    background: #111722;
+    width: 8px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical {
+    background: #324467;
+    min-height: 20px;
+    border-radius: 4px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* Sidebar List */
+/* Sidebar List */
+#SidebarList {
+    background-color: #1a2332;
+    border: none;
+    outline: none;
+}
+#SidebarList::item {
+    background-color: transparent;
+    padding: 0px; /* Let internal widget handle padding */
+    border-bottom: 1px solid #2a3649;
+}
+#SidebarList::item:selected {
+    background-color: #2a3649;
+    border-left: 3px solid #135bec;
+}
+#SidebarList::item:hover {
+    background-color: #2a3649;
+}
+QListWidget::item {
+    padding: 12px;
+    color: #cbd5e1;
+    border-bottom: 1px solid #2a3649;
+}
+QListWidget::item:selected {
+    background-color: #2a3649;
+    color: #ffffff;
+    border-left: 3px solid #135bec;
+}
+QListWidget::item:hover {
+    background-color: #2a3649;
+}
+
+/* Search Bar */
+QLineEdit {
+    background-color: #101622;
+    border: 1px solid #2a3649;
+    border-radius: 4px;
+    padding: 6px;
+    color: white;
+}
+QLineEdit:focus {
+    border: 1px solid #135bec;
+}
+
+/* TopBar */
+#TopBar {
+    background-color: #1a2332;
+    border-bottom: 1px solid #2a3649;
+}
+#TopBarTitle {
+    color: white;
+}
+#TopBarNavContainer {
+    background-color: rgba(16, 22, 34, 0.5);
+    border: 1px solid #2a3649;
+    border-radius: 6px;
+}
+
+/* TopBar Navigation Buttons */
+#TopBarNavBtn {
+    background-color: transparent;
+    color: #94a3b8;
+    border: none;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 4px;
+}
+#TopBarNavBtn:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+}
+#TopBarNavBtn[active="true"] {
+    background-color: #135bec;
+    color: white;
+    font-weight: 600;
+}
+
+/* VideoCard */
+#VideoCardStatusBar {
+    background-color: #1a2332;
+    border: 1px solid #2a3649;
+    border-top: none;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+#VideoCardChannelLabel {
+    color: white;
+}
+
+/* Right Panel Cards */
+#SensorCard {
+    background-color: black;
+    border: 1px solid #2a3649;
+    border-radius: 4px;
+}
+#SensorHeader {
+    background-color: rgba(0,0,0,0.5);
+}
+#SensorTitle {
+    color: white;
+}
+#SensorValue {
+    color: white;
+}
+
+/* Sidebar Specifics */
+#SidebarContainer {
+    background-color: #1a2332;
+    border-right: 1px solid #2a3649;
+}
+#SidebarSearchArea {
+    border-bottom: 1px solid #2a3649;
+}
+#SidebarSearchBar {
+    background-color: #101622;
+    border: 1px solid #2a3649;
+    border-radius: 4px;
+    padding: 8px;
+    color: white;
+    font-size: 12px;
+}
+#SidebarSearchBar:focus {
+    border: 1px solid #135bec;
+}
+
+/* Sidebar Headers */
+#SidebarHeaderTitle {
+    color: #94a3b8;
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+#SidebarHeaderCount {
+    background-color: rgba(19, 91, 236, 0.2); /* Blue alpha */
+    color: #135bec;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+/* Sidebar Items */
+#SidebarItemIcon {
+    color: #64748b;
+    font-size: 14px;
+}
+#SidebarItemText {
+    color: #cbd5e1;
+    font-size: 12px;
+}
+#SidebarItemStatus {
+    font-weight: bold;
+    font-size: 11px;
+}

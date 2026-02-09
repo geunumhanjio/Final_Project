@@ -1,6 +1,9 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QCloseEvent>
+#include <QApplication>
+#include <QFile>
+#include <QDir>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainWindow)
@@ -8,15 +11,47 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     this->setWindowTitle("CCTV 통합 관제 시스템 - 근엄한조");
     this->resize(1280, 720);
+    m_isDark = true; // Default to dark
     initUI();
     initConnections();
+    
+    
+    // Load initial theme
+    loadTheme("style/theme_dark.qss");
 }
 
 MainWindow::~MainWindow() { delete ui; }
 
+void MainWindow::loadTheme(const QString &relativePath)
+{
+    // Use application directory to ensure correct path
+    QString appDir = QCoreApplication::applicationDirPath();
+    QString fullPath = QDir(appDir).filePath(relativePath);
+    
+    // Fallback: Check if we are in build dir and styles are in source
+    if (!QFile::exists(fullPath)) {
+        // Try going up one level (common in build dirs)
+        fullPath = QDir(appDir).filePath("../" + relativePath);
+        if (!QFile::exists(fullPath)) {
+             // Try absolute path if known (Debug fallback)
+             fullPath = "D:/work/QT_prac/VEDA_QT_1/FE/" + relativePath; 
+        }
+    }
+
+    QFile file(fullPath);
+    if(file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QString styleSheet = QLatin1String(file.readAll());
+        qApp->setStyleSheet(styleSheet);
+        qDebug() << "Theme loaded from:" << fullPath;
+        file.close();
+    } else {
+        qDebug() << "FAILED to load theme from:" << fullPath;
+    }
+}
+
 void MainWindow::initUI()
 {
-    this->setStyleSheet("QMainWindow { background-color: #222222; }");
+    // this->setStyleSheet("QMainWindow { background-color: #222222; }"); // Handled by QSS now
     m_topBar = new TopBar(this);
     this->setMenuWidget(m_topBar);
     m_sidebar = new Sidebar("채널 목록", this);
@@ -44,6 +79,7 @@ void MainWindow::initConnections()
 {
     connect(m_topBar, &TopBar::sidebarToggled, [=](){ m_sidebar->setVisible(!m_sidebar->isVisible()); });
     connect(m_topBar, &TopBar::modeChanged, m_centralStack, &QStackedWidget::setCurrentIndex);
+    connect(m_topBar, &TopBar::themeToggled, this, &MainWindow::toggleTheme);
     connect(m_sidebar, &Sidebar::channelStateChanged, m_livePage, &LiveView::setChannelVisible);
 
     connect(m_livePage, &LiveView::requestFullScreen, [=](int index, QString url){
@@ -63,7 +99,16 @@ void MainWindow::initConnections()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    if (m_livePage) m_livePage->stopAll();
+    if (m_livePage) m_livePage->stopAll(); 
     if (m_fullPage) m_fullPage->stop();
     event->accept();
+}
+
+void MainWindow::toggleTheme()
+{
+    m_isDark = !m_isDark;
+    QString qssPath = m_isDark ? "style/theme_dark.qss" : "style/theme_light.qss";
+    loadTheme(qssPath);
+    if(m_fullPage) m_fullPage->updateTheme(m_isDark);
+    if(m_topBar) m_topBar->updateTheme(m_isDark);
 }
