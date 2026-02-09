@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  rpi_ros2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rpi_ros2
+    
+    # 네트워크 모드 - DDS 통신을 위해 host 필수
+    network_mode: host
+    
+    # 권한 설정 - USB 장치 접근
+    privileged: true
+    
+    # USB 장치 마운트
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0  # STM32 시리얼
+      - /dev/ttyUSB1:/dev/ttyUSB1  # LiDAR (있는 경우)
+      - /dev/video0:/dev/video0    # USB 카메라
+    
+    # 환경 변수
+    environment:
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+    
+    # 볼륨
+    volumes:
+      # 소스 코드
+      - ../ros2_ws/src:/root/ros2_ws/src
+      
+      # 공유 메모리 (DDS 성능 향상)
+      - /dev/shm:/dev/shm
+      
+      # udev 룰 (장치 자동 인식)
+      - /run/udev:/run/udev:ro
+      
+      # 모든 USB 장치 접근
+      - /dev:/dev
+      
+      # 빌드 캐시 (선택사항)
+      - rpi_build_cache:/root/ros2_ws/build
+      - rpi_install_cache:/root/ros2_ws/install
+    
+    # 상호작용
+    stdin_open: true
+    tty: true
+    
+    # 자동 재시작
+    restart: unless-stopped
+    
+    # 시작 명령 (자동 빌드 포함)
+    command: >
+      bash -c "
+        source /opt/ros/humble/setup.bash &&
+        cd /root/ros2_ws &&
+        if [ -d src ]; then
+          echo '🔨 Building workspace...'
+          colcon build --symlink-install
+          source install/setup.bash
+        fi &&
+        echo '✅ ROS2 environment ready!' &&
+        exec bash
+      "
+
+volumes:
+  rpi_build_cache:
+  rpi_install_cache:
