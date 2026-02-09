@@ -9,7 +9,7 @@ class MJPEGBridge(Node):
     def __init__(self):
         super().__init__('camera_bridge')
         
-        self.declare_parameter('stream_url', 'http://192.168.0.23:8000/video')
+        self.declare_parameter('stream_url', 'http://192.168.0.33:8000/video')
         url = self.get_parameter('stream_url').value
         
         # QoS 설정
