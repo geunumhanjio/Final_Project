@@ -11,7 +11,6 @@
 #include "fullscreenview.h"
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -24,8 +23,7 @@ public:
 protected:
     void closeEvent(QCloseEvent *event) override; // 창 닫기 이벤트 오버라이드
 private:
-    Ui::MainWindow *ui;
-
+private:
     // 모듈 객체들
     TopBar *m_topBar;
     Sidebar *m_sidebar;
