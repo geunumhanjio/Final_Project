@@ -10,23 +10,27 @@ if [ -f /root/ros2_ws/install/setup.bash ]; then
 fi
 
 # USB 장치 권한 설정
-if [ -e /dev/ttyUSB0 ]; then
-    chmod 666 /dev/ttyUSB0 || true
-fi
+echo "Setting up device permissions..."
+for device in /dev/ttyUSB* /dev/ttyACM* /dev/video*; do
+    if [ -e "$device" ]; then
+        chmod 666 "$device" 2>/dev/null || true
+        echo "  ✓ $device"
+    fi
+done
 
-if [ -e /dev/ttyUSB1 ]; then
-    chmod 666 /dev/ttyUSB1 || true
-fi
-
-if [ -e /dev/video0 ]; then
-    chmod 666 /dev/video0 || true
+# udev 규칙 적용 (있는 경우)
+if [ -d /root/config/udev ]; then
+    cp /root/config/udev/*.rules /etc/udev/rules.d/ 2>/dev/null || true
 fi
 
 echo "================================================"
-echo "🍓 Raspberry Pi ROS2 Container Ready!"
+echo "🍓 Raspberry Pi ROS2 Container"
 echo "================================================"
 echo "ROS_DOMAIN_ID: $ROS_DOMAIN_ID"
+echo "ROS_LOCALHOST_ONLY: $ROS_LOCALHOST_ONLY"
 echo "RMW_IMPLEMENTATION: $RMW_IMPLEMENTATION"
+echo "Hostname: $(hostname)"
+echo "IP Address: $(hostname -I)"
 echo "================================================"
 
 exec "$@"

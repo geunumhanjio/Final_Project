@@ -6,26 +6,30 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: rpi_ros2
+    hostname: rpi_ros2
     
-    # 네트워크 모드 - DDS 통신을 위해 host 필수
+    # 네트워크 설정
     network_mode: host
     
-    # 권한 설정 - USB 장치 접근
+    # 권한 설정
     privileged: true
     
     # USB 장치 마운트
     devices:
       - /dev/ttyUSB0:/dev/ttyUSB0  # STM32 시리얼
-      - /dev/ttyUSB1:/dev/ttyUSB1  # LiDAR (있는 경우)
+      - /dev/ttyUSB1:/dev/ttyUSB1  # LiDAR
       - /dev/video0:/dev/video0    # USB 카메라
+      - /dev/video1:/dev/video1    # 추가 카메라
     
     # 환경 변수
     environment:
       - ROS_DOMAIN_ID=0
       - ROS_LOCALHOST_ONLY=0
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - PYTHONUNBUFFERED=1
+      - RCUTILS_COLORIZED_OUTPUT=1
     
-    # 볼륨
+    # 볼륨 마운트
     volumes:
       # 소스 코드
       - ../ros2_ws/src:/root/ros2_ws/src
@@ -36,12 +40,16 @@ services:
       # udev 룰 (장치 자동 인식)
       - /run/udev:/run/udev:ro
       
-      # 모든 USB 장치 접근
+      # 모든 장치 접근
       - /dev:/dev
       
-      # 빌드 캐시 (선택사항)
+      # 빌드 캐시 (성능 향상)
       - rpi_build_cache:/root/ros2_ws/build
       - rpi_install_cache:/root/ros2_ws/install
+      - rpi_log_cache:/root/ros2_ws/log
+      
+      # 설정 파일 백업
+      - ./config:/root/config:ro
     
     # 상호작용
     stdin_open: true
@@ -50,20 +58,31 @@ services:
     # 자동 재시작
     restart: unless-stopped
     
-    # 시작 명령 (자동 빌드 포함)
+    # 시작 명령
     command: >
       bash -c "
         source /opt/ros/humble/setup.bash &&
         cd /root/ros2_ws &&
-        if [ -d src ]; then
+        if [ -d src ] && [ -n \"\$(ls -A src 2>/dev/null)\" ]; then
           echo '🔨 Building workspace...'
-          colcon build --symlink-install
-          source install/setup.bash
+          colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+          if [ \$? -eq 0 ]; then
+            source install/setup.bash
+            echo '✅ Build successful!'
+          else
+            echo '❌ Build failed!'
+          fi
         fi &&
-        echo '✅ ROS2 environment ready!' &&
+        echo '================================================' &&
+        echo '🍓 Raspberry Pi ROS2 Container Ready!' &&
+        echo 'ROS_DOMAIN_ID: '\$ROS_DOMAIN_ID &&
+        echo 'RMW: '\$RMW_IMPLEMENTATION &&
+        echo 'Network: '\$(hostname -I) &&
+        echo '================================================' &&
         exec bash
       "
 
 volumes:
   rpi_build_cache:
   rpi_install_cache:
+  rpi_log_cache:
