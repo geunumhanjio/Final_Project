@@ -6,4 +6,4 @@ log/
 # Docker
 docker/.env
 
-test_*
+dds_test_*
