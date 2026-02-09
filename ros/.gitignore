@@ -5,3 +5,5 @@ log/
 
 # Docker
 docker/.env
+
+test_*
