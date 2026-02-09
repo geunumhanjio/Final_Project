@@ -1,7 +1,11 @@
 FROM osrf/ros:humble-desktop
 
-# 기본 도구 설치
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 기본 빌드 도구
 RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
     python3-pip \
     python3-colcon-common-extensions \
     git \
@@ -10,16 +14,18 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# ⭐ CycloneDDS 설치
+# DDS 구현체
 RUN apt-get update && apt-get install -y \
     ros-humble-rmw-cyclonedds-cpp \
+    ros-humble-rmw-fastrtps-cpp \
     && rm -rf /var/lib/apt/lists/*
 
-# OpenCV 및 ROS2 이미지 관련 패키지
+# 이미지 처리
 RUN apt-get update && apt-get install -y \
     ros-humble-cv-bridge \
     ros-humble-image-transport \
     ros-humble-image-transport-plugins \
+    ros-humble-compressed-image-transport \
     libopencv-dev \
     python3-opencv \
     && rm -rf /var/lib/apt/lists/*
@@ -39,28 +45,86 @@ RUN apt-get update && apt-get install -y \
     gstreamer1.0-rtsp \
     && rm -rf /var/lib/apt/lists/*
 
-# ⭐ Navigation2 및 SLAM 도구
+# Navigation2 스택
 RUN apt-get update && apt-get install -y \
     ros-humble-navigation2 \
     ros-humble-nav2-bringup \
-    ros-humble-slam-toolbox \
-    ros-humble-robot-localization \
+    ros-humble-nav2-common \
+    ros-humble-nav2-msgs \
     && rm -rf /var/lib/apt/lists/*
 
-# ⭐ 추가 유틸리티 (디버깅용)
+# SLAM
+RUN apt-get update && apt-get install -y \
+    ros-humble-slam-toolbox \
+    ros-humble-cartographer \
+    ros-humble-cartographer-ros \
+    && rm -rf /var/lib/apt/lists/*
+
+# 센서 융합 & Localization
+RUN apt-get update && apt-get install -y \
+    ros-humble-robot-localization \
+    ros-humble-imu-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# TF2 & 로봇 상태
+RUN apt-get update && apt-get install -y \
+    ros-humble-tf2-ros \
+    ros-humble-tf2-tools \
+    ros-humble-robot-state-publisher \
+    ros-humble-joint-state-publisher \
+    ros-humble-joint-state-publisher-gui \
+    && rm -rf /var/lib/apt/lists/*
+
+# URDF & Xacro
+RUN apt-get update && apt-get install -y \
+    ros-humble-urdf \
+    ros-humble-xacro \
+    && rm -rf /var/lib/apt/lists/*
+
+# RViz2 플러그인
+RUN apt-get update && apt-get install -y \
+    ros-humble-rviz2 \
+    ros-humble-rviz-common \
+    ros-humble-rviz-default-plugins \
+    && rm -rf /var/lib/apt/lists/*
+
+# 기본 Python 라이브러리
+RUN pip3 install --no-cache-dir \
+    numpy \
+    scipy \
+    matplotlib \
+    pandas
+
+# X11 및 그래픽
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libxext6 \
+    libsm6 \
+    libxrender1 \
+    libgomp1 \
+    x11-apps \
+    && rm -rf /var/lib/apt/lists/*
+
+# 네트워크 도구
 RUN apt-get update && apt-get install -y \
     net-tools \
     iputils-ping \
     iproute2 \
+    tcpdump \
+    nano \
+    htop \
     && rm -rf /var/lib/apt/lists/*
 
-# 작업 디렉터리
 WORKDIR /root/ros2_ws
 
-# ROS2 환경 자동 로드
+# ROS2 환경 설정
 RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
     echo "if [ -f /root/ros2_ws/install/setup.bash ]; then source /root/ros2_ws/install/setup.bash; fi" >> ~/.bashrc && \
     echo "export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp" >> ~/.bashrc && \
-    echo "export ROS_DOMAIN_ID=0" >> ~/.bashrc
+    echo "export ROS_DOMAIN_ID=0" >> ~/.bashrc && \
+    echo "export ROS_LOCALHOST_ONLY=0" >> ~/.bashrc && \
+    echo "alias sb='source /root/ros2_ws/install/setup.bash'" >> ~/.bashrc && \
+    echo "alias cb='cd /root/ros2_ws && colcon build --symlink-install'" >> ~/.bashrc
 
 CMD ["/bin/bash"]
