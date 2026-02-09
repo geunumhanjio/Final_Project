@@ -55,34 +55,26 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     QWidget *videoContainer = new QWidget(this);
     videoContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     
-    // Use Stacked Layout equivalent by putting everything in cell (0,0) of a Grid
-    QGridLayout *videoLayout = new QGridLayout(videoContainer);
+    // [수정] Grid(Overlay) -> VBox(Stack) 변경
+    QVBoxLayout *videoLayout = new QVBoxLayout(videoContainer);
     videoLayout->setContentsMargins(0, 0, 0, 0);
+    videoLayout->setSpacing(0);
 
-    // 1. Video Layer (Bottom)
-    videoWidget = new VideoWidget(videoContainer);
-    videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    videoWidget->installEventFilter(this);
-    videoLayout->addWidget(videoWidget, 0, 0);
-
-    // 2. Top Info Bar (Overlay Top)
+    // 1. Top Info Bar (Stacked Top)
     topBar = new QWidget(videoContainer);
     topBar->setFixedHeight(80);
     // Initial Theme (matches updateTheme(true))
     
     QHBoxLayout *topLayout = new QHBoxLayout(topBar);
-    topLayout->setContentsMargins(20, 10, 20, 30); // Extra bottom margin for fade
+    topLayout->setContentsMargins(20, 10, 20, 10); // Bottom margin reduced (30->10)
     
     titleLabel = new QLabel("CCTV Camera", topBar);
-    // Initial Style set in updateTheme
     
     liveBadge = new QLabel("LIVE", topBar);
-    // Initial Style set in updateTheme
     
     btnClose = new QPushButton("✕", topBar);
     btnClose->setFixedSize(36, 36);
     btnClose->setCursor(Qt::PointingHandCursor);
-    // Initial Style set in updateTheme
 
     connect(btnClose, &QPushButton::clicked, this, &FullScreenView::closeRequested);
 
@@ -92,18 +84,26 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     topLayout->addStretch();
     topLayout->addWidget(btnClose);
 
-    // Add TopBar to Grid (0,0, AlignTop)
-    videoLayout->addWidget(topBar, 0, 0, Qt::AlignTop);
+    // Add TopBar to VBox
+    videoLayout->addWidget(topBar);
 
-    // 3. Bottom Control Bar (Overlay Bottom)
+    // 2. Video Layer (Stacked Middle) with Stretch
+    videoWidget = new VideoWidget(videoContainer);
+    videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    videoWidget->installEventFilter(this);
+    videoLayout->addWidget(videoWidget, 1); // stretch factor 1 to take available space
+
+    // 3. Bottom Control Bar (Stacked Bottom)
     underBar = new FullUnderBar(videoContainer);
     
     QWidget *bottomWrapper = new QWidget(videoContainer);
     bottomWrapper->setAttribute(Qt::WA_TranslucentBackground);
     QVBoxLayout *bwLayout = new QVBoxLayout(bottomWrapper);
-    bwLayout->setContentsMargins(0, 0, 0, 40); // 40px margin from bottom
+    bwLayout->setContentsMargins(0, 0, 0, 10); // Margin reduced (40 -> 10)
     bwLayout->addWidget(underBar, 0, Qt::AlignHCenter);
-    videoLayout->addWidget(bottomWrapper, 0, 0, Qt::AlignBottom);
+    
+    // Add BottomWrapper to VBox
+    videoLayout->addWidget(bottomWrapper);
 
     mainLayout->addWidget(videoContainer);
 
