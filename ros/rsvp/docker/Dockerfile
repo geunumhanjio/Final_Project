@@ -36,7 +36,7 @@ RUN apt-get update && apt-get install -y \
     v4l-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# GStreamer (카메라 스트리밍)
+# GStreamer
 RUN apt-get update && apt-get install -y \
     libgstreamer1.0-dev \
     libgstreamer-plugins-base1.0-dev \
@@ -49,7 +49,7 @@ RUN apt-get update && apt-get install -y \
     gstreamer1.0-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# LiDAR (YDLIDAR는 소스 빌드 필요하므로 의존성만)
+# LiDAR 의존성
 RUN apt-get update && apt-get install -y \
     libudev-dev \
     pkg-config \
@@ -63,7 +63,7 @@ RUN apt-get update && apt-get install -y \
     ros-humble-joint-state-publisher \
     && rm -rf /var/lib/apt/lists/*
 
-# 진단 & 네트워크 도구
+# 네트워크 도구
 RUN apt-get update && apt-get install -y \
     net-tools \
     iputils-ping \
