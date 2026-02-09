@@ -35,7 +35,7 @@ add_compile_definitions(GST_BIN_PATH="${GST_ROOT}/bin")
 # 3. 프로젝트 소스 파일 (상대 경로 - FE 디렉터리 기준)
 set(PROJECT_SOURCES
         main.cpp
-        mainwindow.cpp mainwindow.h mainwindow.ui
+    mainwindow.cpp mainwindow.h
         topbar.h topbar.cpp
         sidebar.h sidebar.cpp
         liveview.h liveview.cpp

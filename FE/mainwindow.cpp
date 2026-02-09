@@ -1,14 +1,13 @@
 #include "mainwindow.h"
-#include "ui_mainwindow.h"
+#include "mainwindow.h"
 #include <QCloseEvent>
 #include <QApplication>
 #include <QFile>
 #include <QDir>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent), ui(new Ui::MainWindow)
+    : QMainWindow(parent)
 {
-    ui->setupUi(this);
     this->setWindowTitle("CCTV 통합 관제 시스템 - 근엄한조");
     this->resize(1280, 720);
     m_isDark = true; // Default to dark
@@ -20,7 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     loadTheme("style/theme_dark.qss");
 }
 
-MainWindow::~MainWindow() { delete ui; }
+MainWindow::~MainWindow() { }
 
 void MainWindow::loadTheme(const QString &relativePath)
 {
