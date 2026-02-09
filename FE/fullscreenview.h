@@ -19,6 +19,8 @@ public:
     explicit FullScreenView(QWidget *parent = nullptr);
     void play(const QString &url, int index);
     void stop();
+    void updateTheme(bool isDark); // Theme Support
+
 
 signals:
     void closeRequested();
@@ -35,7 +37,11 @@ private slots:
 private:
     VideoWidget *videoWidget;
     FullUnderBar *underBar;
+    
+    // Top Bar Components
+    QWidget *topBar;
     QLabel *titleLabel;
+    QLabel *liveBadge;
     QPushButton *btnClose;
 
     // [수정] QRubberBand* -> QWidget* 으로 변경

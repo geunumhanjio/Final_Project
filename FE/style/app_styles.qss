@@ -1,0 +1,70 @@
+/* Global Theme */
+QMainWindow, QWidget {
+    background-color: #101622;
+    color: #f1f5f9;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Scrollbar */
+QScrollBar:vertical {
+    border: none;
+    background: #111722;
+    width: 8px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical {
+    background: #324467;
+    min-height: 20px;
+    border-radius: 4px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* Sidebar List */
+QListWidget {
+    background-color: #1a2332;
+    border: none;
+    outline: none;
+}
+QListWidget::item {
+    padding: 12px;
+    color: #cbd5e1;
+    border-bottom: 1px solid #2a3649;
+}
+QListWidget::item:selected {
+    background-color: #2a3649;
+    color: #ffffff;
+    border-left: 3px solid #135bec;
+}
+QListWidget::item:hover {
+    background-color: #2a3649;
+}
+
+/* Buttons (Generic) */
+QPushButton {
+    background-color: transparent;
+    color: #94a3b8;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-weight: bold;
+}
+QPushButton:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+}
+
+/* Search Bar in Sidebar */
+QLineEdit {
+    background-color: #101622;
+    border: 1px solid #2a3649;
+    border-radius: 4px;
+    padding: 6px;
+    color: white;
+}
+QLineEdit:focus {
+    border: 1px solid #135bec;
+}
+
+/* TopBar Specifics */
+/* Handled in TopBar class via object names or specific styling */

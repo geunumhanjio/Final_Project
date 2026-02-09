@@ -6,7 +6,7 @@
 #include <QLabel>
 #include <QEvent>
 #include <QShowEvent>
-#include "videowidget.h"
+#include "videocard.h"
 
 class LiveView : public QWidget
 {
@@ -25,7 +25,8 @@ protected:
 
 private:
     QGridLayout *gridLayout;
-    VideoWidget *cctvWidgets[4];
+    VideoCard *cctvWidgets[4]; // Changed to VideoCard
+    QWidget *rightPanel;       // Container for right side
     QLabel *sensorWidgets[2];
     bool streamStarted;
 
@@ -33,6 +34,7 @@ private:
     QStringList highQualityUrls;
 
     void initCCTVStreams();
+    void updateCCTVLayout(); // Dynamic layout update
 };
 
 #endif // LIVEVIEW_H

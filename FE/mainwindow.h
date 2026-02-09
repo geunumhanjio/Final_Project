@@ -1,13 +1,10 @@
-/**
- * @file mainwindow.h
- * @brief 메인 윈도우 헤더. 모든 모듈의 컨트롤러 역할.
- */
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
 #include <QStackedWidget>
 #include <QLabel>
+#include <QCloseEvent>
 #include "topbar.h"
 #include "sidebar.h"
 #include "liveview.h"
@@ -40,5 +37,11 @@ private:
 
     void initUI();          // UI 초기화
     void initConnections(); // 시그널/슬롯 연결
+    void toggleTheme();     // Theme toggle method
+    void loadTheme(const QString &path); // Robust theme loader
+
+    
+private:
+    bool m_isDark; // Current theme state
 };
 #endif // MAINWINDOW_H
