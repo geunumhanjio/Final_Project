@@ -190,22 +190,47 @@ void FullScreenView::onZoomIn() {
 }
 
 void FullScreenView::onZoomOut() {
-    if (zoomHistory.isEmpty()) {
-        setMode(Normal);
+    // [수정] 현재 보고 있는 영역 기준으로 줌 아웃 (팬 이동 반영)
+    QRectF current = videoWidget->getCurrentCrop();
+
+    // 이미 전체화면이거나 거의 전체화면이면 리셋
+    if (current.width() >= 0.99 || current.height() >= 0.99) {
+        onResetZoom();
         return;
     }
 
-    QRectF prevRect = zoomHistory.pop();
-    videoWidget->applyCrop(prevRect);
+    // 이전보다 2배 크기로 확대 (ZoomIn이 0.5배였으므로 역연산)
+    double newW = current.width() * 2.0;
+    double newH = current.height() * 2.0;
 
-    if (prevRect.width() > 0.99 && prevRect.height() > 0.99) {
-        setMode(Normal);
-    } else {
-        currentMode = Zoomed;
-        videoWidget->setCursor(Qt::OpenHandCursor);
-        underBar->setRectButtonMode(2);
-        // btnClose->hide();
+    // 줌 아웃 결과가 전체화면보다 크거나 같으면 전체화면으로 복귀
+    if (newW >= 0.99 || newH >= 0.99) {
+        onResetZoom();
+        return;
     }
+
+    // 현재 화면의 중심점 유지
+    double cx = current.center().x();
+    double cy = current.center().y();
+
+    double newX = cx - (newW / 2.0);
+    double newY = cy - (newH / 2.0);
+
+    // 화면 벗어나지 않도록 보정 (Clamping)
+    newX = qBound(0.0, newX, 1.0 - newW);
+    newY = qBound(0.0, newY, 1.0 - newH);
+
+    videoWidget->applyCrop(QRectF(newX, newY, newW, newH));
+
+    // 히스토리 관리 (깊이 유지를 위해 pop, 값은 사용 안함)
+    if (!zoomHistory.isEmpty()) {
+        zoomHistory.pop();
+    }
+    
+    // 모드 유지 (Zoomed)
+    currentMode = Zoomed;
+    videoWidget->setCursor(Qt::OpenHandCursor);
+    underBar->setRectButtonMode(2);
 }
 
 void FullScreenView::onRectZoomToggled(bool checked) {

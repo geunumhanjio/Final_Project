@@ -13,6 +13,8 @@
 QT_BEGIN_NAMESPACE
 QT_END_NAMESPACE
 
+class SettingsWidget;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -20,18 +22,18 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
 protected:
-    void closeEvent(QCloseEvent *event) override; // 창 닫기 이벤트 오버라이드
+    void closeEvent(QCloseEvent *event) override;
+
 private:
-private:
-    // 모듈 객체들
     TopBar *m_topBar;
     Sidebar *m_sidebar;
     QStackedWidget *m_centralStack; // 페이지 전환 컨테이너
     LiveView *m_livePage;
     FullScreenView *m_fullPage;
     QLabel *m_playbackPage;         // 임시 페이지
-    QLabel *m_settingsPage;         // 임시 페이지
+    SettingsWidget *m_settingsPage; // Settings Widget
 
     void initUI();          // UI 초기화
     void initConnections(); // 시그널/슬롯 연결

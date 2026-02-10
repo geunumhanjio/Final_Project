@@ -42,6 +42,9 @@ set(PROJECT_SOURCES
         fullscreenview.h fullscreenview.cpp
         videowidget.h videowidget.cpp
         videocard.h videocard.cpp
+        streammanager.h streammanager.cpp
+        configmanager.h
+        settingswidget.h
 )
 
 # 4. 실행 파일 생성
