@@ -1,5 +1,6 @@
 #include "liveview.h"
 #include "streammanager.h"
+#include "configmanager.h"
 #include <QDebug>
 #include <QTimer>
 #include <QShowEvent>
@@ -45,41 +46,55 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     rightLayout->setContentsMargins(0, 0, 0, 0);
     rightLayout->setSpacing(4);
     
-    for(int i = 0; i < 2; i++) {
-        QString name = (i == 0) ? "RC Car - Front Cam" : "RC Car - SLAM Lidar Map";
+    // 2-1. RC Car Camera (VideoCard)
+    rcCarCamWidget = new VideoCard(this);
+    rcCarCamWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    rcCarCamWidget->setMinimumSize(320, 240);
+    rcCarCamWidget->setChannelName("RC Car - Front Cam");
+
+    // Connect internal fullscreen button signal for RC Car
+    connect(rcCarCamWidget, &VideoCard::fullScreenRequested, [=](){
+            // Use current IP/Port settings to construct URL
+            ConfigManager::instance().loadDefaults();
+            QString ip = ConfigManager::instance().getCameraIp();
+            QString port = ConfigManager::instance().getCameraPort();
+            QString url = QString("rtsp://%1:%2/robot_cam").arg(ip, port);
+            emit requestFullScreen(4, url); // Index 4 for RC Car
+    });
+
+    rightLayout->addWidget(rcCarCamWidget);
+
+    // 2-2. SLAM Map (QLabel in Card)
+    QWidget *slamCard = new QWidget(rightPanel);
+    slamCard->setObjectName("SensorCard");
+    // Style moved to QSS
         
-        // Wrap QLabel in a styled-card looking widget
-        QWidget *card = new QWidget(rightPanel);
-        card->setObjectName("SensorCard");
-        // Style moved to QSS
+    QVBoxLayout *slamLayout = new QVBoxLayout(slamCard);
+    slamLayout->setContentsMargins(0, 0, 0, 0);
         
-        QVBoxLayout *cardLayout = new QVBoxLayout(card);
-        cardLayout->setContentsMargins(0, 0, 0, 0);
+    // Header
+    QWidget *slamHeader = new QWidget(slamCard);
+    slamHeader->setObjectName("SensorHeader");
+    slamHeader->setFixedHeight(30);
         
-        // Header
-        QWidget *header = new QWidget(card);
-        header->setObjectName("SensorHeader");
-        header->setFixedHeight(30);
+    QHBoxLayout *headerLayout = new QHBoxLayout(slamHeader);
+    headerLayout->setContentsMargins(8, 0, 8, 0);
+    QLabel *slamTitle = new QLabel("RC Car - SLAM Lidar Map", slamHeader);
+    slamTitle->setObjectName("SensorTitle");
+    slamTitle->setStyleSheet("font-weight: bold; font-size: 11px;");
+    headerLayout->addWidget(slamTitle);
         
-        QHBoxLayout *headerLayout = new QHBoxLayout(header);
-        headerLayout->setContentsMargins(8, 0, 8, 0);
-        QLabel *title = new QLabel(name, header);
-        title->setObjectName("SensorTitle");
-        title->setStyleSheet("font-weight: bold; font-size: 11px;");
-        headerLayout->addWidget(title);
+    // Content
+    slamMapWidget = new QLabel("RC Car - SLAM Lidar Map", slamCard);
+    slamMapWidget->setObjectName("SensorValue");
+    slamMapWidget->setAlignment(Qt::AlignCenter);
+    slamMapWidget->setStyleSheet("background-color: transparent; font-size: 14px;"); 
+    slamMapWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         
-        // Content
-        sensorWidgets[i] = new QLabel(name, card);
-        sensorWidgets[i]->setObjectName("SensorValue");
-        sensorWidgets[i]->setAlignment(Qt::AlignCenter);
-        sensorWidgets[i]->setStyleSheet("background-color: transparent; font-size: 14px;"); // Colors in QSS
-        sensorWidgets[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    slamLayout->addWidget(slamHeader);
+    slamLayout->addWidget(slamMapWidget);
         
-        cardLayout->addWidget(header);
-        cardLayout->addWidget(sensorWidgets[i]);
-        
-        rightLayout->addWidget(card);
-    }
+    rightLayout->addWidget(slamCard);
 
     // Add to main layout
     // Grid takes 2/3, Right Panel takes 1/3 -> Equal column widths
@@ -88,6 +103,20 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
 
     if (!gst_is_initialized()) gst_init(nullptr, nullptr);
     streamStarted = false;
+
+    // Connect to StreamManager config change
+    connect(&StreamManager::instance(), &StreamManager::configLoaded, this, &LiveView::refreshStreams);
+}
+
+void LiveView::refreshStreams()
+{
+    qDebug() << "[LiveView] Refreshing streams due to config change...";
+    stopAll();
+    
+    // Slight delay to ensure cleanup before restart
+    QTimer::singleShot(200, this, [this](){
+        initCCTVStreams();
+    });
 }
 
 void LiveView::showEvent(QShowEvent *event)
@@ -107,7 +136,7 @@ void LiveView::initCCTVStreams()
     highQualityUrls.clear();
 
     // Use StreamManager
-    StreamManager::instance().loadConfig(); // Reload to be safe
+    // StreamManager::instance().loadConfig(); // REMOVED: Triggers endless loop with refreshStreams
     QList<ChannelConfig> channels = StreamManager::instance().getChannels();
 
     for(const ChannelConfig &ch : channels) {
@@ -126,6 +155,17 @@ void LiveView::initCCTVStreams()
             }
         });
     }
+
+    // Start RC Car Stream
+    QString ip = ConfigManager::instance().getCameraIp();
+    QString port = ConfigManager::instance().getCameraPort();
+    QString rcUrl = QString("rtsp://%1:%2/robot_cam").arg(ip, port);
+    
+    QTimer::singleShot(400, this, [this, rcUrl]() {
+        if(rcCarCamWidget) {
+            rcCarCamWidget->playUrl(rcUrl, 200);
+        }
+    });
 }
 
 bool LiveView::eventFilter(QObject *obj, QEvent *event) {
@@ -140,17 +180,18 @@ void LiveView::setChannelVisible(int index, bool visible) {
         updateCCTVLayout(); // Recalculate grid
     }
     else if (index < 6) {
-        if(sensorWidgets[index - 4] && sensorWidgets[index - 4]->parentWidget())
-            sensorWidgets[index - 4]->parentWidget()->setVisible(visible);
+        if (index == 4) { // RC Car Cam
+             if(rcCarCamWidget) rcCarCamWidget->setVisible(visible);
+        } else if (index == 5) { // SLAM Map
+             if(slamMapWidget && slamMapWidget->parentWidget())
+                 slamMapWidget->parentWidget()->setVisible(visible);
+        }
         
         // Check if both sensors are hidden
         bool anySensorVisible = false;
-        for(int i=0; i<2; i++) {
-            if(sensorWidgets[i] && sensorWidgets[i]->parentWidget() && !sensorWidgets[i]->parentWidget()->isHidden()) {
-                anySensorVisible = true;
-                break;
-            }
-        }
+        if(rcCarCamWidget && !rcCarCamWidget->isHidden()) anySensorVisible = true;
+        if(slamMapWidget && slamMapWidget->parentWidget() && !slamMapWidget->parentWidget()->isHidden()) anySensorVisible = true;
+
         rightPanel->setVisible(anySensorVisible);
     }
 }
@@ -206,4 +247,5 @@ void LiveView::updateCCTVLayout()
 
 void LiveView::stopAll() {
     for(int i = 0; i < 4; i++) if (cctvWidgets[i]) cctvWidgets[i]->stop();
+    if (rcCarCamWidget) rcCarCamWidget->stop();
 }

@@ -19,11 +19,13 @@ public:
     void loadDefaults() {
         if(getCameraIp().isEmpty()) setCameraIp("192.168.0.39");
         if(getCameraPort().isEmpty()) setCameraPort("8554");
+        // getUseCustomCCTV defaults to false if not set, handled by QSettings default value
     }
 
     // Getter
     QString getCameraIp() const { return m_settings->value("Network/CameraIP", "192.168.0.39").toString(); }
     QString getCameraPort() const { return m_settings->value("Network/CameraPort", "8554").toString(); }
+    bool getUseCustomCCTV() const { return m_settings->value("Network/UseCustomCCTV", false).toBool(); }
 
     // Setter (저장)
     void setCameraIp(const QString &ip) {
@@ -32,6 +34,10 @@ public:
     }
     void setCameraPort(const QString &port) {
         m_settings->setValue("Network/CameraPort", port);
+        emit configChanged();
+    }
+    void setUseCustomCCTV(bool use) {
+        m_settings->setValue("Network/UseCustomCCTV", use);
         emit configChanged();
     }
 

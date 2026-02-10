@@ -84,7 +84,7 @@ void MainWindow::initConnections()
     connect(m_sidebar, &Sidebar::channelStateChanged, m_livePage, &LiveView::setChannelVisible);
 
     connect(m_livePage, &LiveView::requestFullScreen, [=](int index, QString url){
-        if (index < 4 && !url.isEmpty()) {
+        if (index <= 4 && !url.isEmpty()) {
             m_fullPage->play(url, index);
             m_centralStack->setCurrentWidget(m_fullPage);
         } else {

@@ -25,9 +25,13 @@ protected:
 
 private:
     QGridLayout *gridLayout;
-    VideoCard *cctvWidgets[4]; // Changed to VideoCard
-    QWidget *rightPanel;       // Container for right side
-    QLabel *sensorWidgets[2];
+    VideoCard *cctvWidgets[4]; 
+    QWidget *rightPanel;       
+    
+    // Right Panel Widgets
+    VideoCard *rcCarCamWidget;
+    QLabel *slamMapWidget;
+
     bool streamStarted;
 
     QStringList lowQualityUrls;
@@ -35,6 +39,9 @@ private:
 
     void initCCTVStreams();
     void updateCCTVLayout(); // Dynamic layout update
+
+private slots:
+    void refreshStreams();
 };
 
 #endif // LIVEVIEW_H
