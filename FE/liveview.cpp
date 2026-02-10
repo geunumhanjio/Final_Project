@@ -1,4 +1,5 @@
 #include "liveview.h"
+#include "streammanager.h"
 #include <QDebug>
 #include <QTimer>
 #include <QShowEvent>
@@ -105,17 +106,13 @@ void LiveView::initCCTVStreams()
     lowQualityUrls.clear();
     highQualityUrls.clear();
 
-    // =================================================================
-    // [옵션 A] 라즈베리파이 / 내 서버
-    // =================================================================
-    QString ip = "192.168.0.39";
-    QString port = "8554";
+    // Use StreamManager
+    StreamManager::instance().loadConfig(); // Reload to be safe
+    QList<ChannelConfig> channels = StreamManager::instance().getChannels();
 
-    for(int i = 0; i < 4; i++) {
-        QString lowUrl = QString("rtsp://%1:%2/ch%3").arg(ip, port).arg(i+1);
-        lowQualityUrls << lowUrl;
-        QString highUrl = QString("rtsp://%1:%2/ch%3_fhd").arg(ip, port).arg(i+1);
-        highQualityUrls << highUrl;
+    for(const ChannelConfig &ch : channels) {
+        lowQualityUrls << ch.urlLow;
+        highQualityUrls << ch.urlHigh;
     }
 
     for(int i = 0; i < 4; i++) {

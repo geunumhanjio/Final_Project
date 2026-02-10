@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "mainwindow.h"
+#include "settingswidget.h"
 #include <QCloseEvent>
 #include <QApplication>
 #include <QFile>
@@ -60,13 +61,14 @@ void MainWindow::initUI()
 
     m_livePage = new LiveView(this);
     m_playbackPage = new QLabel("기록 화면", this);
-    m_settingsPage = new QLabel("설정 화면", this);
+    m_settingsPage = new SettingsWidget(this);
     m_fullPage = new FullScreenView(this);
 
     m_playbackPage->setStyleSheet("color:white; font-size:20px;");
     m_settingsPage->setStyleSheet("color:white; font-size:20px;");
     m_playbackPage->setAlignment(Qt::AlignCenter);
-    m_settingsPage->setAlignment(Qt::AlignCenter);
+    m_playbackPage->setAlignment(Qt::AlignCenter);
+    // m_settingsPage->setAlignment(Qt::AlignCenter); // SettingsWidget is not a QLabel
 
     m_centralStack->addWidget(m_livePage);
     m_centralStack->addWidget(m_playbackPage);
