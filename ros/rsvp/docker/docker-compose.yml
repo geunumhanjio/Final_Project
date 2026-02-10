@@ -11,7 +11,8 @@ services:
     privileged: true
     
     devices:
-      - /dev/ttyAMA0:/dev/ttyAMA0
+      - /dev/serial0:/dev/serial0:rwm
+      - /dev/ttyAMA0:/dev/ttyAMA0:rwm
       - /dev/ttyUSB0:/dev/ttyUSB0
       - /dev/video0:/dev/video0
     
