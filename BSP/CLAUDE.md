@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview 3
+## Project Overview
 Aiming to bolster industrial safety, this project introduces an integrated disaster management system that leverages Hanwha Vision’s AI-powered CCTV for real-time hazard detection. By seamlessly synchronizing detected event coordinates with ROS-based autonomous robots, the platform facilitates immediate site intervention
 As a driver developer responsible for the system’s lowest-level hardware operations, I implement the robot’s physical movement using an STM32 NUCLEO-F401RE MCU interfaced with various sensors and actuators. My key tasks include collecting encoder data for odometry calculation, acquiring attitude control data through IMU sensor communication, and controlling motors via the L298M motor driver according to system commands. Communication with the ROS environment is relayed through a Raspberry Pi 4, with which I interface via serial.communication
 
@@ -23,16 +23,17 @@ Outputs: `build/ROS_Robot_Driver.elf`, `.hex`, `.bin`
 openocd -f "board/st_nucleo_f4.cfg" -c "program build/ROS_Robot_Driver.elf verify reset"
 ```
 
-## Architecture  ☑️☑️
+## Architecture
 
 **Layered structure:**
 
-- **Application** (`Core/Src/main.c`) — Entry point, peripheral init (GPIO, TIM2, USART2), main loop. Currently a skeleton awaiting motor control integration.
-- **Motor Control Library** (`Core/Src/motor_control/.c`, `Core/Inc/motor_control/.h`) — Custom abstraction over L298N driver. Not yet integrated into `Core/`. Provides `Motor_Init()`, `Motor_Forward()`, `Motor_Stop()`, etc.
+- **Application** (`Core/Src/main.c`) — Entry point, 주변장치 초기화 (GPIO, TIM2, USART1, USART2), 메인 루프에서 `Protocol_Process()` + `Motor_CheckTimeout()` 반복 실행.
+- **UART Protocol** (`Core/Src/uart_protocol.c`, `Core/Inc/uart_protocol.h`) — RPi↔STM32 바이너리 패킷 통신. 인터럽트 기반 바이트 수신 → 상태머신 파싱 → 명령 디스패치. 자세한 내용은 아래 UART Protocol 섹션 참조.
+- **Motor Control** (`Core/Src/motor_control.c`, `Core/Inc/motor_control.h`) — L298N 모터 드라이버 추상화. `Motor_SetVelocity()`, `Motor_EmergencyStop()`, `Motor_SoftStop()`, `Motor_CheckTimeout()`, `Motor_ReleaseEmergency()` 제공. 가속도 제한 및 명령 타임아웃(500ms) 내장.
 - **HAL Drivers** (`Drivers/STM32F4xx_HAL_Driver/`) — STMicroelectronics HAL for STM32F4. Do not edit; these are CubeMX-managed.
 - **CMSIS** (`Drivers/CMSIS/`) — ARM Cortex-M4 core definitions and startup code.
 
-**CubeMX-generated code:** `main.c`, `stm32f4xx_hal_msp.c`, `stm32f4xx_it.c`, and the Makefile are generated from `ROS_Robot_Driver.ioc`. User code must go between `/* USER CODE BEGIN */` and `/* USER CODE END */` markers or it will be overwritten on regeneration.
+**CubeMX-generated code:** `main.c`, `stm32f4xx_hal_msp.c`, `stm32f4xx_it.c`, `usart.c`, `tim.c`, `gpio.c`, Makefile은 `ROS_Robot_Driver.ioc`에서 생성됨. 사용자 코드는 반드시 `/* USER CODE BEGIN */` ~ `/* USER CODE END */` 사이에 작성해야 CubeMX 재생성 시 보존됨.
 
 ## Hardware Pin Mapping 
 
@@ -64,17 +65,55 @@ openocd -f "board/st_nucleo_f4.cfg" -c "program build/ROS_Robot_Driver.elf verif
 
 L298N truth table: IN1=1/IN2=0 → forward, IN1=0/IN2=1 → reverse, both high → brake, both low → coast.
 
+## UART Protocol (RPi ↔ STM32)
+
+USART1 (PA9 TX, PA10 RX), 115200 baud, 인터럽트 기반 수신.
+
+**패킷 구조:**
+```
+[Header1: 0xFF][Header2: 0xFE][CMD][LEN][DATA (0~8 bytes)][CHECKSUM]
+```
+- Checksum: CMD ^ LEN ^ DATA[0] ^ ... ^ DATA[n-1] (XOR)
+- 최소 패킷: 5바이트 (데이터 없을 때), 최대: 13바이트
+
+**명령 (RPi → STM32, 0x01~0x7F):**
+
+| CMD | 코드 | LEN | DATA | 설명 |
+|-----|------|-----|------|------|
+| `CMD_VELOCITY` | 0x01 | 4 | [vL_low, vL_high, vR_low, vR_high] | 양쪽 바퀴 속도 설정 (int16, Little-Endian, mm/s) |
+| `CMD_STOP` | 0x02 | 0 | — | 부드러운 정지 (coast) |
+| `CMD_ESTOP` | 0x03 | 0 | — | 비상 정지 (brake) |
+| `CMD_RELEASE` | 0x04 | 0 | — | 비상 정지 해제 |
+
+**응답 (STM32 → RPi, 0x80~0xFF):** 정의만 존재, 아직 미구현
+
+| RSP | 코드 | 설명 |
+|-----|------|------|
+| `RSP_ODOM` | 0x81 | 오도메트리 데이터 |
+| `RSP_IMU` | 0x82 | IMU 데이터 |
+
+**구현 흐름:** `USART1_IRQHandler` → `HAL_UART_IRQHandler` → `HAL_UART_RxCpltCallback` → `Protocol_FeedByte` (ISR 상태머신) → `ready_packet` 버퍼에 저장 → 메인루프에서 `Protocol_Process()` → `Protocol_Dispatch()` → 모터 제어 함수 호출
+
+## Motor Control
+
+**속도 범위:** -600 ~ +600 mm/s (int16_t), PWM 0~999 (1000단계)
+
+**주요 동작:**
+- **가속도 제한:** 10ms당 최대 200mm/s 변화
+- **명령 타임아웃:** 500ms간 새 명령 없으면 자동 SoftStop (안전장치)
+- **비상 정지:** `Motor_EmergencyStop()` 호출 시 즉시 브레이크, `Motor_ReleaseEmergency()` 전까지 모든 속도 명령 무시
+
 ## Documentation
 
 Reference materials live in `docs/`:
 - `docs/motor_setup/` — CubeMX setup guide, motor specs
 
-
 ## Planned Features (Not Yet Implemented)
 
 - Encoder integration (TIM3/TIM4 encoder mode, 1920 PPR)
 - MPU6050 IMU over I2C
-- ROS topic publishing (/odom, /imu) and /cmd_vel subscription over UART
+- STM32 → RPi 응답 패킷 송신 (RSP_ODOM, RSP_IMU)
+- ROS topic publishing (/odom, /imu)
 - PID speed control
 
 ## Git
@@ -93,6 +132,8 @@ Reference materials live in `docs/`:
 | `<역할>/fix/#이슈번호` | fix 브랜치 | `BSP/fix/#13` |
 
 ### 커밋 컨벤션
+ㄴ
+- 커밋은 기능별로 나눠서 순서대로 진행한다. 
 
 | 깃모지 | 코드 | 커밋내용 |
 | --- | --- | --- |

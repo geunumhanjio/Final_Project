@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "i2c.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -25,6 +26,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "motor_control.h"
+#include "uart_protocol.h"
+#include "encoder.h"
+#include "mpu6050.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -46,7 +50,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-static uint8_t test_phase = 0;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -91,12 +95,28 @@ int main(void)
   MX_GPIO_Init();
   MX_TIM2_Init();
   MX_USART2_UART_Init();
+  MX_TIM3_Init();
+  MX_TIM4_Init();
+  MX_I2C1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   if (Motor_Init() == MOTOR_OK) {
       printf("Motor driver initialized successfully!\r\n");
   } else {
       printf("Motor driver initialization failed!\r\n");
       Error_Handler();
+  }
+
+  Protocol_Init(&huart1);
+  printf("UART protocol ready. Waiting for RPi commands...\r\n");
+
+  Encoder_Init();
+  printf("Encoder started (TIM3=Left, TIM4=Right)\r\n");
+
+  if (MPU6050_Init() == HAL_OK) {
+      printf("MPU6050 initialized!\r\n");
+  } else {
+      printf("MPU6050 init failed! Check wiring.\r\n");
   }
   /* USER CODE END 2 */
 
@@ -107,130 +127,40 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    switch (test_phase) {
-    case 0:
-        // 전진: 양쪽 300 mm/s
-        printf("[Test 1] Forward 300 mm/s\r\n");
-        Motor_SetVelocity(300, 300);
-        HAL_Delay(2000);
-        test_phase++;
-        break;
+    Protocol_Process();
+    Motor_CheckTimeout();
 
-    case 1:
-        // 부드러운 정지 (Coast)
-        printf("[Test 2] SoftStop\r\n");
-        Motor_SoftStop();
-        HAL_Delay(1000);
-        test_phase++;
-        break;
+    /* Send sensor data to RPi every 50ms via USART1 */
+    static uint32_t last_send = 0;
+    uint32_t now = HAL_GetTick();
+    if (now - last_send >= 50) {
+        last_send = now;
 
-    case 2:
-        // 후진: 양쪽 -200 mm/s
-        printf("[Test 3] Backward 200 mm/s\r\n");
-        Motor_SetVelocity(-200, -200);
-        HAL_Delay(2000);
-        test_phase++;
-        break;
+        Protocol_SendOdom(Encoder_GetCount(ENCODER_LEFT),
+                          Encoder_GetCount(ENCODER_RIGHT));
 
-    case 3:
-        // 비상 정지 (Brake)
-        printf("[Test 4] EmergencyStop\r\n");
-        Motor_EmergencyStop();
-        HAL_Delay(1000);
-        test_phase++;
-        break;
-
-    case 4:
-        // 비상 정지 해제
-        printf("[Test 5] ReleaseEmergency\r\n");
-        Motor_ReleaseEmergency();
-        HAL_Delay(500);
-        test_phase++;
-        break;
-
-    case 5:
-        // 제자리 좌회전: 왼쪽 후진, 오른쪽 전진
-        printf("[Test 6] TurnLeft (L=-250, R=+250)\r\n");
-        Motor_SetVelocity(-250, 250);
-        HAL_Delay(1500);
-        test_phase++;
-        break;
-
-    case 6:
-        printf("[Test 6-1] SoftStop\r\n");
-        Motor_SoftStop();
-        HAL_Delay(1000);
-        test_phase++;
-        break;
-
-    case 7:
-        // 제자리 우회전: 왼쪽 전진, 오른쪽 후진
-        printf("[Test 7] TurnRight (L=+250, R=-250)\r\n");
-        Motor_SetVelocity(250, -250);
-        HAL_Delay(1500);
-        test_phase++;
-        break;
-
-    case 8:
-        printf("[Test 7-1] SoftStop\r\n");
-        Motor_SoftStop();
-        HAL_Delay(1000);
-        test_phase++;
-        break;
-
-    case 9:
-        // 좌 완만 커브: 왼쪽 느리게, 오른쪽 빠르게
-        printf("[Test 8] Curve Left (L=150, R=400)\r\n");
-        Motor_SetVelocity(150, 400);
-        HAL_Delay(2000);
-        test_phase++;
-        break;
-
-    case 10:
-        printf("[Test 8-1] SoftStop\r\n");
-        Motor_SoftStop();
-        HAL_Delay(1000);
-        test_phase++;
-        break;
-
-    case 11:
-        // 최대 속도 테스트
-        printf("[Test 9] Max speed 600 mm/s\r\n");
-        Motor_SetVelocity(600, 600);
-        HAL_Delay(2000);
-        test_phase++;
-        break;
-
-    case 12:
-        // 비상 정지로 최대 속도에서 즉시 정지
-        printf("[Test 10] EmergencyStop from max speed\r\n");
-        Motor_EmergencyStop();
-        HAL_Delay(1000);
-        Motor_ReleaseEmergency();
-        HAL_Delay(500);
-        test_phase++;
-        break;
-
-    case 13:
-        // 타임아웃 테스트: 명령 후 500ms 이상 대기
-        printf("[Test 11] Timeout test - driving then waiting 700ms\r\n");
-        Motor_SetVelocity(300, 300);
-        HAL_Delay(700);
-        if (Motor_CheckTimeout()) {
-            printf("  -> Timeout triggered, auto-stopped!\r\n");
-        } else {
-            printf("  -> No timeout (unexpected)\r\n");
+        MPU6050_Data_t imu;
+        if (MPU6050_ReadAll(&imu) == HAL_OK) {
+            Protocol_SendIMU(&imu);
         }
-        HAL_Delay(1000);
-        test_phase++;
-        break;
+    }
 
-    default:
-        // 전체 테스트 완료 → 처음부터 반복
-        printf("=== All tests done. Restarting... ===\r\n\r\n");
-        HAL_Delay(3000);
-        test_phase = 0;
-        break;
+    /* Debug print to PC (USART2) every 100ms */
+    static uint32_t last_print = 0;
+    if (now - last_print >= 100) {
+        last_print = now;
+
+        printf("L:%6d  R:%6d  ",
+               Encoder_GetCount(ENCODER_LEFT),
+               Encoder_GetCount(ENCODER_RIGHT));
+
+        MPU6050_Data_t imu_dbg;
+        if (MPU6050_ReadAll(&imu_dbg) == HAL_OK) {
+            printf("AX:%6d AY:%6d AZ:%6d GX:%6d GY:%6d GZ:%6d",
+                   imu_dbg.accel_x, imu_dbg.accel_y, imu_dbg.accel_z,
+                   imu_dbg.gyro_x, imu_dbg.gyro_y, imu_dbg.gyro_z);
+        }
+        printf("\r\n");
     }
   }
   /* USER CODE END 3 */
