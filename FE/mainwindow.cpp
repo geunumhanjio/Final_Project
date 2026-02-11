@@ -1,5 +1,5 @@
 #include "mainwindow.h"
-#include "mainwindow.h"
+#include "fullscreenview.h"
 #include "settingswidget.h"
 #include <QCloseEvent>
 #include <QApplication>
@@ -18,9 +18,67 @@ MainWindow::MainWindow(QWidget *parent)
     
     // Load initial theme
     loadTheme("style/theme_dark.qss");
+    
+    // ROS2 Control Init
+    m_rosClient = new RosBridgeClient(this);
+    m_rosClient->connectToHost("ws://192.168.0.237:9090");
+    
+    m_inputTimer = new QTimer(this);
+    connect(m_inputTimer, &QTimer::timeout, this, &MainWindow::processInput);
 }
 
 MainWindow::~MainWindow() { }
+
+void MainWindow::keyPressEvent(QKeyEvent *event) {
+    if (event->isAutoRepeat()) return; // Ignore auto-repeat key presses
+    
+    int key = event->key();
+    // [Mod] WASD Control
+    if (key == Qt::Key_W || key == Qt::Key_S || key == Qt::Key_A || key == Qt::Key_D) {
+        if (!m_pressedKeys.contains(key)) {
+            m_pressedKeys.insert(key);
+            if (!m_inputTimer->isActive()) {
+                m_inputTimer->start(100); // 10Hz
+                processInput(); // Immediate response
+            }
+        }
+    } else {
+        QMainWindow::keyPressEvent(event);
+    }
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent *event) {
+    if (event->isAutoRepeat()) return;
+
+    int key = event->key();
+    if (m_pressedKeys.contains(key)) {
+        m_pressedKeys.remove(key);
+        
+        if (m_pressedKeys.isEmpty()) {
+            m_inputTimer->stop();
+            // Send Stop Command
+            m_rosClient->sendCmdVel(0.0, 0.0);
+            qDebug() << "[Control] STOP";
+        } else {
+            processInput(); // Update direction immediately
+        }
+    } else {
+        QMainWindow::keyReleaseEvent(event);
+    }
+}
+
+void MainWindow::processInput() {
+    double linear = 0.0;
+    double angular = 0.0;
+    
+    if (m_pressedKeys.contains(Qt::Key_W)) linear += 0.3;
+    if (m_pressedKeys.contains(Qt::Key_S)) linear -= 0.3;
+    if (m_pressedKeys.contains(Qt::Key_A)) angular += 0.5;
+    if (m_pressedKeys.contains(Qt::Key_D)) angular -= 0.5;
+    
+    m_rosClient->sendCmdVel(linear, angular);
+    // qDebug() << "[Control] Linear:" << linear << "Angular:" << angular;
+}
 
 void MainWindow::loadTheme(const QString &relativePath)
 {

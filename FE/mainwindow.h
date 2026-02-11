@@ -8,12 +8,16 @@
 #include "topbar.h"
 #include "sidebar.h"
 #include "liveview.h"
-#include "fullscreenview.h"
+#include "rosbridgeclient.h"
+#include <QSet>
+#include <QTimer>
+#include <QKeyEvent>
 
 QT_BEGIN_NAMESPACE
 QT_END_NAMESPACE
 
 class SettingsWidget;
+class FullScreenView;
 
 class MainWindow : public QMainWindow
 {
@@ -25,6 +29,11 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void keyPressEvent(QKeyEvent *event) override;
+    void keyReleaseEvent(QKeyEvent *event) override;
+
+private slots:
+    void processInput();
 
 private:
     TopBar *m_topBar;
@@ -43,5 +52,10 @@ private:
     
 private:
     bool m_isDark; // Current theme state
+    
+    // ROS2 Control
+    RosBridgeClient *m_rosClient;
+    QTimer *m_inputTimer;
+    QSet<int> m_pressedKeys;
 };
 #endif // MAINWINDOW_H
