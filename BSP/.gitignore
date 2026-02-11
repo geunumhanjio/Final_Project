@@ -33,6 +33,5 @@ Release/
 .DS_Store
 Thumbs.db
 
-# Personal notes (optional - remove if you want to track)
-mass/
+# Personal notes
 CLAUDE.md
