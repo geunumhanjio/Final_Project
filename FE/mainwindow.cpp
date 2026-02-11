@@ -1,10 +1,12 @@
 #include "mainwindow.h"
 #include "fullscreenview.h"
 #include "settingswidget.h"
+#include "playbackview.h" // [New]
 #include <QCloseEvent>
 #include <QApplication>
 #include <QFile>
 #include <QDir>
+#include <QStandardPaths> // [New]
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -12,16 +14,20 @@ MainWindow::MainWindow(QWidget *parent)
     this->setWindowTitle("CCTV 통합 관제 시스템 - 근엄한조");
     this->resize(1280, 720);
     m_isDark = true; // Default to dark
+
+    // [Fix] Initialize Clients BEFORE initConnections
+    qDebug() << "[MainWindow] Initializing RosBridgeClient...";
+    m_rosClient = new RosBridgeClient(this);
+    m_rosClient->connectToHost("ws://192.168.0.237:9090");
+    
+    qDebug() << "[MainWindow] Initializing CameraControlClient...";
+    m_cameraClient = new CameraControlClient(this);
+
     initUI();
     initConnections();
     
-    
     // Load initial theme
     loadTheme("style/theme_dark.qss");
-    
-    // ROS2 Control Init
-    m_rosClient = new RosBridgeClient(this);
-    m_rosClient->connectToHost("ws://192.168.0.237:9090");
     
     m_inputTimer = new QTimer(this);
     connect(m_inputTimer, &QTimer::timeout, this, &MainWindow::processInput);
@@ -114,39 +120,120 @@ void MainWindow::initUI()
     this->setMenuWidget(m_topBar);
     m_sidebar = new Sidebar("채널 목록", this);
     this->addDockWidget(Qt::LeftDockWidgetArea, m_sidebar);
+    
+    qDebug() << "[MainWindow] Creating Central Stack...";
     m_centralStack = new QStackedWidget(this);
     this->setCentralWidget(m_centralStack);
 
+    qDebug() << "[MainWindow] Creating LiveView...";
     m_livePage = new LiveView(this);
-    m_playbackPage = new QLabel("기록 화면", this);
+    
+    qDebug() << "[MainWindow] Creating PlaybackView...";
+    m_playbackPage = new PlaybackView(this); // [Modified]
+    
+    qDebug() << "[MainWindow] Creating SettingsWidget...";
     m_settingsPage = new SettingsWidget(this);
+    
+    qDebug() << "[MainWindow] Creating FullScreenView...";
     m_fullPage = new FullScreenView(this);
+    
+    qDebug() << "[MainWindow] Adding widgets to stack...";
 
-    m_playbackPage->setStyleSheet("color:white; font-size:20px;");
     m_settingsPage->setStyleSheet("color:white; font-size:20px;");
-    m_playbackPage->setAlignment(Qt::AlignCenter);
-    m_playbackPage->setAlignment(Qt::AlignCenter);
+    // m_playbackPage styling removed as it is now VideoWidget
     // m_settingsPage->setAlignment(Qt::AlignCenter); // SettingsWidget is not a QLabel
 
     m_centralStack->addWidget(m_livePage);
     m_centralStack->addWidget(m_playbackPage);
     m_centralStack->addWidget(m_settingsPage);
     m_centralStack->addWidget(m_fullPage);
+    qDebug() << "[MainWindow] initUI Completed.";
 }
 
 void MainWindow::initConnections()
 {
+    qDebug() << "[MainWindow] initConnections Started...";
     connect(m_topBar, &TopBar::sidebarToggled, [=](){ m_sidebar->setVisible(!m_sidebar->isVisible()); });
     connect(m_topBar, &TopBar::modeChanged, m_centralStack, &QStackedWidget::setCurrentIndex);
     connect(m_topBar, &TopBar::themeToggled, this, &MainWindow::toggleTheme);
     connect(m_sidebar, &Sidebar::channelStateChanged, m_livePage, &LiveView::setChannelVisible);
+    
+    // Connect Recording Navigation
+    connect(m_livePage, &LiveView::recordCommandRequested, [=](int channelId, bool start){
+        // 1. Get Camera IP (Assume all cameras share the same NVR/IP for now as per ConfigManager)
+        ConfigManager::instance().loadDefaults();
+        QString ip = ConfigManager::instance().getCameraIp();
+
+        // 2. Send Command to Camera Server (Port 9000)
+        m_cameraClient->sendRecordCommand(ip, channelId, start);
+        
+        // 3. Feedback
+        if (start) {
+            qDebug() << "[Recording] Started on Channel" << channelId;
+        } else {
+            qDebug() << "[Recording] Stopped on Channel" << channelId;
+            // Note: Playback update is now handled by videoReceived signal
+        }
+    });
+
+    // [New] Connect Playback View
+    if (m_cameraClient) {
+        // 1. Refresh Button -> Request Recordings
+        connect(m_playbackPage, &PlaybackView::refreshRequested, [=](){
+             ConfigManager::instance().loadDefaults();
+             QString ip = ConfigManager::instance().getCameraIp();
+             m_cameraClient->requestRecordings(ip);
+        });
+
+        // 2. Received List -> Update UI
+        connect(m_cameraClient, &CameraControlClient::recordingListReceived, m_playbackPage, &PlaybackView::updateList);
+
+        // 3. Play Video (Check Local -> Download -> Play)
+        connect(m_playbackPage, &PlaybackView::playRequested, [=](const QString &filename){
+            qDebug() << "[MainWindow] playRequested signal received for:" << filename;
+            QString savePath = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+            QString localFilePath = savePath + "/" + filename;
+            
+            QFileInfo fileInfo(localFilePath);
+            if (fileInfo.exists() && fileInfo.size() > 1024) {
+                qDebug() << "[MainWindow] Found valid local file:" << localFilePath << "Size:" << fileInfo.size();
+                
+                // [New] Stop background RTSP streams to free resources/prevent errors
+                m_livePage->stopAll(); 
+
+                m_fullPage->play(localFilePath, 0); 
+                m_centralStack->setCurrentWidget(m_fullPage);
+            } else {
+                if (fileInfo.exists()) {
+                     qDebug() << "[MainWindow] Found invalid/small file (" << fileInfo.size() << "bytes). Deleting to re-download.";
+                     QFile::remove(localFilePath);
+                }
+                qDebug() << "[MainWindow] File not found local, requesting download:" << filename;
+                ConfigManager::instance().loadDefaults();
+                QString ip = ConfigManager::instance().getCameraIp();
+                m_cameraClient->requestDownload(ip, filename);
+            }
+        });
+        
+        // 4. Download Progress
+        connect(m_cameraClient, &CameraControlClient::downloadProgress, m_playbackPage, &PlaybackView::updateDownloadProgress);
+        
+        // 5. Download Finished -> Add to List (No Auto Play)
+        connect(m_cameraClient, &CameraControlClient::downloadFinished, [=](const QString &filePath){
+            qDebug() << "[MainWindow] Download Finished:" << filePath;
+            m_playbackPage->addLocalItem(filePath);
+        });
+
+    } else {
+        qCritical() << "[MainWindow] m_cameraClient is NULL in initConnections!";
+    }
 
     connect(m_livePage, &LiveView::requestFullScreen, [=](int index, QString url){
         if (index <= 4 && !url.isEmpty()) {
+            qDebug() << "Full Screen Request:" << url;
+            
+            m_centralStack->setCurrentWidget(m_fullPage);
             m_fullPage->play(url, index);
-            m_centralStack->setCurrentWidget(m_fullPage);
-        } else {
-            m_centralStack->setCurrentWidget(m_fullPage);
         }
     });
 
@@ -154,6 +241,7 @@ void MainWindow::initConnections()
         m_fullPage->stop();
         m_centralStack->setCurrentWidget(m_livePage);
     });
+    qDebug() << "[MainWindow] initConnections Completed.";
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

@@ -12,6 +12,8 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     
     // Main Layout: Split into Grid (Left 2x2) and Side Panel (Right 1x2)
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
+    setFocusPolicy(Qt::ClickFocus); // [Fix] Allow clicking background to regain focus
+
     mainLayout->setContentsMargins(4, 4, 4, 4);
     mainLayout->setSpacing(4);
 
@@ -26,6 +28,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
         cctvWidgets[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         cctvWidgets[i]->setMinimumSize(320, 240);
         cctvWidgets[i]->setChannelName(QString("Channel %1 - Camera").arg(i+1));
+        cctvWidgets[i]->setChannelId(i + 1); // 1-based ID
         
         // Connect internal fullscreen button signal
         connect(cctvWidgets[i], &VideoCard::fullScreenRequested, [=](){
@@ -33,6 +36,9 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
              if (i < highQualityUrls.size()) url = highQualityUrls[i];
              emit requestFullScreen(i, url);
         });
+
+        // Connect record signal
+        connect(cctvWidgets[i], &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
         
         gridLayout->addWidget(cctvWidgets[i], i / 2, i % 2);
     }
@@ -51,6 +57,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     rcCarCamWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     rcCarCamWidget->setMinimumSize(320, 240);
     rcCarCamWidget->setChannelName("RC Car - Front Cam");
+    rcCarCamWidget->setChannelId(5); // ID 5 for RC Car
 
     // Connect internal fullscreen button signal for RC Car
     connect(rcCarCamWidget, &VideoCard::fullScreenRequested, [=](){
@@ -61,6 +68,9 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
             QString url = QString("rtsp://%1:%2/robot_cam").arg(ip, port);
             emit requestFullScreen(4, url); // Index 4 for RC Car
     });
+    
+    // Connect record signal
+    connect(rcCarCamWidget, &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
 
     rightLayout->addWidget(rcCarCamWidget);
 
@@ -101,7 +111,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     mainLayout->addWidget(gridContainer, 2); 
     mainLayout->addWidget(rightPanel, 1);
 
-    if (!gst_is_initialized()) gst_init(nullptr, nullptr);
+    // if (!gst_is_initialized()) gst_init(nullptr, nullptr); // Moved to main.cpp
     streamStarted = false;
 
     // Connect to StreamManager config change
@@ -131,6 +141,7 @@ void LiveView::showEvent(QShowEvent *event)
 void LiveView::initCCTVStreams()
 {
     qDebug() << "[LiveView] Initializing RTSP connections...";
+    streamStarted = true; // [Fix] Ensure flag is set when streams are initialized
 
     lowQualityUrls.clear();
     highQualityUrls.clear();
@@ -158,8 +169,18 @@ void LiveView::initCCTVStreams()
 
     // Start RC Car Stream
     QString ip = ConfigManager::instance().getCameraIp();
-    QString port = ConfigManager::instance().getCameraPort();
-    QString rcUrl = QString("rtsp://%1:%2/robot_cam").arg(ip, port);
+    // QString port = ConfigManager::instance().getCameraPort();
+    // [Mod] Use specific URL for RC Car as requested
+    QString rcUrl = QString("rtsp://%1:9554/camera").arg(ip); 
+    // If exact IP is required regardless of config: QString rcUrl = "rtsp://192.168.0.237:9554/camera";
+    // Assuming IP might match config, but port/path is different. 
+    // Let's stick to the requested URL exactly to be safe, or use IP from config if it matches?
+    // User said: "rtsp://192.168.0.237:9554/camera 이 주소로..."
+    // I will use ConfigManager IP if it matches 192.168.0.237 usually, but to be safe and exact:
+    bool useConfigIp = (ip == "192.168.0.237"); // Just logical check, not code
+    // I will simply set it to the hardcoded string or usage of IP if they want dynamic.
+    // Given the request is specific:
+    rcUrl = "rtsp://192.168.0.237:9554/camera";
     
     QTimer::singleShot(400, this, [this, rcUrl]() {
         if(rcCarCamWidget) {
@@ -172,6 +193,12 @@ bool LiveView::eventFilter(QObject *obj, QEvent *event) {
     // Keep event filter if we want to handle other things, 
     // but fullscreen is now handled by VideoCard signal.
     return QWidget::eventFilter(obj, event);
+}
+
+// [Fix] Click background to focus (for WASD)
+void LiveView::mousePressEvent(QMouseEvent *event) {
+    this->setFocus();
+    QWidget::mousePressEvent(event);
 }
 
 void LiveView::setChannelVisible(int index, bool visible) {
@@ -248,4 +275,5 @@ void LiveView::updateCCTVLayout()
 void LiveView::stopAll() {
     for(int i = 0; i < 4; i++) if (cctvWidgets[i]) cctvWidgets[i]->stop();
     if (rcCarCamWidget) rcCarCamWidget->stop();
+    streamStarted = false; // [Fix] Reset flag so showEvent restarts streams
 }

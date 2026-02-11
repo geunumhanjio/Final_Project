@@ -69,6 +69,8 @@ set(PROJECT_SOURCES
         videocard.h videocard.cpp
         streammanager.h streammanager.cpp
         rosbridgeclient.h rosbridgeclient.cpp
+        cameracontrolclient.h cameracontrolclient.cpp
+        playbackview.h playbackview.cpp # [New]
         configmanager.h
         settingswidget.h
 )

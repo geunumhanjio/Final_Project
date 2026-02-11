@@ -8,7 +8,9 @@ VideoCard::VideoCard(QWidget *parent) : QWidget(parent)
 {
     setupUi();
     m_isHovered = false;
-    showRecIndicator(true); // Default to showing REC for demo
+    m_isRecording = false;
+    m_channelId = -1;
+    showRecIndicator(false); // Default hidden until recording start
 }
 
 VideoCard::~VideoCard()
@@ -65,15 +67,28 @@ void VideoCard::setupUi()
     // Action Buttons
     m_btnFullscreen = new QPushButton("⛶", m_topOverlay);
     m_btnSettings = new QPushButton("⚙", m_topOverlay);
+    m_btnRecord = new QPushButton("●", m_topOverlay); // [New] Rec Button
+    
     m_btnFullscreen->setFixedSize(24, 24);
     m_btnSettings->setFixedSize(24, 24);
+    m_btnRecord->setFixedSize(24, 24);
+
     m_btnFullscreen->setStyleSheet("QPushButton { background-color: rgba(0,0,0,100); color: white; border: none; border-radius: 4px; } QPushButton:hover { background-color: #135bec; }");
     m_btnSettings->setStyleSheet("QPushButton { background-color: rgba(0,0,0,100); color: white; border: none; border-radius: 4px; } QPushButton:hover { background-color: #135bec; }");
+    m_btnRecord->setStyleSheet("QPushButton { background-color: rgba(255,0,0,180); color: white; border: none; border-radius: 12px; } QPushButton:hover { background-color: #ff4444; }");
+    
+    // [Fix] Prevent buttons from stealing focus
+    m_btnFullscreen->setFocusPolicy(Qt::NoFocus);
+    m_btnSettings->setFocusPolicy(Qt::NoFocus);
+    m_btnRecord->setFocusPolicy(Qt::NoFocus);
 
     topLayout->addWidget(m_recBadge);
+    topLayout->addWidget(m_btnRecord); // Add Record Button next to badge
     topLayout->addStretch();
     topLayout->addWidget(m_btnFullscreen);
     topLayout->addWidget(m_btnSettings);
+    
+    connect(m_btnRecord, &QPushButton::clicked, this, &VideoCard::toggleRecord);
     
     // 2-3. Bottom In-Video Overlay (Resolution Info) - Removed as requested
     /*
@@ -191,4 +206,23 @@ void VideoCard::mouseDoubleClickEvent(QMouseEvent *event)
 void VideoCard::updateOverlayLayout()
 {
     // If we wanted to do manual positioning instead of Grid, we would do it here.
+}
+
+void VideoCard::toggleRecord()
+{
+    m_isRecording = !m_isRecording;
+    
+    if (m_isRecording) {
+        // Start Recording
+        showRecIndicator(true);
+        m_btnRecord->setText("■"); // Stop Square
+        m_btnRecord->setStyleSheet("QPushButton { background-color: rgba(0,0,0,150); color: white; border: 1px solid white; border-radius: 4px; } QPushButton:hover { background-color: #444; }");
+        if (m_channelId != -1) emit recordRequested(m_channelId, true);
+    } else {
+        // Stop Recording
+        showRecIndicator(false);
+        m_btnRecord->setText("●"); // Rec Circle
+        m_btnRecord->setStyleSheet("QPushButton { background-color: rgba(255,0,0,180); color: white; border: none; border-radius: 12px; } QPushButton:hover { background-color: #ff4444; }");
+        if (m_channelId != -1) emit recordRequested(m_channelId, false);
+    }
 }

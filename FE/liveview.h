@@ -18,10 +18,13 @@ public:
 
 signals:
     void requestFullScreen(int index, QString url);
+    void recordCommandRequested(int channelId, bool start);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
+
     void showEvent(QShowEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override; // [Fix] Focus on click
 
 private:
     QGridLayout *gridLayout;

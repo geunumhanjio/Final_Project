@@ -3,13 +3,16 @@
 #include <QDebug>
 #include <QApplication>
 #include <QMutexLocker>
+#include <QFile>
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
 {
+    qDebug() << "[VideoWidget] Constructor called";
     setAttribute(Qt::WA_NativeWindow);
     setAttribute(Qt::WA_StyledBackground, true);
     this->setStyleSheet("background-color: black;");
     setMinimumSize(160, 120);
+    setFocusPolicy(Qt::NoFocus); // [Fix] Prevent stealing focus from MainWindow
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -43,6 +46,7 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
 
     busTimer = new QTimer(this);
     connect(busTimer, &QTimer::timeout, this, &VideoWidget::pollGstBus);
+    qDebug() << "[VideoWidget] Constructor finished";
 }
 
 VideoWidget::~VideoWidget() { stop(); }
@@ -119,31 +123,72 @@ void VideoWidget::playUrl(const QString &url, int latency)
     if (winId == 0) { startRetryTimer(); return; }
 
     // VLC급 속도 설정 (latency=0 일 때)
+    // VLC급 속도 설정 (latency=0 일 때)
     QString options = "";
     QString sinkOptions = "";
     if (latency == 0) {
-        options = "drop-on-latency=true buffer-mode=none";
+        // RTSP Only Options
+        options = ""; // "drop-on-latency=true buffer-mode=none"; 
         sinkOptions = "sync=false";
     }
 
-    // 파이프라인 (videocrop 포함)
-    QString pipelineStr = QString(
-                              "rtspsrc location=%1 protocols=tcp latency=%2 %3 ! "
-                              "rtph264depay ! h264parse ! avdec_h264 ! "
-                              "videoconvert ! videocrop name=crop ! videoconvert ! "
-                              "autovideosink name=sink %4"
-                              ).arg(url).arg(latency).arg(options).arg(sinkOptions);
+    QString pipelineStr;
+    
+    // [Check] Local File vs RTSP
+    if (QFile::exists(url)) {
+        // Local File Playback
+        // Use decodebin for automatic demuxing/decoding
+        #ifdef Q_OS_WIN
+            QString path = url; 
+            path.replace("\\", "/"); 
+        #else
+            QString path = url;
+        #endif
+        
+        // Improved Pipeline: filesrc -> decodebin -> queue -> converter -> crop -> sink
+        // Added 'queue' to buffer decoded frames and prevent stalling
+        // [Fix] Force sync=true for local files to ensure normal playback speed
+        pipelineStr = QString(
+            "filesrc location=\"%1\" ! decodebin ! queue ! "
+            "videoconvert ! videocrop name=crop ! videoconvert ! "
+            "autovideosink name=sink sync=true" 
+        ).arg(path);
+        
+        qDebug() << "[VideoWidget] Playing Local File (Improved):" << path;
+        
+    } else {
+        // RTSP Stream
+        pipelineStr = QString(
+            "rtspsrc location=%1 protocols=tcp latency=%2 %3 ! "
+            "rtph264depay ! h264parse ! avdec_h264 ! "
+            "videoconvert ! videocrop name=crop ! videoconvert ! "
+            "autovideosink name=sink %4"
+        ).arg(url).arg(latency).arg(options).arg(sinkOptions);
+        
+        qDebug() << "[VideoWidget] Playing Rtsp Stream:" << url;
+    }
 
     GError *error = nullptr;
     pipeline = gst_parse_launch(pipelineStr.toUtf8().constData(), &error);
 
     if (error || !pipeline) {
+        qCritical() << "[VideoWidget] GST Error:" << (error ? error->message : "Unknown");
         if (error) g_error_free(error);
-        startRetryTimer();
+        
+        // Only retry for network streams or if it's not a local file error
+        if (!QFile::exists(url)) startRetryTimer(); 
         return;
     }
 
+    // [Fix] Handle pad-added signal for decodebin if used?
+    // gst_parse_launch handles basic linking for decodebin -> queue -> videoconvert
+    // effectively. So explicit signal handling is usually not needed for linear pipelines.
+    
+    // Check if 'crop' element exists (it should)
     cropper = gst_bin_get_by_name(GST_BIN(pipeline), "crop");
+    if (!cropper) {
+        qWarning() << "[VideoWidget] Warning: 'crop' element not found in pipeline (Check pipeline syntax)";
+    }
 
     GstBus *bus = gst_element_get_bus(pipeline);
     gst_bus_set_sync_handler(bus, (GstBusSyncHandler)busSyncHandler, this, nullptr);
@@ -151,7 +196,11 @@ void VideoWidget::playUrl(const QString &url, int latency)
 
     busTimer->start(50);
     watchdogTimer->start(10000);
-    gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    
+    GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        qCritical() << "[VideoWidget] Failed to set pipeline to PLAYING";
+    }
 }
 
 void VideoWidget::stop()

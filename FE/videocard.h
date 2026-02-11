@@ -32,9 +32,14 @@ public:
     void setChannelStatus(bool active);
     void setStreamInfo(const QString &info);
     void showRecIndicator(bool show);
+    void setChannelId(int id) { m_channelId = id; }
 
 signals:
     void fullScreenRequested();
+    void recordRequested(int channelId, bool start);
+
+private slots:
+    void toggleRecord();
 
 protected:
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -68,9 +73,12 @@ private:
     QLabel *m_recLabel;
     QPushButton *m_btnFullscreen;
     QPushButton *m_btnSettings;
+    QPushButton *m_btnRecord; // [New] Record Button
     QLabel *m_streamInfoLabel;
 
     bool m_isHovered;
+    bool m_isRecording; // [New] Recording State
+    int m_channelId;    // [New] Channel ID
 };
 
 #endif // VIDEOCARD_H
