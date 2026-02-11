@@ -1,4 +1,4 @@
-# STM32 CubeMX 핀 설정 가이드 - 모터 제어
+# STM32 CubeMX 설정 가이드 - 모터 제어 (TIM2 PWM, GPIO)
 
 ## 1. 프로젝트 생성
 1. STM32CubeMX 실행
@@ -14,18 +14,7 @@
 **PA0 - TIM2_CH1 (왼쪽 모터 속도)**
 - 핀 클릭 → `TIM2_CH1`으로 설정
 
-**PA1 - TIM2_CH2 (오른쪽 모터 속도)**                                                                                                                                 
-● Done. I added two sections to the Git section of CLAUDE.md:                                                                                                                                                                 
-                  
-  1. 브랜치 전략 — Branch naming conventions (master, <역할>_prod, <역할>_dev, <역할>/feat/#이슈번호, <역할>/fix/#이슈번호)                                                                                                   
-  2. 커밋 컨벤션 — Commit message rules with gitmoji codes and type prefixes:
-    - :sparkles: → [Feat] 기능 구현                                                                                                                                                                                           
-    - :bug: → [Fix] 버그 수정                                                                                                                                                                                               
-    - :memo: → [Docs] 문서 관련                                                                                                                                                                                               
-    - :card_file_box: → [Mod] 파일 수정                                                                                                                                                                                       
-    - :art: → [Style] 스타일 변경                                                                                                                                                                                             
-    - :test_tube: → [Test] 테스트 관련                                                                                                                                                                                        
-    - :zap: → [Perf] 성능 개선                                   
+**PA1 - TIM2_CH2 (오른쪽 모터 속도)**
 - 핀 클릭 → `TIM2_CH2`로 설정
 
 **TIM2 설정:**
