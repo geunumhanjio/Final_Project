@@ -7,12 +7,11 @@
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
 {
-    qDebug() << "[VideoWidget] Constructor called";
     setAttribute(Qt::WA_NativeWindow);
     setAttribute(Qt::WA_StyledBackground, true);
     this->setStyleSheet("background-color: black;");
     setMinimumSize(160, 120);
-    setFocusPolicy(Qt::NoFocus); // [Fix] Prevent stealing focus from MainWindow
+    setFocusPolicy(Qt::NoFocus);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -25,39 +24,108 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     pipeline = nullptr;
     cropper = nullptr;
     m_isPlaying = false;
-    currentLatency = 200;
-    sourceWidth = 1920; // FHD 가정
+    sourceWidth = 1920; 
     sourceHeight = 1080;
-    currentCropRect = QRectF(0.0, 0.0, 1.0, 1.0); // 초기값: 전체 화면
-
-    retryTimer = new QTimer(this);
-    retryTimer->setSingleShot(true);
-    connect(retryTimer, &QTimer::timeout, [this](){
-        if (!currentUrl.isEmpty()) playUrl(currentUrl, currentLatency);
-    });
-
-    watchdogTimer = new QTimer(this);
-    watchdogTimer->setSingleShot(true);
-    connect(watchdogTimer, &QTimer::timeout, [this](){
-        if(m_isPlaying) return;
-        stop();
-        startRetryTimer();
-    });
+    currentCropRect = QRectF(0.0, 0.0, 1.0, 1.0); 
 
     busTimer = new QTimer(this);
     connect(busTimer, &QTimer::timeout, this, &VideoWidget::pollGstBus);
-    qDebug() << "[VideoWidget] Constructor finished";
 }
 
 VideoWidget::~VideoWidget() { stop(); }
 
-// [확대] 특정 영역 자르기
+// Protected Helper to set Pipeline from Subclass
+bool VideoWidget::setPipeline(GstElement *p) {
+    if (pipeline) stop(); // Clear existing if any
+    
+    pipeline = p;
+    if (!pipeline) return false;
+
+    // Check for cropper
+    cropper = gst_bin_get_by_name(GST_BIN(pipeline), "crop");
+    if (!cropper) {
+        qWarning() << "[VideoWidget] Warning: 'crop' element not found in pipeline";
+    }
+
+    GstBus *bus = gst_element_get_bus(pipeline);
+    gst_bus_set_sync_handler(bus, (GstBusSyncHandler)busSyncHandler, this, nullptr);
+    gst_object_unref(bus);
+
+    busTimer->start(50);
+    
+    GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
+    if (ret == GST_STATE_CHANGE_FAILURE) {
+        qCritical() << "[VideoWidget] Failed to set pipeline to PLAYING";
+        return false;
+    }
+    return true;
+}
+
+void VideoWidget::stop()
+{
+    m_isPlaying = false;
+    
+    if (busTimer->isActive()) busTimer->stop();
+
+    if (cropper) { gst_object_unref(cropper); cropper = nullptr; }
+    
+    if (pipeline) {
+        gst_element_set_state(pipeline, GST_STATE_NULL);
+        gst_element_get_state(pipeline, NULL, NULL, 500 * GST_MSECOND);
+        gst_object_unref(pipeline);
+        pipeline = nullptr;
+    }
+    showPlaceholder("No Signal");
+    
+    // Reset Resolution to default to avoid confusion, though usually safe
+    sourceWidth = 1920; 
+    sourceHeight = 1080;
+}
+
+void VideoWidget::updateSourceResolution() {
+    if (!cropper) return;
+    
+    GstPad *pad = gst_element_get_static_pad(cropper, "sink");
+    if (pad) {
+        GstCaps *caps = gst_pad_get_current_caps(pad);
+        if (caps) {
+            GstStructure *str = gst_caps_get_structure(caps, 0);
+            int w, h;
+            if (gst_structure_get_int(str, "width", &w) && gst_structure_get_int(str, "height", &h)) {
+                sourceWidth = w;
+                sourceHeight = h;
+                qDebug() << "[VideoWidget] Source resolution updated:" << w << "x" << h;
+                
+                // Re-apply current crop with new dimensions
+                // applyCrop(currentCropRect); // Optional: might cause recursion if called from stream thread?
+                // Just updating sourceWidth/Height is enough for next applyCrop call.
+                // But better to re-calculate now if we are already zoomed?
+                if (currentCropRect.width() < 0.99) {
+                     // Force re-apply safely? 
+                     // applyCrop calls g_object_set which is threat-safe-ish
+                     // But we are in bus thread (likely). 
+                     // Safe enough.
+                     applyCrop(currentCropRect);
+                }
+            }
+            gst_caps_unref(caps);
+        }
+        gst_object_unref(pad);
+    }
+}
+
+void VideoWidget::showPlaceholder(const QString &text) {
+    placeholderLabel->setText(text);
+    placeholderLabel->show();
+}
+
 void VideoWidget::applyCrop(const QRectF &rect)
 {
     QMutexLocker locker(&cropMutex);
-    currentCropRect = rect; // 현재 상태 저장
+    currentCropRect = rect; 
 
-    if (!cropper || !m_isPlaying) return;
+    // Allow crop adjustment even if paused, as long as pipeline exists
+    if (!cropper) return;
 
     int left = static_cast<int>(rect.left() * sourceWidth);
     int right = static_cast<int>((1.0 - rect.right()) * sourceWidth);
@@ -70,151 +138,23 @@ void VideoWidget::applyCrop(const QRectF &rect)
     g_object_set(cropper, "top", top, "bottom", bottom, "left", left, "right", right, nullptr);
 }
 
-// [이동] 화면 패닝 (드래그)
-void VideoWidget::panView(qreal dx, qreal dy)
-{
-    // 전체 화면 상태면 이동 불가
+void VideoWidget::panView(qreal dx, qreal dy) {
     if (currentCropRect.width() >= 1.0 && currentCropRect.height() >= 1.0) return;
 
-    // 이동 비율 계산
     qreal percentX = dx / (qreal)this->width();
     qreal percentY = dy / (qreal)this->height();
 
-    // 반대 방향으로 이동 (종이를 당기는 원리)
     qreal newX = currentCropRect.x() - percentX;
     qreal newY = currentCropRect.y() - percentY;
 
-    // 화면 밖으로 나가지 않게 제한 (Clamping)
     newX = qBound(0.0, newX, 1.0 - currentCropRect.width());
     newY = qBound(0.0, newY, 1.0 - currentCropRect.height());
 
     applyCrop(QRectF(newX, newY, currentCropRect.width(), currentCropRect.height()));
 }
 
-void VideoWidget::resetCrop()
-{
+void VideoWidget::resetCrop() {
     applyCrop(QRectF(0, 0, 1, 1));
-}
-
-void VideoWidget::startRetryTimer()
-{
-    if (m_isPlaying || retryTimer->isActive() || currentUrl.isEmpty()) return;
-    placeholderLabel->setText("Retrying..."); placeholderLabel->show();
-    retryTimer->start(3000);
-}
-
-void VideoWidget::playUrl(const QString &url, int latency)
-{
-    if (m_isPlaying && currentUrl == url && currentLatency == latency) return;
-
-    m_isPlaying = false;
-    currentUrl = url;
-    currentLatency = latency;
-
-    if (retryTimer->isActive()) retryTimer->stop();
-    if (watchdogTimer->isActive()) watchdogTimer->stop();
-    if (busTimer->isActive()) busTimer->stop();
-    stop();
-
-    placeholderLabel->setText("Connecting...");
-    placeholderLabel->show();
-
-    WId winId = this->winId();
-    if (winId == 0) { startRetryTimer(); return; }
-
-    // VLC급 속도 설정 (latency=0 일 때)
-    // VLC급 속도 설정 (latency=0 일 때)
-    QString options = "";
-    QString sinkOptions = "";
-    if (latency == 0) {
-        // RTSP Only Options
-        options = ""; // "drop-on-latency=true buffer-mode=none"; 
-        sinkOptions = "sync=false";
-    }
-
-    QString pipelineStr;
-    
-    // [Check] Local File vs RTSP
-    if (QFile::exists(url)) {
-        // Local File Playback
-        // Use decodebin for automatic demuxing/decoding
-        #ifdef Q_OS_WIN
-            QString path = url; 
-            path.replace("\\", "/"); 
-        #else
-            QString path = url;
-        #endif
-        
-        // Improved Pipeline: filesrc -> decodebin -> queue -> converter -> crop -> sink
-        // Added 'queue' to buffer decoded frames and prevent stalling
-        // [Fix] Force sync=true for local files to ensure normal playback speed
-        pipelineStr = QString(
-            "filesrc location=\"%1\" ! decodebin ! queue ! "
-            "videoconvert ! videocrop name=crop ! videoconvert ! "
-            "autovideosink name=sink sync=true" 
-        ).arg(path);
-        
-        qDebug() << "[VideoWidget] Playing Local File (Improved):" << path;
-        
-    } else {
-        // RTSP Stream
-        pipelineStr = QString(
-            "rtspsrc location=%1 protocols=tcp latency=%2 %3 ! "
-            "rtph264depay ! h264parse ! avdec_h264 ! "
-            "videoconvert ! videocrop name=crop ! videoconvert ! "
-            "autovideosink name=sink %4"
-        ).arg(url).arg(latency).arg(options).arg(sinkOptions);
-        
-        qDebug() << "[VideoWidget] Playing Rtsp Stream:" << url;
-    }
-
-    GError *error = nullptr;
-    pipeline = gst_parse_launch(pipelineStr.toUtf8().constData(), &error);
-
-    if (error || !pipeline) {
-        qCritical() << "[VideoWidget] GST Error:" << (error ? error->message : "Unknown");
-        if (error) g_error_free(error);
-        
-        // Only retry for network streams or if it's not a local file error
-        if (!QFile::exists(url)) startRetryTimer(); 
-        return;
-    }
-
-    // [Fix] Handle pad-added signal for decodebin if used?
-    // gst_parse_launch handles basic linking for decodebin -> queue -> videoconvert
-    // effectively. So explicit signal handling is usually not needed for linear pipelines.
-    
-    // Check if 'crop' element exists (it should)
-    cropper = gst_bin_get_by_name(GST_BIN(pipeline), "crop");
-    if (!cropper) {
-        qWarning() << "[VideoWidget] Warning: 'crop' element not found in pipeline (Check pipeline syntax)";
-    }
-
-    GstBus *bus = gst_element_get_bus(pipeline);
-    gst_bus_set_sync_handler(bus, (GstBusSyncHandler)busSyncHandler, this, nullptr);
-    gst_object_unref(bus);
-
-    busTimer->start(50);
-    watchdogTimer->start(10000);
-    
-    GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
-    if (ret == GST_STATE_CHANGE_FAILURE) {
-        qCritical() << "[VideoWidget] Failed to set pipeline to PLAYING";
-    }
-}
-
-void VideoWidget::stop()
-{
-    m_isPlaying = false;
-    if (cropper) { gst_object_unref(cropper); cropper = nullptr; }
-    if (pipeline) {
-        gst_element_set_state(pipeline, GST_STATE_NULL);
-        gst_element_get_state(pipeline, NULL, NULL, 500 * GST_MSECOND);
-        gst_object_unref(pipeline);
-        pipeline = nullptr;
-    }
-    placeholderLabel->show();
-    placeholderLabel->setText("No Signal");
 }
 
 void VideoWidget::pollGstBus()
@@ -229,12 +169,17 @@ void VideoWidget::pollGstBus()
                 GstState old, new_st;
                 gst_message_parse_state_changed(msg, &old, &new_st, 0);
                 if (new_st == GST_STATE_PLAYING) {
-                    m_isPlaying = true; watchdogTimer->stop(); retryTimer->stop(); placeholderLabel->hide();
+                    m_isPlaying = true; 
+                    placeholderLabel->hide();
+                    updateSourceResolution(); // [New] Get correct resolution
+                    emit playbackStateChanged(true);
                 }
             } break;
         case GST_MESSAGE_ERROR:
         case GST_MESSAGE_EOS:
-            m_isPlaying = false; startRetryTimer(); break;
+            m_isPlaying = false; 
+            startRetryTimer(); // Calls virtual method (overridden by Live/Recorded)
+            break;
         }
         gst_message_unref(msg);
     }
@@ -244,7 +189,6 @@ void VideoWidget::pollGstBus()
 void VideoWidget::showEvent(QShowEvent *e) { QWidget::showEvent(e); }
 void VideoWidget::resizeEvent(QResizeEvent *e) { QWidget::resizeEvent(e); if (pipeline) { /* overlay expose */ } }
 
-// [수정] 변수명 msg로 통일
 GstBusSyncReply VideoWidget::busSyncHandler(GstBus *bus, GstMessage *msg, gpointer user_data) {
     VideoWidget *widget = static_cast<VideoWidget*>(user_data);
     if (gst_is_video_overlay_prepare_window_handle_message(msg)) {

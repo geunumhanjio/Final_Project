@@ -3,6 +3,7 @@
 
 #include <QStyleOption>
 #include <QPainter>
+#include <QDateTime>
 
 FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
 {
@@ -39,7 +40,43 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     // EHBox *layout = new EHBox(this); // typo removed
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(10, 5, 10, 5);
+    mainLayout->setContentsMargins(10, 5, 10, 5);
     mainLayout->setSpacing(0); // We use dividers
+
+    // [New] Playback Controls Container
+    playbackContainer = new QWidget(this);
+    QHBoxLayout *pbLayout = new QHBoxLayout(playbackContainer);
+    pbLayout->setContentsMargins(0, 0, 0, 0);
+    pbLayout->setSpacing(8);
+
+    btnPlayPause = new QPushButton("⏯", playbackContainer);
+    btnPlayPause->setFixedSize(36, 36);
+    btnPlayPause->setObjectName("playBtn");
+
+    btnSkipBackward = new QPushButton("⏪ -5s", playbackContainer);
+    btnSkipBackward->setFixedWidth(60);
+
+    btnSkipForward = new QPushButton("+5s ⏩", playbackContainer);
+    btnSkipForward->setFixedWidth(60);
+
+    seekSlider = new QSlider(Qt::Horizontal, playbackContainer);
+    seekSlider->setRange(0, 1000);
+    seekSlider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+
+    timeLabel = new QLabel("00:00 / 00:00", playbackContainer);
+    timeLabel->setAlignment(Qt::AlignCenter);
+    timeLabel->setFixedWidth(100);
+    timeLabel->setObjectName("timeLabel");
+
+    pbLayout->addWidget(btnSkipBackward);
+    pbLayout->addWidget(btnPlayPause);
+    pbLayout->addWidget(btnSkipForward);
+    pbLayout->addWidget(seekSlider);
+    pbLayout->addWidget(timeLabel);
+
+    // Initial Hide
+    playbackContainer->setVisible(false);
+    m_isFileMode = false;
 
     // Setup Buttons with Unicode Icons
     btnZoomIn = new QPushButton("⊕ Zoom Center", this);
@@ -62,7 +99,19 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     connect(btnRectZoom, &QPushButton::toggled, this, &FullUnderBar::reqRectZoom);
     connect(btnResetZoom, &QPushButton::clicked, this, &FullUnderBar::reqResetZoom);
 
+    // [New] Playback Connections
+    connect(btnPlayPause, &QPushButton::clicked, this, &FullUnderBar::reqPlayPause);
+    connect(btnSkipBackward, &QPushButton::clicked, this, &FullUnderBar::reqSkipBackward);
+    connect(btnSkipForward, &QPushButton::clicked, this, &FullUnderBar::reqSkipForward);
+    connect(seekSlider, &QSlider::sliderReleased, [this](){
+        emit reqSeek(seekSlider->value());
+    });
+    // Optional: Seek while dragging
+    // connect(seekSlider, &QSlider::sliderMoved, this, &FullUnderBar::reqSeek); 
+
     // Add to layout with dividers
+    mainLayout->addWidget(playbackContainer);
+    mainLayout->addWidget(createDivider());
     mainLayout->addWidget(btnZoomIn);
     mainLayout->addWidget(createDivider());
     mainLayout->addWidget(btnZoomOut);
@@ -110,6 +159,36 @@ void FullUnderBar::setRectButtonMode(int state)
     btnRectZoom->blockSignals(false);
 }
 
+void FullUnderBar::setMode(bool isFile)
+{
+    m_isFileMode = isFile;
+    playbackContainer->setVisible(isFile);
+    // Adjust logic if needed (e.g., hide zoom controls if play mode? - keeping both for now)
+}
+
+void FullUnderBar::updateTime(qint64 currentMs, qint64 totalMs)
+{
+    if (totalMs <= 0) return;
+    
+    // Prevent slider update while user is dragging
+    if (!seekSlider->isSliderDown()) {
+        int val = (currentMs * 1000) / totalMs;
+        seekSlider->setValue(val);
+    }
+    
+    QTime current = QTime::fromMSecsSinceStartOfDay(currentMs);
+    QTime total = QTime::fromMSecsSinceStartOfDay(totalMs);
+    // Format: mm:ss
+    timeLabel->setText(QString("%1 / %2")
+        .arg(current.toString("mm:ss"))
+        .arg(total.toString("mm:ss")));
+}
+
+void FullUnderBar::setPlaying(bool isPlaying)
+{
+    btnPlayPause->setText(isPlaying ? "⏸" : "⏯");
+}
+
 void FullUnderBar::updateTheme(bool isDark)
 {
     if (isDark) {
@@ -145,6 +224,15 @@ void FullUnderBar::updateTheme(bool isDark)
             "}"
             "#resetBtn:hover { background-color: #38BDF8; }"
         );
+
+        // [New] Playback Styling Dark
+        playbackContainer->setStyleSheet("background: transparent;");
+        seekSlider->setStyleSheet(
+            "QSlider::groove:horizontal { border: 1px solid #334155; height: 6px; background: #1E293B; margin: 2px 0; border-radius: 3px; }"
+            "QSlider::handle:horizontal { background: #0EA5E9; border: 1px solid #0EA5E9; width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; }"
+            "QSlider::handle:horizontal:hover { background: #38BDF8; }"
+        );
+        timeLabel->setStyleSheet("color: #E2E8F0; font-family: monospace; font-weight: bold;");
     } else {
         // Light Mode (White/Orange)
         // Background: White/60 (adjusted for transparency)
@@ -179,5 +267,14 @@ void FullUnderBar::updateTheme(bool isDark)
             "}"
             "#resetBtn:hover { background-color: #FB923C; }" // Orange-400
         );
+        
+        // [New] Playback Styling Light
+        playbackContainer->setStyleSheet("background: transparent;");
+        seekSlider->setStyleSheet(
+            "QSlider::groove:horizontal { border: 1px solid #CBD5E1; height: 6px; background: #E2E8F0; margin: 2px 0; border-radius: 3px; }"
+            "QSlider::handle:horizontal { background: #F98006; border: 1px solid #F98006; width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; }"
+            "QSlider::handle:horizontal:hover { background: #FB923C; }"
+        );
+        timeLabel->setStyleSheet("color: #334155; font-family: monospace; font-weight: bold;");
     }
 }

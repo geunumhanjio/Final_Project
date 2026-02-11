@@ -7,9 +7,12 @@
 #include <QVBoxLayout>
 #include <QMouseEvent>
 #include <QStack>
+#include <QStackedWidget> // [New]
 // [수정] QRubberBand 대신 QWidget 사용 (커스텀 스타일링을 위해)
 // #include <QRubberBand>
 #include "videowidget.h"
+#include "livevideowidget.h"
+#include "recordedvideowidget.h"
 #include "full_underbar.h"
 
 class FullScreenView : public QWidget
@@ -35,7 +38,11 @@ private slots:
     void onResetZoom();
 
 private:
-    VideoWidget *videoWidget;
+    QStackedWidget *videoStack; // [New]
+    LiveVideoWidget *liveWidget; // [New]
+    RecordedVideoWidget *recordedWidget; // [New]
+    
+    VideoWidget *videoWidget; // Pointer to active widget
     FullUnderBar *underBar;
     
     // Top Bar Components

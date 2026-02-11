@@ -15,45 +15,54 @@ class VideoWidget : public QWidget
 
 public:
     explicit VideoWidget(QWidget *parent = nullptr);
-    ~VideoWidget();
+    virtual ~VideoWidget();
 
-    // latency: 0이면 전체화면 모드 (버퍼링 끔)
-    void playUrl(const QString &url, int latency = 200);
-    void stop();
-    Q_INVOKABLE void startRetryTimer();
+    virtual void playUrl(const QString &url, int latency = 200) = 0; // Pure virtual
+    virtual void stop();
+    Q_INVOKABLE virtual void startRetryTimer() {}
+
     bool isPlaying() const { return m_isPlaying; }
 
-    // [기능 1] 자르기 (0.0 ~ 1.0 상대 좌표)
+    virtual void pause() {}
+    virtual void resume() {}
+    virtual void seek(qint64 positionMs) {}
+    virtual void seekRelative(qint64 offsetMs) {}
+    virtual qint64 getDuration() { return 0; }
+    virtual qint64 getPosition() { return 0; }
+
     void applyCrop(const QRectF &rect);
     void resetCrop();
-
-    // [기능 2] 화면 이동 (픽셀 단위 이동량 입력)
     void panView(qreal dx, qreal dy);
-
-    // [기능 3] 현재 보고 있는 영역 정보 반환 (히스토리 저장용)
     QRectF getCurrentCrop() const { return currentCropRect; }
+
+signals:
+    void positionChanged(qint64 positionMs);
+    void durationChanged(qint64 durationMs);
+    void playbackStateChanged(bool isPlaying);
 
 protected:
     void showEvent(QShowEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     QPaintEngine *paintEngine() const override { return nullptr; }
 
-private slots:
-    void pollGstBus();
+    // Helpers for subclasses
+    bool setPipeline(GstElement *p);
+    GstElement* getPipeline() const { return pipeline; }
+    void showPlaceholder(const QString &text);
+    void setPlayingState(bool playing) { m_isPlaying = playing; }
+    void updateSourceResolution(); // [New]
+
+protected slots:
+    virtual void pollGstBus();
 
 private:
     GstElement *pipeline;
-    GstElement *cropper; // GStreamer crop 요소
+    GstElement *cropper;
     int sourceWidth, sourceHeight;
     QMutex cropMutex;
-    QRectF currentCropRect; // 현재 보고 있는 영역 기억
+    QRectF currentCropRect;
 
-    QString currentUrl;
-    int currentLatency;
     QLabel *placeholderLabel;
-
-    QTimer *retryTimer;
-    QTimer *watchdogTimer;
     QTimer *busTimer;
 
     bool m_isPlaying;

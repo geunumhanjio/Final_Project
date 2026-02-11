@@ -66,6 +66,8 @@ set(PROJECT_SOURCES
         liveview.h liveview.cpp
         fullscreenview.h fullscreenview.cpp
         videowidget.h videowidget.cpp
+        livevideowidget.h livevideowidget.cpp # [New]
+        recordedvideowidget.h recordedvideowidget.cpp # [New]
         videocard.h videocard.cpp
         streammanager.h streammanager.cpp
         rosbridgeclient.h rosbridgeclient.cpp

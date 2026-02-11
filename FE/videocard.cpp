@@ -2,7 +2,9 @@
 #include <QEvent>
 #include <QMouseEvent>
 #include <QGraphicsOpacityEffect>
+#include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
+#include "livevideowidget.h"
 
 VideoCard::VideoCard(QWidget *parent) : QWidget(parent)
 {
@@ -34,7 +36,7 @@ void VideoCard::setupUi()
     videoLayout->setContentsMargins(0, 0, 0, 0);
     
     // 2-1. The Video Widget
-    m_videoWidget = new VideoWidget(videoContainer);
+    m_videoWidget = new LiveVideoWidget(videoContainer);
     m_videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     videoLayout->addWidget(m_videoWidget, 0, 0);
 

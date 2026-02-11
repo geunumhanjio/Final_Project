@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QCursor>
 #include <QPainter>
+#include <QFileInfo>
 
 // =============================================================
 // [내부 클래스] 직접 그려지는 네모 박스
@@ -88,10 +89,22 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     videoLayout->addWidget(topBar);
 
     // 2. Video Layer (Stacked Middle) with Stretch
-    videoWidget = new VideoWidget(videoContainer);
-    videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    videoWidget->installEventFilter(this);
-    videoLayout->addWidget(videoWidget, 1); // stretch factor 1 to take available space
+    // 2. Video Layer (Stacked Middle) with Stretch
+    videoStack = new QStackedWidget(videoContainer);
+    videoStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    
+    liveWidget = new LiveVideoWidget(videoStack);
+    liveWidget->installEventFilter(this);
+    
+    recordedWidget = new RecordedVideoWidget(videoStack);
+    recordedWidget->installEventFilter(this);
+    
+    videoStack->addWidget(liveWidget);
+    videoStack->addWidget(recordedWidget);
+    
+    videoWidget = liveWidget; // Default
+    
+    videoLayout->addWidget(videoStack, 1); // stretch factor 1 to take available space
 
     // 3. Bottom Control Bar (Stacked Bottom)
     underBar = new FullUnderBar(videoContainer);
@@ -112,6 +125,54 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     connect(underBar, &FullUnderBar::reqRectZoom, this, &FullScreenView::onRectZoomToggled);
     connect(underBar, &FullUnderBar::reqResetZoom, this, &FullScreenView::onResetZoom);
 
+    // [New] Playback Control Connections
+    connect(underBar, &FullUnderBar::reqPlayPause, [this](){
+        if(videoWidget->isPlaying()) videoWidget->pause();
+        else videoWidget->resume();
+    });
+
+    connect(underBar, &FullUnderBar::reqSkipBackward, [this](){
+        videoWidget->seekRelative(-5000); // -5s
+    });
+
+    connect(underBar, &FullUnderBar::reqSkipForward, [this](){
+        videoWidget->seekRelative(5000); // +5s
+    });
+
+    connect(underBar, &FullUnderBar::reqSeek, [this](qint64 val){
+        // Slider value 0-1000 mapping to Duration
+        qint64 duration = videoWidget->getDuration();
+        if (duration > 0) {
+            qint64 target = (val * duration) / 1000;
+            videoWidget->seek(target);
+        }
+    });
+
+    // Update UI from VideoWidget
+    // Update UI from VideoWidget (Connect Both)
+    // Live Widget (limited signals)
+     connect(liveWidget, &VideoWidget::playbackStateChanged, [this](bool playing){
+        if (videoWidget == liveWidget) underBar->setPlaying(playing);
+    });
+
+    // Recorded Widget
+    connect(recordedWidget, &VideoWidget::positionChanged, [this](qint64 pos){
+        if (videoWidget == recordedWidget) {
+            qint64 dur = recordedWidget->getDuration();
+            underBar->updateTime(pos, dur);
+        }
+    });
+    
+    connect(recordedWidget, &VideoWidget::playbackStateChanged, [this](bool playing){
+        if (videoWidget == recordedWidget) underBar->setPlaying(playing);
+    });
+    
+
+
+    connect(videoWidget, &VideoWidget::durationChanged, [this](qint64 dur){
+         // Time update handles duration too
+    });
+
     rubberBand = nullptr;
     isDrawing = false;
     isPanning = false;
@@ -124,8 +185,34 @@ void FullScreenView::play(const QString &url, int index)
     setMode(Normal);
 
     QString name = getChannelName(index);
-    titleLabel->setText(name); // Label itself has style
-    // titleLabel->show(); // Always visible in topBar
+    titleLabel->setText(name); 
+
+    // [Mod] Show/Hide Playback Controls & Switch Widget
+    bool isFile = QFileInfo::exists(url);
+    underBar->setMode(isFile);
+    
+    if(isFile) {
+         titleLabel->setText(QString("Playback: %1").arg(QFileInfo(url).fileName()));
+         liveBadge->setVisible(false);
+         
+         // Switch to Recorded Widget
+         videoWidget = recordedWidget;
+         videoStack->setCurrentWidget(recordedWidget);
+         
+         // Fix connection for generic play/pause to target correct widget?
+         // Actually the lambda uses `videoWidget` pointer which is updated here!
+         // But lambda captures `this`, so `videoWidget` access inside lambda is dynamic?
+         // No, `[this](){ videoWidget->... }` accesses `this->videoWidget`.
+         // So updating `videoWidget` member variable is sufficient!
+         
+    } else {
+         liveBadge->setVisible(true);
+         
+         // Switch to Live Widget
+         videoWidget = liveWidget;
+         videoStack->setCurrentWidget(liveWidget);
+    }
+
     videoWidget->playUrl(url, 0);
 }
 
