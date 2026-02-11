@@ -1,1 +1,0 @@
-g++ ProxyServer.cpp -o proxy-server $(pkg-config --cflags --libs gstreamer-1.0 gstreamer-rtsp-server-1.0 gstreamer-app-1.0)
