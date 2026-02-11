@@ -198,9 +198,10 @@ void MainWindow::initConnections()
             if (fileInfo.exists() && fileInfo.size() > 1024) {
                 qDebug() << "[MainWindow] Found valid local file:" << localFilePath << "Size:" << fileInfo.size();
                 
-                // [New] Stop background RTSP streams to free resources/prevent errors
-                m_livePage->stopAll(); 
+                // [Mod] Keep background RTSP streams running (No stopAll)
+                // m_livePage->stopAll(); 
 
+                m_returnToWidget = m_playbackPage; // [Mod] Return to PlaybackView on close
                 m_fullPage->play(localFilePath, 0); 
                 m_centralStack->setCurrentWidget(m_fullPage);
             } else {
@@ -232,6 +233,7 @@ void MainWindow::initConnections()
         if (index <= 4 && !url.isEmpty()) {
             qDebug() << "Full Screen Request:" << url;
             
+            m_returnToWidget = m_livePage; // [Mod] Return to LiveView on close
             m_centralStack->setCurrentWidget(m_fullPage);
             m_fullPage->play(url, index);
         }
@@ -239,7 +241,12 @@ void MainWindow::initConnections()
 
     connect(m_fullPage, &FullScreenView::closeRequested, [=](){
         m_fullPage->stop();
-        m_centralStack->setCurrentWidget(m_livePage);
+        // [Mod] Return to previous widget (Live or Playback)
+        if (m_returnToWidget) {
+            m_centralStack->setCurrentWidget(m_returnToWidget);
+        } else {
+            m_centralStack->setCurrentWidget(m_livePage); // Default check
+        }
     });
     qDebug() << "[MainWindow] initConnections Completed.";
 }

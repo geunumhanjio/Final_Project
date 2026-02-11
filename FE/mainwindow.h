@@ -63,5 +63,8 @@ private:
     
     QTimer *m_inputTimer;
     QSet<int> m_pressedKeys;
+    
+    // [New] Widget to return to after closing FullScreenView
+    QWidget* m_returnToWidget = nullptr; 
 };
 #endif // MAINWINDOW_H
