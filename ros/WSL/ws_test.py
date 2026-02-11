@@ -7,9 +7,12 @@ async def test():
     async with websockets.connect(uri) as ws:
         # 목표 위치 전송
         msg = {
-            "type": "goal_pose",
+            "type": "cmd_vel",
             "timestamp": 1234567890.0,
-            "data": {"x": 2.5, "y": 1.3, "theta": 1.57}
+			"data": {
+              "linear_x": 0.3,
+              "angular_z": 0.5
+            }
         }
         await ws.send(json.dumps(msg))
         
