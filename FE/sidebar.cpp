@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QStackedLayout> // [New]
 #include <QListWidget>
 #include <QListWidgetItem>
 #include <QLineEdit>
@@ -28,41 +29,118 @@ void Sidebar::setupUi()
     container = new QWidget(this);
     container->setObjectName("SidebarContainer");
     
-    QVBoxLayout *layout = new QVBoxLayout(container);
+    // Use Stacked Layout to switch between Live and Playback modes
+    mainStack = new QStackedLayout(container);
+    mainStack->setContentsMargins(0, 0, 0, 0);
+
+    setupLiveUI();       // Index 0
+    setupPlaybackUI();   // Index 1
+
+    mainStack->addWidget(liveWidget);
+    mainStack->addWidget(playbackWidget);
+
+    this->setWidget(container);
+}
+
+void Sidebar::setMode(SidebarMode mode)
+{
+    if (mode == Live) {
+        mainStack->setCurrentIndex(0);
+        this->setWindowTitle("채널 목록");
+    } else {
+        mainStack->setCurrentIndex(1);
+        this->setWindowTitle("녹화 목록");
+    }
+}
+
+void Sidebar::setupLiveUI()
+{
+    liveWidget = new QWidget(container);
+    QVBoxLayout *layout = new QVBoxLayout(liveWidget);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
     // 1. Search Bar Area
-    QWidget *searchArea = new QWidget(container);
+    QWidget *searchArea = new QWidget(liveWidget);
     searchArea->setObjectName("SidebarSearchArea");
-    searchArea->setStyleSheet(""); // Clear just in case
+    searchArea->setStyleSheet(""); 
     QVBoxLayout *searchLayout = new QVBoxLayout(searchArea);
-    searchLayout->setContentsMargins(0, 12, 0, 12); // Padding moved to layout or handled in QSS if possible, but padding usually layout.
+    searchLayout->setContentsMargins(0, 12, 0, 12);
     
-    searchBar = new QLineEdit(container);
+    searchBar = new QLineEdit(liveWidget);
     searchBar->setObjectName("SidebarSearchBar");
     searchBar->setPlaceholderText("Filter devices...");
     
     searchLayout->addWidget(searchBar);
     
     // 2. Channel List
-    channelList = new QListWidget(container);
+    channelList = new QListWidget(liveWidget);
     channelList->setObjectName("SidebarList");
     channelList->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    setupList();
+    setupList(); // Populates channelList using existing logic
 
     layout->addWidget(searchArea);
-    layout->addWidget(channelList, 1); // Stretch factor 1
-    
-    // 3. Bottom Stats (Optional, matching design)
-    // For simplicity, omitting bottom stats or adding a spacer is fine. 
-    // The design has CPU Load / Network. We can add a simple placeholder if needed, 
-    // but the task is mainly about appearance of the list.
-
-    this->setWidget(container);
+    layout->addWidget(channelList, 1); 
 
     connect(channelList, &QListWidget::itemClicked, this, &Sidebar::onItemClicked);
     connect(searchBar, &QLineEdit::textChanged, this, &Sidebar::filterChannels);
+}
+
+void Sidebar::setupPlaybackUI()
+{
+    playbackWidget = new QWidget(container);
+    QVBoxLayout *layout = new QVBoxLayout(playbackWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    
+    // Header for Playback Mode
+    QLabel *sidebarHeader = new QLabel("CATEGORIES", playbackWidget);
+    sidebarHeader->setFixedHeight(50);
+    sidebarHeader->setAlignment(Qt::AlignCenter);
+    sidebarHeader->setObjectName("SidebarHeaderTitle"); // Reuse style if possible or add new
+    sidebarHeader->setStyleSheet("color: #94A3B8; font-weight: bold; font-size: 14px; letter-spacing: 1px; border-bottom: 1px solid #334155;");
+    layout->addWidget(sidebarHeader);
+
+    categoryList = new QListWidget(playbackWidget);
+    categoryList->setFocusPolicy(Qt::NoFocus);
+    categoryList->setStyleSheet(
+        "QListWidget { background-color: transparent; border: none; outline: none; }"
+        "QListWidget::item { padding: 12px 16px; color: #CBD5E1; font-size: 14px; border-bottom: 1px solid #1E293B; }"
+        "QListWidget::item:selected { background-color: #2563EB; color: white; font-weight: bold; border-left: 4px solid #60A5FA; }"
+        "QListWidget::item:hover { background-color: #1E293B; }"
+    );
+    
+    // Populate Categories (Same as PlaybackView logic)
+    struct Category { int id; QString name; };
+    QList<Category> categories = {
+        {0, "📂  All Recordings"}, // [New]
+        {1, "📹  CCTV 1 (Low)"},
+        {2, "📹  CCTV 2 (Low)"},
+        {3, "📹  CCTV 3 (Low)"},
+        {4, "📹  CCTV 4 (Low)"},
+        {5, "🎥  CCTV 1 (High)"},
+        {6, "🎥  CCTV 2 (High)"},
+        {7, "🎥  CCTV 3 (High)"},
+        {8, "🎥  CCTV 4 (High)"},
+        {9, "🚗  RC Car Camera"},
+        {10, "📡  Lidar Map"}
+    };
+
+    for(const auto &cat : categories) {
+        QListWidgetItem *item = new QListWidgetItem(cat.name);
+        item->setData(Qt::UserRole, cat.id);
+        categoryList->addItem(item);
+    }
+
+    layout->addWidget(categoryList);
+    
+    connect(categoryList, &QListWidget::itemClicked, this, &Sidebar::onCategoryClicked);
+}
+
+void Sidebar::onCategoryClicked(QListWidgetItem *item)
+{
+    if(!item) return;
+    int catId = item->data(Qt::UserRole).toInt();
+    emit categorySelected(catId);
 }
 
 void Sidebar::setupList()

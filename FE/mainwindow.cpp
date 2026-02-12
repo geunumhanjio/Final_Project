@@ -187,9 +187,23 @@ void MainWindow::initConnections()
 {
     qDebug() << "[MainWindow] initConnections Started...";
     connect(m_topBar, &TopBar::sidebarToggled, [=](){ m_sidebar->setVisible(!m_sidebar->isVisible()); });
-    connect(m_topBar, &TopBar::modeChanged, m_centralStack, &QStackedWidget::setCurrentIndex);
+    connect(m_topBar, &TopBar::modeChanged, [=](int index){
+        m_centralStack->setCurrentIndex(index);
+        // [New] Switch Sidebar Context
+        // Index 0: Live -> SidebarMode::Live
+        // Index 1: Playback -> SidebarMode::Playback
+        // Others: Maybe default to Live or Hide?
+        if (index == 1) {
+            m_sidebar->setMode(Sidebar::Playback);
+        } else {
+            m_sidebar->setMode(Sidebar::Live);
+        }
+    });
     connect(m_topBar, &TopBar::themeToggled, this, &MainWindow::toggleTheme);
     connect(m_sidebar, &Sidebar::channelStateChanged, m_livePage, &LiveView::setChannelVisible);
+    
+    // [New] Sidebar Category Selection -> Filter Playback List
+    connect(m_sidebar, &Sidebar::categorySelected, m_playbackPage, &PlaybackView::filterRecordings);
     
     // Connect Recording Navigation
     connect(m_livePage, &LiveView::recordCommandRequested, [=](int channelId, bool start){
@@ -220,6 +234,12 @@ void MainWindow::initConnections()
 
         // 2. Received List -> Update UI
         connect(m_cameraClient, &CameraControlClient::recordingListReceived, m_playbackPage, &PlaybackView::updateList);
+
+        // [New] Video Received (Recording Finished) -> Auto Refresh
+        connect(m_cameraClient, &CameraControlClient::videoReceived, [=](QString url){
+            qDebug() << "[MainWindow] Recording finished at:" << url << "- Refreshing list.";
+            if (m_playbackPage) emit m_playbackPage->refreshRequested();
+        });
 
         // 3. Play Video (Check Local -> Download -> Play)
         connect(m_playbackPage, &PlaybackView::playRequested, [=](const QString &filename){
