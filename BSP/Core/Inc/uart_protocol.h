@@ -80,6 +80,12 @@ bool Protocol_Process(void);
 const ProtoStats_t* Protocol_GetStats(void);
 
 /**
+ * @brief  UART 에러 발생 횟수 조회 (디버깅용)
+ * @retval 에러 카운트
+ */
+uint32_t Protocol_GetErrorCount(void);
+
+/**
  * @brief  오도메트리(엔코더 카운트) 응답 패킷 송신
  * @param  left_ticks:  왼쪽 엔코더 카운트 (int16)
  * @param  right_ticks: 오른쪽 엔코더 카운트 (int16)

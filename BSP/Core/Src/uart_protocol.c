@@ -20,6 +20,9 @@ static Packet_t ready_packet;
 /* Statistics */
 static ProtoStats_t stats;
 
+/* UART error tracking */
+static volatile uint32_t uart_error_count = 0;
+
 /* Private function prototypes -----------------------------------------------*/
 static void Protocol_Dispatch(const Packet_t *pkt);
 static void Protocol_HandleVelocity(const Packet_t *pkt);
@@ -134,6 +137,24 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
         /* Re-arm for next byte */
         HAL_UART_Receive_IT(proto_huart, &rx_byte, 1);
     }
+}
+
+/* UART Error callback — re-arm RX so the interrupt chain doesn't break -----*/
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+    if (huart->Instance == proto_huart->Instance) {
+        uart_error_count++;
+        /* Clear error flags and re-arm RX interrupt */
+        __HAL_UART_CLEAR_OREFLAG(huart);
+        __HAL_UART_CLEAR_NEFLAG(huart);
+        __HAL_UART_CLEAR_FEFLAG(huart);
+        HAL_UART_Receive_IT(proto_huart, &rx_byte, 1);
+    }
+}
+
+uint32_t Protocol_GetErrorCount(void)
+{
+    return uart_error_count;
 }
 
 /* Private functions ---------------------------------------------------------*/
