@@ -8,12 +8,20 @@
 #include "topbar.h"
 #include "sidebar.h"
 #include "liveview.h"
-#include "fullscreenview.h"
+#include "rosbridgeclient.h"
+#include "cameracontrolclient.h" // [New]
+#include <QSet>
+#include <QTimer>
+#include <QKeyEvent>
 
 QT_BEGIN_NAMESPACE
 QT_END_NAMESPACE
 
+#include "videowidget.h"
+#include "playbackview.h" // [New]
+
 class SettingsWidget;
+class FullScreenView;
 
 class MainWindow : public QMainWindow
 {
@@ -25,6 +33,15 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override; // [New]
+    void keyPressEvent(QKeyEvent *event) override;   // Kept for backup/other keys
+    void keyReleaseEvent(QKeyEvent *event) override; // Kept for backup/other keys
+
+private:
+    bool handleWasdKey(QKeyEvent *event, bool isPress); // [New] Shared logic
+
+private slots:
+    void processInput();
 
 private:
     TopBar *m_topBar;
@@ -32,7 +49,7 @@ private:
     QStackedWidget *m_centralStack; // 페이지 전환 컨테이너
     LiveView *m_livePage;
     FullScreenView *m_fullPage;
-    QLabel *m_playbackPage;         // 임시 페이지
+    PlaybackView *m_playbackPage;   // [Modified] VideoWidget -> PlaybackView
     SettingsWidget *m_settingsPage; // Settings Widget
 
     void initUI();          // UI 초기화
@@ -43,5 +60,15 @@ private:
     
 private:
     bool m_isDark; // Current theme state
+    
+    // ROS2 Control
+    RosBridgeClient *m_rosClient;
+    CameraControlClient *m_cameraClient;
+    
+    QTimer *m_inputTimer;
+    QSet<int> m_pressedKeys;
+    
+    // [New] Widget to return to after closing FullScreenView
+    QWidget* m_returnToWidget = nullptr; 
 };
 #endif // MAINWINDOW_H

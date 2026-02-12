@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  rpi_ros2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rpi_ros2
+    hostname: rpi_ros2
+    network_mode: host
+    privileged: true
+    
+    devices:
+      - /dev/serial0:/dev/serial0:rwm
+      - /dev/ttyAMA0:/dev/ttyAMA0:rwm
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/video0:/dev/video0
+    
+    environment:
+      - ROS_DOMAIN_ID=0
+      - ROS_LOCALHOST_ONLY=0
+      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - PYTHONUNBUFFERED=1
+      - RCUTILS_COLORIZED_OUTPUT=1
+    
+    volumes:
+      - ../ros2_ws/src:/root/ros2_ws/src
+      - /dev/shm:/dev/shm
+      - /run/udev:/run/udev:ro
+      - /dev:/dev
+    
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    
+    command: /bin/bash
+

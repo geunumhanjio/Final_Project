@@ -1,76 +1,92 @@
-# VEDA_QT_1 - CCTV 통합 관제 시스템
+# VEDA_QT_1 - CCTV 통합 관제 및 로봇 제어 시스템
 
-이 프로젝트는 Qt와 GStreamer를 활용하여 개발된 CCTV 관제 시스템입니다.
-4개의 RTSP 카메라 스트림을 동시에 모니터링하고, 특정 채널을 전체 화면으로 확대하여 제어할 수 있는 기능을 제공합니다.
+VEDA_QT_1은 Qt 6와 GStreamer를 활용하여 개발된 **고성능 CCTV 관제 시스템**입니다. 
+다수의 RTSP 카메라 스트림을 실시간으로 모니터링하고, ROS2 기반의 이동 로봇을 원격으로 제어할 수 있는 통합 솔루션입니다.
 
 ## ✨ 주요 기능
-- **다채널 동시 관제**: 4개의 CCTV 카메라와 1개의 RC카 카메라, 센서 데이터를 한 화면에서 모니터링합니다.
-- **전체 화면 및 줌 제어**: 특정 채널을 더블 클릭하여 전체 화면으로 전환하며, 마우스 드래그로 **팬(Pan)** 이동 및 휠/버튼으로 **줌(Zoom)** 기능을 제공합니다.
-  - **스마트 줌 아웃**: 줌 아웃 시 현재 보고 있는 시점의 중심을 유지하며 자연스럽게 축소됩니다.
-- **유연한 RTSP 설정**:
-  - 기본 모드: `rtsp://IP:Port/ch1` 형식의 간편 연결
-  - 고급 모드 (CCTV 옵션): `rtsp://admin:5hanwha!@IP:Port/0/H.264/media.smp` 형식의 인증 기반 연결 지원
 
-## 📂 프로젝트 구조 및 모듈 설명
+### 1. **다채널 영상 관제**
+- **4분할 라이브 뷰**: 4개의 고정형 CCTV 카메라 영상을 동시에 모니터링합니다.
+- **스마트 줌 & 팬**: 특정 채널을 더블 클릭하여 전체 화면으로 전환하며, 마우스 드래그(Pan)와 휠(Zoom)을 통해 세밀한 관찰이 가능합니다.
+- **GStreamer 가속**: 하드웨어 가속을 지원하는 GStreamer 파이프라인을 통해 지연 시간(Low Latency)을 최소화했습니다.
 
-### 1. **Core (핵심 기능)**
-- **`main.cpp`**: 프로그램의 진입점입니다. `QApplication`을 시작하고 `MainWindow`를 실행합니다.
-- **`mainwindow.cpp / .h`**: 메인 윈도우 클래스입니다.
-  - 전체 레이아웃(`QStackedWidget`)을 관리하며, 상단바, 사이드바, 그리고 각 페이지(라이브 뷰, 전체 화면, 설정 등)를 제어합니다.
+### 2. **ROS2 로봇 원격 제어**
+- **WebSocket 통신**: `rosbridge_server`와 연결되어 로봇과 실시간으로 데이터를 주고받습니다.
+- **수동 주행 제어**: 키보드 방향키를 사용하여 로봇의 이동(`cmd_vel`)을 직접 제어할 수 있습니다.
+- **자율 주행 (Goal Pose)**: 맵 상의 특정 지점을 클릭하여 로봇에게 목적지 이동 명령을 내릴 수 있습니다 (구현 예정).
+- **비상 정지 (Emergency Stop)**: 위급 상황 시 로봇을 즉시 멈추는 기능을 제공합니다.
 
-### 2. **UI Components (화면 구성 요소)**
-- **`liveview.cpp / .h`**: **실시간 관제 화면**입니다.
-  - 4분할 그리드(`QGridLayout`)로 CCTV 영상을 보여줍니다.
-  - 우측 패널에 **RC카 전방 카메라**(`rtsp://.../robot_cam`)와 **SLAM 라이다 맵**을 표시합니다.
-- **`fullscreenview.cpp / .h`**: **전체 화면 보기**입니다.
-  - 특정 채널을 더블 클릭했을 때 전환되는 화면입니다.
-  - 상단바(타이틀, 닫기), 비디오 영역, 하단바(컨트롤)로 구성되어 있습니다.
-  - **개선된 줌 로직**: 드래그 후 줌 아웃 시, 이동된 위치를 기준으로 축소되어 화면 탐색이 용이합니다.
-- **`sidebar.cpp / .h`**: **좌측 사이드바**입니다.
-  - 채널 목록(Camera 1~4)을 표시하고, 체크박스를 통해 각 카메라의 가시성을 토글(ON/OFF)할 수 있습니다.
-- **`topbar.cpp / .h`**: **상단 네비게이션 바**입니다.
-  - 사이드바 열기/닫기, 테마 변경(Dark/Light), 페이지 전환 탭(라이브 뷰, 기록, 설정) 기능을 제공합니다.
-- **`full_underbar.cpp / .h`**: 전체 화면 모드 하단에 표시되는 **컨트롤 바**입니다.
-  - 줌 인/아웃, 리셋 버튼, 사각형 영역 확대 모드 버튼 등을 포함합니다.
-
-### 3. **Video Processing (영상 처리)**
-- **`videowidget.cpp / .h`**: **영상 재생의 핵심 엔진**입니다.
-  - `GStreamer` 파이프라인을 직접 생성하고 관리합니다 (`rtspsrc` -> `rtph264depay` -> `avdec_h264` ...).
-  - 영상의 크롭(Crop) 및 확대를 위해 `videocrop` 요소를 사용합니다.
-- **`videocard.cpp / .h`**: `VideoWidget`을 감싸는 **래퍼(Wrapper) 위젯**입니다.
-  - 영상 위에 오버레이되는 채널 이름, 상태 표시 등의 UI 요소를 추가로 관리합니다.
-
-### 4. **Configuration & Management (설정 및 관리)**
-- **`configmanager.h`**: **설정 관리자 (싱글톤)**입니다.
-  - `settings.ini` 파일에 IP, 포트, CCTV 옵션 등을 영구적으로 저장하고 불러옵니다.
-- **`streammanager.h / .cpp`**: **스트림 주소 관리자 (싱글톤)**입니다.
-  - `ConfigManager`의 설정값을 바탕으로 각 채널의 RTSP URL을 동적으로 생성합니다.
-  - "CCTV Option" 체크 여부에 따라 URL 형식을 전환합니다.
-- **`settingswidget.h`**: **설정 변경 화면**입니다.
-  - 사용자가 GUI 환경에서 카메라 자산 IP와 포트를 변경하고 저장할 수 있도록 합니다.
-  - **CCTV Option 체크박스**: 인증 정보가 포함된 복잡한 URL 형식을 사용할지 선택할 수 있습니다.
+### 3. **유연한 설정 관리**
+- **설정 UI 제공**: 프로그램 내 설정 탭에서 카메라 IP, 포트, ROS2 브릿지 주소 등을 손쉽게 변경할 수 있습니다.
+- **설정 파일(settings.ini)**: 변경된 설정은 파일로 영구 저장되어 재실행 시에도 유지됩니다.
+- **듀얼 인증 모드**: 일반 RTSP 연결과 인증 정보(ID/PW)가 포함된 보안 연결 모드를 모두 지원합니다.
 
 ---
 
-## ⚙️ 빌드 및 실행 방법
+## 🛠 시스템 요구 사항 (Prerequisites)
 
-### 요구 사항
-- **Qt 6.x** (Widgets 모듈)
-- **GStreamer 1.0 (MinGW 64bit)**
-- **CMake 3.16+**
+이 프로젝트를 빌드하고 실행하기 위해서는 다음 환경이 필요합니다.
 
-### 빌드 단계
-1. 프로젝트 루트에서 `build` 디렉토리 생성
-2. `cmake ..` 명령어로 프로젝트 구성 (GStreamer 경로 확인 필요)
-3. `cmake --build .` 명령어로 컴파일 및 실행 파일 생성
+- **OS**: Windows 10 / 11 (64-bit)
+- **Compiler**: MSVC (Visual Studio 2019 이상 권장) 또는 MinGW 64-bit
+- **Qt Version**: Qt 6.x (Widgets, WebSockets 모듈 필수)
+- **CMake**: 3.16 버전 이상
 
-## 📝 설정 파일 (settings.ini)
-프로그램을 한 번 실행하면 실행 파일과 같은 경로에 `settings.ini`가 생성됩니다.
-```ini
-[Network]
-CameraIP=192.168.0.39
-CameraPort=8554
-UseCustomCCTV=false
+### 필수 의존성 (Dependencies)
+- **GStreamer 1.0 (MSVC 버전)**
+  - [GStreamer 공식 다운로드](https://gstreamer.freedesktop.org/download/)에서 **MSVC 64-bit** 버전을 설치해야 합니다.
+  - **Runtime**과 **Development** 패키지 두 가지를 모두 설치해주세요.
+  - 권장 설치 경로: `C:\Program Files\gstreamer\1.0\msvc_x86_64` (또는 `C:\gstreamer\...`)
+
+---
+
+## 🚀 빌드 및 실행 방법
+
+### 1. 프로젝트 클론
+```bash
+git clone https://github.com/your-repo/VEDA_QT_1.git
+cd VEDA_QT_1/FE
 ```
-- `UseCustomCCTV=true` 설정 시 `admin:5hanwha!` 계정을 사용하는 고정된 URL 포맷으로 접속합니다.
-- 이 파일을 직접 수정하거나, 프로그램 내 **[설정 화면]** 탭에서 변경할 수 있습니다.
+
+### 2. Qt Creator 설정 (MSVC 기준)
+1. **Qt Creator** 실행 후 프로젝트(`CMakeLists.txt`) 열기
+2. **Configure Project** 단계에서 `Desktop Qt %VERSION% MSVC2019 64bit` 키트 선택
+3. **Run CMake** 버튼 클릭
+   - *참고: CMake가 자동으로 시스템에 설치된 GStreamer 경로를 탐색합니다.*
+   - 정상적으로 찾으면 `Selected GStreamer Root (MSVC): ...` 메시지가 출력됩니다.
+
+### 3. 빌드 및 실행
+1. 좌측 하단의 **Build (망치 아이콘)** 클릭
+2. 빌드 완료 후 **Run (초록색 재생 아이콘)** 클릭
+
+---
+
+## 📂 프로젝트 구조
+
+```
+FE/
+├── main.cpp                # 프로그램 진입점 (GStreamer 환경 변수 설정)
+├── mainwindow.cpp          # 메인 윈도우 및 전체 UI 관리
+├── CMakeLists.txt          # 빌드 설정 (MSVC/MinGW GStreamer 분기 처리)
+│
+├── Components/
+│   ├── liveview.cpp        # 4채널 CCTV 그리드 뷰
+│   ├── fullscreenview.cpp  # 전체 화면 및 줌/팬 제어
+│   ├── videowidget.cpp     # GStreamer 렌더링 엔진 (RTSP 스트리밍)
+│   ├── videocard.cpp       # 비디오 위젯 레퍼 (UI 오버레이)
+│   │
+│   ├── topbar.cpp          # 상단 네비게이션, 테마 토글
+│   ├── sidebar.cpp         # 좌측 채널 목록 제어
+│   └── settingswidget.cpp  # 설정 변경 화면
+│
+├── Network/
+│   ├── streammanager.cpp   # RTSP URL 관리 및 생성
+│   ├── configmanager.cpp   # 설정값(settings.ini) 로드/저장
+│   └── rosbridgeclient.cpp # ROS2 WebSocket 통신 클라이언트
+│
+└── Resources/
+    └── style/              # CSS 스타일시트 (Dark/Light 테마)
+```
+
+## 📝 라이선스
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
