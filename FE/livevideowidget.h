@@ -26,6 +26,9 @@ private:
     QTimer *watchdogTimer;
     QString currentUrl;
     int currentLatency;
+
+public:
+    QString getUrl() const { return currentUrl; }
 };
 
 #endif // LIVEVIDEOWIDGET_H

@@ -33,8 +33,12 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
-    void keyPressEvent(QKeyEvent *event) override;
-    void keyReleaseEvent(QKeyEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override; // [New]
+    void keyPressEvent(QKeyEvent *event) override;   // Kept for backup/other keys
+    void keyReleaseEvent(QKeyEvent *event) override; // Kept for backup/other keys
+
+private:
+    bool handleWasdKey(QKeyEvent *event, bool isPress); // [New] Shared logic
 
 private slots:
     void processInput();

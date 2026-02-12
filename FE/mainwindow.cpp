@@ -6,7 +6,11 @@
 #include <QApplication>
 #include <QFile>
 #include <QDir>
-#include <QStandardPaths> // [New]
+#include <QDir>
+#include <QStandardPaths> 
+#include <QLineEdit> // [New]
+#include <QTextEdit> // [New]
+#include <QPlainTextEdit> // [New]
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -14,6 +18,9 @@ MainWindow::MainWindow(QWidget *parent)
     this->setWindowTitle("CCTV 통합 관제 시스템 - 근엄한조");
     this->resize(1280, 720);
     m_isDark = true; // Default to dark
+    
+    // [New] Install global event filter for WASD
+    qApp->installEventFilter(this);
 
     // [Fix] Initialize Clients BEFORE initConnections
     qDebug() << "[MainWindow] Initializing RosBridgeClient...";
@@ -35,42 +42,68 @@ MainWindow::MainWindow(QWidget *parent)
 
 MainWindow::~MainWindow() { }
 
-void MainWindow::keyPressEvent(QKeyEvent *event) {
-    if (event->isAutoRepeat()) return; // Ignore auto-repeat key presses
+// [New] Global Event Filter for WASD
+bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+    if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
+        QKeyEvent *ke = static_cast<QKeyEvent*>(event);
+        int key = ke->key();
+
+        // Check for WASD keys
+        if (key == Qt::Key_W || key == Qt::Key_S || key == Qt::Key_A || key == Qt::Key_D) {
+            
+            // [Check] Is user typing in a text field?
+            QWidget *focusW = QApplication::focusWidget();
+            if (focusW) {
+                if (qobject_cast<QLineEdit*>(focusW) || qobject_cast<QTextEdit*>(focusW) || qobject_cast<QPlainTextEdit*>(focusW)) {
+                    // Let the text widget handle it
+                    return false; 
+                }
+            }
+
+            // Handle Robot Control
+            return handleWasdKey(ke, event->type() == QEvent::KeyPress);
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
+}
+
+// [New] Shared WASD Logic
+bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress) {
+    if (event->isAutoRepeat()) return false;
     
     int key = event->key();
-    // [Mod] WASD Control
-    if (key == Qt::Key_W || key == Qt::Key_S || key == Qt::Key_A || key == Qt::Key_D) {
+
+    if (isPress) {
         if (!m_pressedKeys.contains(key)) {
             m_pressedKeys.insert(key);
             if (!m_inputTimer->isActive()) {
-                m_inputTimer->start(100); // 10Hz
-                processInput(); // Immediate response
+                m_inputTimer->start(100); 
+                processInput(); 
             }
         }
     } else {
-        QMainWindow::keyPressEvent(event);
+        if (m_pressedKeys.contains(key)) {
+            m_pressedKeys.remove(key);
+            if (m_pressedKeys.isEmpty()) {
+                m_inputTimer->stop();
+                m_rosClient->sendCmdVel(0.0, 0.0);
+                qDebug() << "[Control] STOP";
+            } else {
+                processInput();
+            }
+        }
     }
+    return true; // Consume event
+}
+
+void MainWindow::keyPressEvent(QKeyEvent *event) {
+    // Other keys usually handled by shortcuts or specific widgets.
+    // WASD is now handled by eventFilter.
+    QMainWindow::keyPressEvent(event);
 }
 
 void MainWindow::keyReleaseEvent(QKeyEvent *event) {
-    if (event->isAutoRepeat()) return;
-
-    int key = event->key();
-    if (m_pressedKeys.contains(key)) {
-        m_pressedKeys.remove(key);
-        
-        if (m_pressedKeys.isEmpty()) {
-            m_inputTimer->stop();
-            // Send Stop Command
-            m_rosClient->sendCmdVel(0.0, 0.0);
-            qDebug() << "[Control] STOP";
-        } else {
-            processInput(); // Update direction immediately
-        }
-    } else {
-        QMainWindow::keyReleaseEvent(event);
-    }
+    QMainWindow::keyReleaseEvent(event);
 }
 
 void MainWindow::processInput() {
@@ -246,6 +279,30 @@ void MainWindow::initConnections()
             m_centralStack->setCurrentWidget(m_returnToWidget);
         } else {
             m_centralStack->setCurrentWidget(m_livePage); // Default check
+        }
+    });
+    
+    // [New] Connect FullScreenView Recording
+    connect(m_fullPage, &FullScreenView::recordRequested, [=](int index, bool start){
+        // Map Native Index (0-3 for CCTV, 4 for RC Car) to High Quality IDs
+        // CCTV: 0->5, 1->6, 2->7, 3->8
+        // RC Car: 4->9
+        
+        int actualChannelId;
+        if (index < 4) {
+            actualChannelId = index + 5;
+        } else {
+            actualChannelId = 9;
+        }
+        
+        ConfigManager::instance().loadDefaults();
+        QString ip = ConfigManager::instance().getCameraIp();
+        
+        // Use m_cameraClient directly
+        if (m_cameraClient) {
+            m_cameraClient->sendRecordCommand(ip, actualChannelId, start);
+             if (start) qDebug() << "[FullScreen] Recording Started on Channel" << actualChannelId;
+             else qDebug() << "[FullScreen] Recording Stopped on Channel" << actualChannelId;
         }
     });
     qDebug() << "[MainWindow] initConnections Completed.";

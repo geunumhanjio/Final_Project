@@ -53,6 +53,17 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     btnPlayPause->setFixedSize(36, 36);
     btnPlayPause->setObjectName("playBtn");
 
+    // [New] Record Button (Visible Only in Live Mode)
+    btnRecord = new QPushButton("REC", this); // Added to main layout, not playback container
+    btnRecord->setCheckable(true);
+    btnRecord->setFixedSize(60, 36);
+    btnRecord->setObjectName("recBtn");
+    btnRecord->setStyleSheet(
+        "#recBtn { color: #EF4444; border: 1px solid #EF4444; border-radius: 6px; font-weight: bold; background: transparent; }"
+        "#recBtn:checked { background-color: #EF4444; color: white; }"
+        "#recBtn:hover { background-color: rgba(239, 68, 68, 0.1); }"
+    );
+
     btnSkipBackward = new QPushButton("⏪ -5s", playbackContainer);
     btnSkipBackward->setFixedWidth(60);
 
@@ -99,6 +110,13 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     connect(btnRectZoom, &QPushButton::toggled, this, &FullUnderBar::reqRectZoom);
     connect(btnResetZoom, &QPushButton::clicked, this, &FullUnderBar::reqResetZoom);
 
+    // [New] Record Connection
+    connect(btnRecord, &QPushButton::toggled, [this](bool checked){
+        if (checked) btnRecord->setText("STOP");
+        else btnRecord->setText("REC");
+        emit reqRecord(checked);
+    });
+
     // [New] Playback Connections
     connect(btnPlayPause, &QPushButton::clicked, this, &FullUnderBar::reqPlayPause);
     connect(btnSkipBackward, &QPushButton::clicked, this, &FullUnderBar::reqSkipBackward);
@@ -111,6 +129,8 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
 
     // Add to layout with dividers
     mainLayout->addWidget(playbackContainer);
+    mainLayout->addWidget(btnRecord); // [New]
+    mainLayout->addWidget(createDivider());
     mainLayout->addWidget(createDivider());
     mainLayout->addWidget(btnZoomIn);
     mainLayout->addWidget(createDivider());
@@ -162,8 +182,14 @@ void FullUnderBar::setRectButtonMode(int state)
 void FullUnderBar::setMode(bool isFile)
 {
     m_isFileMode = isFile;
+    m_isFileMode = isFile;
     playbackContainer->setVisible(isFile);
-    // Adjust logic if needed (e.g., hide zoom controls if play mode? - keeping both for now)
+    btnRecord->setVisible(!isFile); // Show Record button only in Live mode
+    
+    // Reset Record Button state when switching modes
+    if (isFile && btnRecord->isChecked()) {
+        btnRecord->setChecked(false); // Stop if switching to file (shouldn't happen usually)
+    }
 }
 
 void FullUnderBar::updateTime(qint64 currentMs, qint64 totalMs)

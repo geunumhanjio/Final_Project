@@ -123,7 +123,15 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     connect(underBar, &FullUnderBar::reqZoomIn, this, &FullScreenView::onZoomIn);
     connect(underBar, &FullUnderBar::reqZoomOut, this, &FullScreenView::onZoomOut);
     connect(underBar, &FullUnderBar::reqRectZoom, this, &FullScreenView::onRectZoomToggled);
+
     connect(underBar, &FullUnderBar::reqResetZoom, this, &FullScreenView::onResetZoom);
+
+    // [New] Record Connection
+    connect(underBar, &FullUnderBar::reqRecord, [this](bool start){
+        if (currentChannelId >= 0) {
+            emit recordRequested(currentChannelId, start);
+        }
+    });
 
     // [New] Playback Control Connections
     connect(underBar, &FullUnderBar::reqPlayPause, [this](){
@@ -183,6 +191,8 @@ void FullScreenView::play(const QString &url, int index)
 {
     zoomHistory.clear();
     setMode(Normal);
+    
+    currentChannelId = index; // [New] Store index
 
     QString name = getChannelName(index);
     titleLabel->setText(name); 

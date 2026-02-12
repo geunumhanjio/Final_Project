@@ -57,7 +57,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     rcCarCamWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     rcCarCamWidget->setMinimumSize(320, 240);
     rcCarCamWidget->setChannelName("RC Car - Front Cam");
-    rcCarCamWidget->setChannelId(5); // ID 5 for RC Car
+    rcCarCamWidget->setChannelId(9); // ID 9 for RC Car (Avoid conflict with High Quality ID 5)
 
     // Connect internal fullscreen button signal for RC Car
     connect(rcCarCamWidget, &VideoCard::fullScreenRequested, [=](){

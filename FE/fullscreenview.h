@@ -24,9 +24,9 @@ public:
     void stop();
     void updateTheme(bool isDark); // Theme Support
 
-
 signals:
     void closeRequested();
+    void recordRequested(int channelId, bool start); // [New]
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -66,6 +66,8 @@ private:
 
     QString getChannelName(int index);
     void setMode(Mode mode);
+    
+    int currentChannelId = -1; // [New] Track current channel
 };
 
 #endif // FULLSCREENVIEW_H
