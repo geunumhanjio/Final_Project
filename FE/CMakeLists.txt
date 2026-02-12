@@ -46,10 +46,17 @@ else()
 endif()
 
 # (1) 헤더 파일 경로 추가 (공통)
+# (1) 헤더 파일 경로 추가 (공통)
 include_directories(
     "${GST_ROOT}/include/gstreamer-1.0"
     "${GST_ROOT}/include/glib-2.0"
     "${GST_ROOT}/lib/glib-2.0/include"
+    # [New] Modularized Paths
+    "${CMAKE_CURRENT_SOURCE_DIR}/Views"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Components"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Video"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Network"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Utils"
 )
 
 # (2) bin 경로 정의 (main.cpp에서 DLL 로딩용)
@@ -60,27 +67,27 @@ add_compile_definitions(GST_BIN_PATH="${GST_ROOT}/bin")
 # 3. 프로젝트 소스 파일 (상대 경로 - FE 디렉터리 기준)
 set(PROJECT_SOURCES
         main.cpp
-    mainwindow.cpp mainwindow.h
-        topbar.h topbar.cpp
-        sidebar.h sidebar.cpp
-        liveview.h liveview.cpp
-        fullscreenview.h fullscreenview.cpp
-        videowidget.h videowidget.cpp
-        livevideowidget.h livevideowidget.cpp # [New]
-        recordedvideowidget.h recordedvideowidget.cpp # [New]
-        videocard.h videocard.cpp
-        streammanager.h streammanager.cpp
-        rosbridgeclient.h rosbridgeclient.cpp
-        cameracontrolclient.h cameracontrolclient.cpp
-        playbackview.h playbackview.cpp # [New]
-        configmanager.h
-        settingswidget.h
+        mainwindow.cpp mainwindow.h
+        Components/topbar.h Components/topbar.cpp
+        Components/sidebar.h Components/sidebar.cpp
+        Views/liveview.h Views/liveview.cpp
+        Views/fullscreenview.h Views/fullscreenview.cpp
+        Video/videowidget.h Video/videowidget.cpp
+        Video/livevideowidget.h Video/livevideowidget.cpp
+        Video/recordedvideowidget.h Video/recordedvideowidget.cpp
+        Components/videocard.h Components/videocard.cpp
+        Network/streammanager.h Network/streammanager.cpp
+        Network/rosbridgeclient.h Network/rosbridgeclient.cpp
+        Network/cameracontrolclient.h Network/cameracontrolclient.cpp
+        Views/playbackview.h Views/playbackview.cpp
+        Utils/configmanager.h
+        Components/settingswidget.h
 )
 
 # 4. 실행 파일 생성
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(VEDA_QT_1 MANUAL_FINALIZATION ${PROJECT_SOURCES}
-        full_underbar.h full_underbar.cpp)
+        Components/full_underbar.h Components/full_underbar.cpp)
 else()
     if(ANDROID)
         add_library(VEDA_QT_1 SHARED ${PROJECT_SOURCES})
