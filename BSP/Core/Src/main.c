@@ -145,22 +145,17 @@ int main(void)
         }
     }
 
-    /* Debug print to PC (USART2) every 100ms */
+    /* Debug print to PC (USART2) every 500ms */
     static uint32_t last_print = 0;
-    if (now - last_print >= 100) {
+    if (now - last_print >= 500) {
         last_print = now;
 
-        printf("L:%6d  R:%6d  ",
+        const ProtoStats_t *st = Protocol_GetStats();
+        printf("[DIAG] rx_pkt:%lu err:%lu chk_err:%lu unk:%lu  enc L:%d R:%d\r\n",
+               st->rx_packets, Protocol_GetErrorCount(),
+               st->rx_checksum_errors, st->rx_unknown_cmd,
                Encoder_GetCount(ENCODER_LEFT),
                Encoder_GetCount(ENCODER_RIGHT));
-
-        MPU6050_Data_t imu_dbg;
-        if (MPU6050_ReadAll(&imu_dbg) == HAL_OK) {
-            printf("AX:%6d AY:%6d AZ:%6d GX:%6d GY:%6d GZ:%6d",
-                   imu_dbg.accel_x, imu_dbg.accel_y, imu_dbg.accel_z,
-                   imu_dbg.gyro_x, imu_dbg.gyro_y, imu_dbg.gyro_z);
-        }
-        printf("\r\n");
     }
   }
   /* USER CODE END 3 */
