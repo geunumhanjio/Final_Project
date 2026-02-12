@@ -96,18 +96,14 @@ void Sidebar::setupPlaybackUI()
     QLabel *sidebarHeader = new QLabel("CATEGORIES", playbackWidget);
     sidebarHeader->setFixedHeight(50);
     sidebarHeader->setAlignment(Qt::AlignCenter);
-    sidebarHeader->setObjectName("SidebarHeaderTitle"); // Reuse style if possible or add new
-    sidebarHeader->setStyleSheet("color: #94A3B8; font-weight: bold; font-size: 14px; letter-spacing: 1px; border-bottom: 1px solid #334155;");
+    sidebarHeader->setObjectName("PlaybackHeaderTitle"); // [Mod] Unique ID
+    // [Mod] Inline style removed
     layout->addWidget(sidebarHeader);
 
     categoryList = new QListWidget(playbackWidget);
+    categoryList->setObjectName("CategoryList"); // [New] For QSS targeting
     categoryList->setFocusPolicy(Qt::NoFocus);
-    categoryList->setStyleSheet(
-        "QListWidget { background-color: transparent; border: none; outline: none; }"
-        "QListWidget::item { padding: 12px 16px; color: #CBD5E1; font-size: 14px; border-bottom: 1px solid #1E293B; }"
-        "QListWidget::item:selected { background-color: #2563EB; color: white; font-weight: bold; border-left: 4px solid #60A5FA; }"
-        "QListWidget::item:hover { background-color: #1E293B; }"
-    );
+    // [Mod] Inline stylesheet removed to allow Theme support via QSS
     
     // Populate Categories (Same as PlaybackView logic)
     struct Category { int id; QString name; };

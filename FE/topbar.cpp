@@ -25,7 +25,7 @@ TopBar::TopBar(QWidget *parent) : QWidget(parent)
     timer->start(1000);
     timer->start(1000);
     updateTime();
-    updateTheme(true); // Default Dark
+
 }
 
 void TopBar::setupUi()
@@ -39,6 +39,7 @@ void TopBar::setupUi()
     btnToggle->setText("☰");
     btnToggle->setFixedSize(32, 32);
     btnToggle->setCursor(Qt::PointingHandCursor);
+    btnToggle->setObjectName("TopBarToggleBtn"); // [New]
     btnToggle->setStyleSheet("QPushButton { color: #94a3b8; font-size: 20px; border: none; background: transparent; } QPushButton:hover { color: white; background: rgba(255,255,255,0.05); border-radius: 4px; }");
     // Note: btnToggle icon color might need manual update or QIcon theme, keeping simple for now.
 
@@ -164,23 +165,4 @@ void TopBar::updateTime()
     timeLabel->setText(now.toString("HH:mm:ss"));
 }
 
-void TopBar::updateTheme(bool isDark)
-{
-    if (isDark) {
-        // Dark Mode: Light Text
-        titleLabel->setStyleSheet("font-weight: bold; font-size: 16px; letter-spacing: 1px; color: #e2e8f0; background-color: transparent;");
-        if(btnToggle) btnToggle->setStyleSheet("QPushButton { color: #94a3b8; font-size: 20px; border: none; background: transparent; } QPushButton:hover { color: white; background: rgba(255,255,255,0.05); border-radius: 4px; }");
-        
-        // Date/Time Dark
-        dateLabel->setStyleSheet("color: #64748b; font-family: monospace; font-size: 11px; font-weight: bold; background-color: transparent;");
-        timeLabel->setStyleSheet("color: #135bec; font-family: monospace; font-weight: bold; font-size: 14px; background-color: transparent;");
-    } else {
-        // Light Mode: Dark Text (Gray 900)
-        titleLabel->setStyleSheet("font-weight: bold; font-size: 16px; letter-spacing: 1px; color: #1e293b; background-color: transparent;");
-        if(btnToggle) btnToggle->setStyleSheet("QPushButton { color: #475569; font-size: 20px; border: none; background: transparent; } QPushButton:hover { color: #1e293b; background: rgba(0,0,0,0.05); border-radius: 4px; }");
-        
-        // Date/Time Light
-        dateLabel->setStyleSheet("color: #64748b; font-family: monospace; font-size: 11px; font-weight: bold; background-color: transparent;");
-        timeLabel->setStyleSheet("color: #135bec; font-family: monospace; font-weight: bold; font-size: 14px; background-color: transparent;");
-    }
-}
+

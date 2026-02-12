@@ -340,6 +340,5 @@ void MainWindow::toggleTheme()
     m_isDark = !m_isDark;
     QString qssPath = m_isDark ? "style/theme_dark.qss" : "style/theme_light.qss";
     loadTheme(qssPath);
-    if(m_fullPage) m_fullPage->updateTheme(m_isDark);
-    if(m_topBar) m_topBar->updateTheme(m_isDark);
+    // [Mod] Removed manual updateTheme calls
 }

@@ -22,7 +22,7 @@ public:
     explicit FullScreenView(QWidget *parent = nullptr);
     void play(const QString &url, int index);
     void stop();
-    void updateTheme(bool isDark); // Theme Support
+ // Theme Support
 
 signals:
     void closeRequested();

@@ -17,7 +17,7 @@ class TopBar : public QWidget
     Q_OBJECT
 public:
     explicit TopBar(QWidget *parent = nullptr);
-    void updateTheme(bool isDark); // Sync Text/Icon color
+ // Sync Text/Icon color
 
 signals:
     void sidebarToggled();       // Sidebar toggle signal

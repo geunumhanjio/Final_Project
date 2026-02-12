@@ -45,6 +45,7 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
 
     // [New] Playback Controls Container
     playbackContainer = new QWidget(this);
+    playbackContainer->setObjectName("FS_PlaybackContainer"); // [New]
     QHBoxLayout *pbLayout = new QHBoxLayout(playbackContainer);
     pbLayout->setContentsMargins(0, 0, 0, 0);
     pbLayout->setSpacing(8);
@@ -71,6 +72,7 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     btnSkipForward->setFixedWidth(60);
 
     seekSlider = new QSlider(Qt::Horizontal, playbackContainer);
+    seekSlider->setObjectName("FS_SeekSlider"); // [New]
     seekSlider->setRange(0, 1000);
     seekSlider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
@@ -215,92 +217,4 @@ void FullUnderBar::setPlaying(bool isPlaying)
     btnPlayPause->setText(isPlaying ? "⏸" : "⏯");
 }
 
-void FullUnderBar::updateTheme(bool isDark)
-{
-    if (isDark) {
-        // Dark Mode (Original)
-        this->setStyleSheet(
-            "#controlBar { "
-            "   background-color: rgba(15, 23, 42, 0.6); " // More transparent (0.8 -> 0.6)
-            "   border: 1px solid rgba(255, 255, 255, 0.1); "
-            "   border-radius: 12px; "
-            "}"
-            "QPushButton { "
-            "   background-color: transparent; "
-            "   color: #CBD5E1; "
-            "   border: none; "
-            "   padding: 8px 15px; "
-            "   font-size: 13px; font-weight: 500; font-family: 'Segoe UI', sans-serif;"
-            "}"
-            "QPushButton:hover { "
-            "   background-color: rgba(255, 255, 255, 0.1); "
-            "   border-radius: 8px; "
-            "   color: #FFFFFF; "
-            "}"
-            "QPushButton:checked { "
-            "   color: #0EA5E9; font-weight: bold;"
-            "   background-color: rgba(14, 165, 233, 0.1);"
-            "}"
-        );
-        
-        // Reset Button Dark
-        btnResetZoom->setStyleSheet(
-            "#resetBtn { "
-            "   background-color: #0EA5E9; color: white; border-radius: 8px; font-weight: bold; "
-            "}"
-            "#resetBtn:hover { background-color: #38BDF8; }"
-        );
 
-        // [New] Playback Styling Dark
-        playbackContainer->setStyleSheet("background: transparent;");
-        seekSlider->setStyleSheet(
-            "QSlider::groove:horizontal { border: 1px solid #334155; height: 6px; background: #1E293B; margin: 2px 0; border-radius: 3px; }"
-            "QSlider::handle:horizontal { background: #0EA5E9; border: 1px solid #0EA5E9; width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; }"
-            "QSlider::handle:horizontal:hover { background: #38BDF8; }"
-        );
-        timeLabel->setStyleSheet("color: #E2E8F0; font-family: monospace; font-weight: bold;");
-    } else {
-        // Light Mode (White/Orange)
-        // Background: White/60 (adjusted for transparency)
-        this->setStyleSheet(
-            "#controlBar { "
-            "   background-color: rgba(255, 255, 255, 0.60); " // More transparent (0.85 -> 0.60)
-            "   border: 1px solid rgba(0, 0, 0, 0.1); "
-            "   border-radius: 12px; "
-            "}"
-            "QPushButton { "
-            "   background-color: transparent; "
-            "   color: #374151; " // Gray 700 (Lighter/Brighter than Black, visible on White)
-            "   border: none; "
-            "   padding: 8px 15px; "
-            "   font-size: 13px; font-weight: 500; font-family: 'Segoe UI', sans-serif;"
-            "}"
-            "QPushButton:hover { "
-            "   background-color: rgba(255, 255, 255, 1.0); " // White hover
-            "   border-radius: 8px; "
-            "   color: #F98006; " // Primary Orange
-            "}"
-            "QPushButton:checked { "
-            "   color: #F98006; font-weight: bold;"
-            "   background-color: rgba(249, 128, 6, 0.1);"
-            "}"
-        );
-
-        // Reset Button Light (Primary Orange)
-        btnResetZoom->setStyleSheet(
-            "#resetBtn { "
-            "   background-color: #F98006; color: white; border-radius: 8px; font-weight: bold; "
-            "}"
-            "#resetBtn:hover { background-color: #FB923C; }" // Orange-400
-        );
-        
-        // [New] Playback Styling Light
-        playbackContainer->setStyleSheet("background: transparent;");
-        seekSlider->setStyleSheet(
-            "QSlider::groove:horizontal { border: 1px solid #CBD5E1; height: 6px; background: #E2E8F0; margin: 2px 0; border-radius: 3px; }"
-            "QSlider::handle:horizontal { background: #F98006; border: 1px solid #F98006; width: 14px; height: 14px; margin: -5px 0; border-radius: 7px; }"
-            "QSlider::handle:horizontal:hover { background: #FB923C; }"
-        );
-        timeLabel->setStyleSheet("color: #334155; font-family: monospace; font-weight: bold;");
-    }
-}

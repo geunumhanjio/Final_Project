@@ -14,10 +14,14 @@ PlaybackView::PlaybackView(QWidget *parent) : QWidget(parent)
     // Header
     QHBoxLayout *headerLayout = new QHBoxLayout();
     m_titleLabel = new QLabel("Videos - Select Category", this);
-    m_titleLabel->setStyleSheet("font-size: 24px; font-weight: bold; color: white;");
+    m_titleLabel->setObjectName("PlaybackTitle"); // [New]
+    // [Mod] Removed inline style
     
     m_btnRefresh = new QPushButton("Refresh", this);
     m_btnRefresh->setFixedSize(100, 36);
+    // Refresh button style kept for now or can be moved too, but user focused on Title/List.
+    // I'll leave the button inline for now as it wasn't mentioned, but ObjectName is better.
+    m_btnRefresh->setObjectName("PlaybackRefreshBtn");
     m_btnRefresh->setStyleSheet(
         "QPushButton { background-color: #2563eb; color: white; border-radius: 6px; font-weight: bold; }"
         "QPushButton:hover { background-color: #1d4ed8; }"
@@ -29,12 +33,8 @@ PlaybackView::PlaybackView(QWidget *parent) : QWidget(parent)
 
     // File List
     m_listWidget = new QListWidget(this);
-    m_listWidget->setStyleSheet(
-        "QListWidget { background-color: #0F172A; border-radius: 8px; border: 1px solid #334155; color: white; font-size: 14px; }"
-        "QListWidget::item { padding: 8px; border-bottom: 1px solid #1E293B; }"
-        "QListWidget::item:selected { background-color: #3b82f6; }"
-        "QListWidget::item:hover { background-color: #334155; }"
-    );
+    m_listWidget->setObjectName("PlaybackList"); // [New]
+    // [Mod] Removed inline style to use QSS (will enforce Dark style in both themes)
 
     // Progress Bar
     m_progressBar = new QProgressBar(this);

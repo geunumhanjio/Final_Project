@@ -16,7 +16,7 @@ public:
     // 버튼 상태 변경 (0:기본, 1:그리기중, 2:확대됨)
     // 버튼 상태 변경 (0:기본, 1:그리기중, 2:확대됨)
     void setRectButtonMode(int state);
-    void updateTheme(bool isDark); // Theme switcher
+ // Theme switcher
 
     // [New] Playback Controls
     void setMode(bool isFile); // True: Playback, False: Live

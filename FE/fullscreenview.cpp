@@ -63,6 +63,7 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
 
     // 1. Top Info Bar (Stacked Top)
     topBar = new QWidget(videoContainer);
+    topBar->setObjectName("FS_TopBar"); // [New]
     topBar->setFixedHeight(80);
     // Initial Theme (matches updateTheme(true))
     
@@ -70,10 +71,13 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     topLayout->setContentsMargins(20, 10, 20, 10); // Bottom margin reduced (30->10)
     
     titleLabel = new QLabel("CCTV Camera", topBar);
+    titleLabel->setObjectName("FS_TitleLabel"); // [New]
     
     liveBadge = new QLabel("LIVE", topBar);
+    liveBadge->setObjectName("FS_LiveBadge"); // [New]
     
     btnClose = new QPushButton("✕", topBar);
+    btnClose->setObjectName("FS_CloseBtn"); // [New]
     btnClose->setFixedSize(36, 36);
     btnClose->setCursor(Qt::PointingHandCursor);
 
@@ -439,36 +443,4 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
     return QWidget::eventFilter(obj, event);
 }
 
-void FullScreenView::updateTheme(bool isDark)
-{
-    underBar->updateTheme(isDark);
 
-    if (isDark) {
-        // Dark Theme Top Bar
-        topBar->setStyleSheet("background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0,0,0,200), stop:1 transparent);");
-        
-        // Title Text: Yellow with Dark Box
-        titleLabel->setStyleSheet("color: #EAB308; font-weight: bold; font-size: 18px; background-color: rgba(15, 23, 42, 0.6); border-radius: 8px; padding: 4px 12px; border: 1px solid rgba(255, 255, 255, 0.1);");
-        
-        liveBadge->setStyleSheet("color: #EF4444; font-weight: bold; font-size: 11px; border: 1px solid rgba(239, 68, 68, 0.5); background-color: rgba(220, 38, 38, 0.1); padding: 2px 6px; border-radius: 4px;");
-        btnClose->setStyleSheet(
-            "QPushButton { background-color: rgba(30, 41, 59, 0.5); color: #CBD5E1; border: 1px solid rgba(51, 65, 85, 0.5); border-radius: 8px; font-size: 16px; }"
-            "QPushButton:hover { background-color: rgba(220, 38, 38, 0.9); color: white; border-color: #EF4444; }"
-        );
-    } else {
-        // Light Theme Top Bar (White/Orange)
-        topBar->setStyleSheet("background: transparent;");
-        
-        // Title Text: Dark Gray
-        titleLabel->setStyleSheet("color: #111827; font-weight: bold; font-size: 18px; background-color: rgba(255,255,255,0.8); border-radius: 8px; padding: 4px 12px; border: 1px solid rgba(255,255,255,0.6);"); 
-        
-        // Live Badge: Primary (Orange)
-        liveBadge->setStyleSheet("color: #F98006; font-weight: bold; font-size: 11px; border: 1px solid rgba(249, 128, 6, 0.3); background-color: rgba(249, 128, 6, 0.1); padding: 2px 6px; border-radius: 4px;");
-        
-        // Close Button: White Circle look
-        btnClose->setStyleSheet(
-            "QPushButton { background-color: rgba(255, 255, 255, 0.9); color: #374151; border: 1px solid rgba(255, 255, 255, 0.5); border-radius: 18px; font-size: 16px; }"
-            "QPushButton:hover { background-color: #FFFFFF; color: #111827; transform: scale(1.05); }"
-        );
-    }
-}
