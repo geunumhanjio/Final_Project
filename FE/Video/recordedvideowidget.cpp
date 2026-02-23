@@ -143,3 +143,18 @@ void RecordedVideoWidget::updatePosition() {
     qint64 dur = getDuration();
     if (dur > 0) emit durationChanged(dur);
 }
+
+void RecordedVideoWidget::refreshFrame() {
+    // Force redraw current frame (essential when paused)
+    GstElement *pipeline = getPipeline();
+    if (!pipeline) return;
+
+    qint64 current = getPosition();
+    
+    // Seek to current position with FLUSH to force pipeline to re-preroll and output a frame
+    if (!gst_element_seek_simple(pipeline, GST_FORMAT_TIME, 
+        (GstSeekFlags)(GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_ACCURATE), 
+        current * GST_MSECOND)) {
+        qWarning() << "[RecordedVideoWidget] Check frame failed";
+    }
+}

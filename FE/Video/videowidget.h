@@ -35,6 +35,8 @@ public:
     void panView(qreal dx, qreal dy);
     QRectF getCurrentCrop() const { return currentCropRect; }
 
+    virtual void refreshFrame() {} // [New] For forcing update when paused
+
 signals:
     void positionChanged(qint64 positionMs);
     void durationChanged(qint64 durationMs);

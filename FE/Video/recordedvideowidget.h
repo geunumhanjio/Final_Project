@@ -21,6 +21,8 @@ public:
     qint64 getDuration() override;
     qint64 getPosition() override;
 
+    void refreshFrame() override; // [New]
+
 private slots:
     void updatePosition();
 

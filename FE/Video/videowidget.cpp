@@ -24,8 +24,8 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     pipeline = nullptr;
     cropper = nullptr;
     m_isPlaying = false;
-    sourceWidth = 1920; 
-    sourceHeight = 1080;
+    sourceWidth = 0; // [Mod] Init to 0 to detect valid resolution
+    sourceHeight = 0;
     currentCropRect = QRectF(0.0, 0.0, 1.0, 1.0); 
 
     busTimer = new QTimer(this);
@@ -77,9 +77,9 @@ void VideoWidget::stop()
     }
     showPlaceholder("No Signal");
     
-    // Reset Resolution to default to avoid confusion, though usually safe
-    sourceWidth = 1920; 
-    sourceHeight = 1080;
+    // Reset Resolution
+    sourceWidth = 0; 
+    sourceHeight = 0;
 }
 
 void VideoWidget::updateSourceResolution() {
@@ -96,16 +96,11 @@ void VideoWidget::updateSourceResolution() {
                 sourceHeight = h;
                 qDebug() << "[VideoWidget] Source resolution updated:" << w << "x" << h;
                 
-                // Re-apply current crop with new dimensions
-                // applyCrop(currentCropRect); // Optional: might cause recursion if called from stream thread?
-                // Just updating sourceWidth/Height is enough for next applyCrop call.
-                // But better to re-calculate now if we are already zoomed?
-                if (currentCropRect.width() < 0.99) {
-                     // Force re-apply safely? 
-                     // applyCrop calls g_object_set which is threat-safe-ish
-                     // But we are in bus thread (likely). 
-                     // Safe enough.
-                     applyCrop(currentCropRect);
+                // Re-apply current crop if valid
+                if (currentCropRect.isValid()) {
+                    // Temporarily unlock/lock not needed as we are in same thread usually
+                    // But to be safe simply call applyCrop
+                    applyCrop(currentCropRect);
                 }
             }
             gst_caps_unref(caps);
@@ -125,7 +120,19 @@ void VideoWidget::applyCrop(const QRectF &rect)
     currentCropRect = rect; 
 
     // Allow crop adjustment even if paused, as long as pipeline exists
-    if (!cropper) return;
+    if (!cropper) {
+        // Warning logged once
+        return;
+    }
+
+    // [Fix] Ensure resolution is known before cropping
+    if (sourceWidth <= 0 || sourceHeight <= 0) {
+        updateSourceResolution();
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            qWarning() << "[VideoWidget] cannot apply crop, source resolution unknown";
+            return;
+        }
+    }
 
     int left = static_cast<int>(rect.left() * sourceWidth);
     int right = static_cast<int>((1.0 - rect.right()) * sourceWidth);
@@ -135,7 +142,15 @@ void VideoWidget::applyCrop(const QRectF &rect)
     left = qMax(0, left); right = qMax(0, right);
     top = qMax(0, top); bottom = qMax(0, bottom);
 
+    // Debug
+    // qDebug() << "Crop:" << left << right << top << bottom;
+
     g_object_set(cropper, "top", top, "bottom", bottom, "left", left, "right", right, nullptr);
+
+    // [New] If paused, force frame update so user sees the zoom effect immediately
+    if (!m_isPlaying) {
+        refreshFrame();
+    }
 }
 
 void VideoWidget::panView(qreal dx, qreal dy) {
