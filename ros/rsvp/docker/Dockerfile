@@ -74,6 +74,45 @@ RUN apt-get update && apt-get install -y \
     htop \
     && rm -rf /var/lib/apt/lists/*
 
+# ROS2 camera 의존성
+RUN apt-get update && apt-get install -y \
+    ros-humble-camera-info-manager \
+    && rm -rf /var/lib/apt/lists/*
+
+# libcamera 빌드 의존성
+RUN apt-get update && apt-get install -y \
+    meson \
+    ninja-build \
+    libyaml-dev \
+    python3-yaml \
+    python3-ply \
+    python3-jinja2 \
+    libgnutls28-dev \
+    openssl \
+    libudev-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# libcamera 최신 버전 빌드 및 설치
+RUN cd /tmp \
+    && git clone --depth 1 --branch v0.3.0 https://github.com/raspberrypi/libcamera.git \
+    && cd libcamera \
+    && meson setup build --prefix=/usr --libdir=/usr/lib/aarch64-linux-gnu \
+    && ninja -C build \
+    && ninja -C build install \
+    && ldconfig \
+    && ln -s /usr/lib/aarch64-linux-gnu/pkgconfig/camera.pc /usr/lib/aarch64-linux-gnu/pkgconfig/libcamera.pc \
+    && cd / && rm -rf /tmp/libcamera
+
+# YDLiDAR SDK 설치
+RUN cd /tmp \
+    && git clone https://github.com/YDLIDAR/YDLidar-SDK.git \
+    && cd YDLidar-SDK/build \
+    && cmake .. \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig \
+    && cd / && rm -rf /tmp/YDLidar-SDK
+
 WORKDIR /root/ros2_ws
 
 # ROS2 환경 설정
@@ -84,6 +123,10 @@ RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc && \
     echo "export ROS_LOCALHOST_ONLY=0" >> ~/.bashrc && \
     echo "alias sb='source /root/ros2_ws/install/setup.bash'" >> ~/.bashrc && \
     echo "alias cb='cd /root/ros2_ws && colcon build --symlink-install'" >> ~/.bashrc
+
+# libcamera 라이브러리 경로 환경변수 추가
+RUN echo "export LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:\$LD_LIBRARY_PATH" >> ~/.bashrc && \
+    echo "export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig:\$PKG_CONFIG_PATH" >> ~/.bashrc
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
