@@ -160,3 +160,6 @@ Reference materials live in `docs/`:
 예시: `:sparkles: [Feat] 모터 제어 라이브러리 추가`
 
 ⚠️ 커밋 메세지와 프로젝트에 클로드를 사용하였다는 내용을 적지마
+
+## Plan Mode 
+- 계획을 수립하면 해당 내용을 .md 파일로 만들어서 docs/plan에 넣어줘
