@@ -132,7 +132,7 @@ int main(void)
 
     /* Send sensor data to RPi every 50ms via USART1 */
     static uint32_t last_send = 0;
-    uint32_t now = HAL_GetTick();
+    uint32_t now = HAL_GetTick();  // HAL_GetTick()은 1ms 마다 증가하는 시스템 타이머 값을 읽어옴 (Non-blocking)
     if (now - last_send >= 50) {
         last_send = now;
 
