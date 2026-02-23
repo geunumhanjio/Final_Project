@@ -1,0 +1,232 @@
+<mxfile host="65bd71144e">
+    <diagram name="System Architecture" id="system-arch">
+        <mxGraphModel dx="1429" dy="879" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="1500" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="ros_group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;arcSize=8;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="73" width="670" height="207" as="geometry"/>
+                </mxCell>
+                <mxCell id="ros_title" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;PC&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="395" y="93" width="300" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="rpi_group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;arcSize=6;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="410" width="670" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="rpi_title" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;Raspberry Pi 4&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="397.5" y="430" width="300" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="ros_node" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;strokeWidth=1.5;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="480" width="495" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="ros_node_line1" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;• ROS의 /cmd_vel 토픽 구독 → STM 보드로 모터 제어 명령 전송&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#555555;" parent="1" vertex="1">
+                    <mxGeometry x="345" y="530" width="400" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="ros_node_line2" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;• STM 보드로부터 센서 데이터 수신 → ROS의 /odom, /imu 토픽 발행&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#555555;" parent="1" vertex="1">
+                    <mxGeometry x="345" y="552" width="400" height="22" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow_rpi_stm" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" edge="1" target="16" source="8">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="480" y="552" as="sourcePoint"/>
+                        <mxPoint x="540" y="740" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="490" y="680"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="49" value="속도 [mm/s]" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="arrow_rpi_stm">
+                    <mxGeometry x="0.0535" y="-1" relative="1" as="geometry">
+                        <mxPoint y="-6" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow_rpi_stm_up" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#333333;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" parent="1" edge="1" target="9" source="17">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="523.65" y="768" as="sourcePoint"/>
+                        <mxPoint x="566.35" y="589.9999999999999" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="610" y="680"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="50" value="센서 데이터" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="arrow_rpi_stm_up">
+                    <mxGeometry x="-0.1787" y="-3" relative="1" as="geometry">
+                        <mxPoint y="-14" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="stm_group" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;arcSize=5;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="750" width="670" height="270" as="geometry"/>
+                </mxCell>
+                <mxCell id="stm_title" value="&lt;b&gt;&lt;font style=&quot;font-size: 18px;&quot;&gt;STM32 NUCLEO-F401RE&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="345" y="790" width="400" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="mod_uart" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;UART&lt;br&gt;Protocol&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(USART1)&lt;/font&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=1.5;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="850" width="130" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="mod_motor" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;Motor&lt;br&gt;Control&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(TIM2 PWM)&lt;/font&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=1.5;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="850" width="130" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="mod_encoder" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;Encoder&lt;br&gt;Driver&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(TIM3/TIM4)&lt;/font&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=1.5;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="560" y="850" width="130" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="mod_imu" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;MPU6050&lt;br&gt;Driver&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#888888&quot;&gt;(I2C1)&lt;/font&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;strokeWidth=1.5;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="720" y="850" width="130" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="hal_bar" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;STM32 HAL Drivers&lt;/b&gt;  |  &lt;b&gt;CMSIS&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;strokeWidth=1;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="240" y="961" width="610" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow_motor_l298n" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#d6b656;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1" target="hw_l298n" source="25">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="379.76" y="1020" as="sourcePoint"/>
+                        <mxPoint x="379.76" y="1080" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="35" value="방향" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="arrow_motor_l298n">
+                    <mxGeometry x="-0.0127" y="1" relative="1" as="geometry">
+                        <mxPoint x="-1" y="-3" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow_enc_hw_up" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#d6b656;" parent="1" edge="1" source="hw_encoder">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="619.71" y="1080" as="sourcePoint"/>
+                        <mxPoint x="619.71" y="1020" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="38" value="A상/B상" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="arrow_enc_hw_up">
+                    <mxGeometry x="-0.0619" y="5" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow_imu_hw" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#d6b656;entryX=0.25;entryY=0;entryDx=0;entryDy=0;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" parent="1" edge="1" target="33" source="20">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="780.7185714285713" y="1020" as="sourcePoint"/>
+                        <mxPoint x="789.29" y="1080" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="770" y="1050"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="42" value="제어" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="arrow_imu_hw">
+                    <mxGeometry x="-0.1847" y="3" relative="1" as="geometry">
+                        <mxPoint x="-3" y="1" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="arrow_imu_hw_up" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#d6b656;entryX=0.75;entryY=1;entryDx=0;entryDy=0;exitX=0.75;exitY=0;exitDx=0;exitDy=0;" parent="1" edge="1" target="20" source="33">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="800" y="1080" as="sourcePoint"/>
+                        <mxPoint x="800" y="1020" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="800" y="1060"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="43" value="데이터" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="arrow_imu_hw_up">
+                    <mxGeometry x="-0.0462" y="2" relative="1" as="geometry">
+                        <mxPoint x="3" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="hw_l298n" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;L298N&lt;/b&gt;&lt;br&gt;모터 드라이버&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="1090" width="160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="hw_encoder" value="&lt;span style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;휠 엔코더&lt;/b&gt;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="540" y="1090" width="160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="hw_imu" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;GY-521&lt;/b&gt;&lt;br&gt;(MPU6050)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="705" y="1090" width="160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow_l298n_dc" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#666666;" parent="1" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="360" y="1180" as="sourcePoint"/>
+                        <mxPoint x="360" y="1220" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="hw_dc_motor" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;DC 모터&lt;/b&gt;&lt;br&gt;좌 / 우&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="280" y="1220" width="160" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#999999;strokeWidth=1.5;" vertex="1" parent="1">
+                    <mxGeometry x="300" y="143" width="490" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="ros_node_title" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;ROS Navigation Stack&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="445" y="153" width="200" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="TX" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="515" y="600" width="25" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="RX" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="550" y="600" width="25" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="ros_desc" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;span style=&quot;color: rgb(63, 63, 63); text-align: left;&quot;&gt;•&amp;nbsp;&lt;/span&gt;주행 경로와 이동 속도 계산&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=12;fontColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="390" y="203" width="300" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="RX" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="515" y="750" width="25" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="17" value="TX" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="550" y="750" width="25" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="22" value="PWM" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="310" y="1000" width="40" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="TIM" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="605" y="1000" width="30" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="GPIO" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="370" y="1000" width="40" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#d6b656;" edge="1" parent="1" target="20">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="795" y="1020" as="sourcePoint"/>
+                        <mxPoint x="795" y="1080" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="20" value="I2C" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="770" y="1000" width="30" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="33" value="I2C" style="whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="770" y="1090" width="30" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="36" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#d6b656;" edge="1" parent="1" target="hw_l298n">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="329.76" y="1020" as="sourcePoint"/>
+                        <mxPoint x="329.76" y="1080" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="37" value="속력" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="36">
+                    <mxGeometry x="-0.0127" y="1" relative="1" as="geometry">
+                        <mxPoint y="-3" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="3" value="&lt;b&gt;&lt;font style=&quot;font-size: 14px;&quot;&gt;ROS 노드&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;fontSize=13;" vertex="1" parent="1">
+                    <mxGeometry x="445" y="490" width="200" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="55" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#333333;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="525.5" y="280" as="sourcePoint"/>
+                        <mxPoint x="525.5" y="410" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="487.5" y="340"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="56" value="/cmd_vel" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="55">
+                    <mxGeometry x="0.0535" y="-1" relative="1" as="geometry">
+                        <mxPoint y="-6" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="57" value="" style="endArrow=block;endFill=1;strokeWidth=2;strokeColor=#333333;entryX=0.5;entryY=1;entryDx=0;entryDy=0;exitX=0.5;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="560.5" y="410" as="sourcePoint"/>
+                        <mxPoint x="560.5" y="280" as="targetPoint"/>
+                        <Array as="points">
+                            <mxPoint x="607.5" y="340"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="58" value="/odom, /imu" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="57">
+                    <mxGeometry x="-0.1787" y="-3" relative="1" as="geometry">
+                        <mxPoint y="-14" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
