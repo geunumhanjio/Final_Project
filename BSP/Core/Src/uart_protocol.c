@@ -161,6 +161,14 @@ uint32_t Protocol_GetErrorCount(void)
 
 static void Protocol_Dispatch(const Packet_t *pkt)
 {
+#ifdef DEBUG_PACKET
+    printf("[PKT] CMD=0x%02X LEN=%d", pkt->cmd, pkt->len);
+    for (uint8_t i = 0; i < pkt->len; i++) {
+        printf(" D[%d]=0x%02X", i, pkt->data[i]);
+    }
+    printf("\r\n");
+#endif
+
     switch (pkt->cmd) {
 
     case CMD_VELOCITY:
