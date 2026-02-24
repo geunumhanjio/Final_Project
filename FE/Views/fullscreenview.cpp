@@ -3,6 +3,13 @@
 #include <QCursor>
 #include <QPainter>
 #include <QFileInfo>
+#include <QMenu>         // [New]
+#include <QAction>       // [New]
+#include <QCheckBox>     // [New]
+#include <QLabel>        // [New]
+#include "osdwidget.h"   // [New]
+#include <QGuiApplication>
+#include <QApplication>
 
 // =============================================================
 // [내부 클래스] 직접 그려지는 네모 박스
@@ -128,10 +135,113 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     liveBadge = new QLabel("LIVE", topBar);
     liveBadge->setObjectName("FS_LiveBadge"); // [New]
     
+    // [New] Settings Button for OSD Menu
+    btnSettings = new QPushButton("⚙", topBar);
+    btnSettings->setObjectName("FS_SettingsBtn");
+    btnSettings->setFixedSize(36, 36);
+    btnSettings->setCursor(Qt::PointingHandCursor);
+    
     btnClose = new QPushButton("✕", topBar);
     btnClose->setObjectName("FS_CloseBtn"); // [New]
     btnClose->setFixedSize(36, 36);
     btnClose->setCursor(Qt::PointingHandCursor);
+
+    // [New] Connect Settings (OSD Menu) Signal
+    connect(btnSettings, &QPushButton::clicked, this, [this](){
+        if (!videoWidget || !videoWidget->getOsdWidget()) return;
+        
+        QWidget *popup = new QWidget(this);
+        popup->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+        popup->setAttribute(Qt::WA_DeleteOnClose);
+        popup->setStyleSheet("QWidget { background-color: #2b2b2b; color: white; border: 1px solid #555; border-radius: 4px; } "
+                             "QCheckBox { spacing: 8px; font-size: 11px; padding: 4px; border: none; } "
+                             "QCheckBox::indicator { width: 14px; height: 14px; } "
+                             "QLabel { border: none; font-weight: bold; font-size: 12px; }");
+
+        QVBoxLayout *layout = new QVBoxLayout(popup);
+        layout->setContentsMargins(8, 8, 8, 8);
+        layout->setSpacing(4);
+
+        // Header with Title and X button
+        QHBoxLayout *headerLayout = new QHBoxLayout();
+        QLabel *title = new QLabel("OSD Settings", popup);
+        QPushButton *closeBtn = new QPushButton("✕", popup);
+        closeBtn->setFixedSize(20, 20);
+        closeBtn->setStyleSheet("QPushButton { border: none; background: transparent; color: #aaa; font-weight: bold; } "
+                                "QPushButton:hover { color: white; background: rgba(255,0,0,150); border-radius: 2px; }");
+        connect(closeBtn, &QPushButton::clicked, popup, &QWidget::close);
+
+        headerLayout->addWidget(title);
+        headerLayout->addStretch();
+        headerLayout->addWidget(closeBtn);
+        layout->addLayout(headerLayout);
+
+        // Divider
+        QFrame *line = new QFrame(popup);
+        line->setFrameShape(QFrame::HLine);
+        line->setStyleSheet("border: 1px solid #555;");
+        layout->addWidget(line);
+
+        OsdWidget *osd = videoWidget->getOsdWidget();
+
+        // [New] All Checkbox
+        QCheckBox *cbAll = new QCheckBox("All", popup);
+        cbAll->setStyleSheet("font-weight: bold; color: #F59E0B;");
+        layout->addWidget(cbAll);
+
+        // Divider
+        QFrame *line2 = new QFrame(popup);
+        line2->setFrameShape(QFrame::HLine);
+        line2->setStyleSheet("border: 1px solid #555;");
+        layout->addWidget(line2);
+
+        QList<QPair<OsdWidget::Metric, QCheckBox*>> metricCbs;
+        int checkedCount = 0;
+
+        for (int i = 0; i < OsdWidget::MetricCount; ++i) {
+            OsdWidget::Metric metric = static_cast<OsdWidget::Metric>(i);
+            QCheckBox *cb = new QCheckBox(OsdWidget::getMetricName(metric), popup);
+            bool isVis = osd->isMetricVisible(metric);
+            cb->setChecked(isVis);
+            if (isVis) checkedCount++;
+            
+            metricCbs.append(qMakePair(metric, cb));
+            layout->addWidget(cb);
+        }
+
+        for (auto pair : metricCbs) {
+            OsdWidget::Metric metric = pair.first;
+            QCheckBox *cb = pair.second;
+            
+            connect(cb, &QCheckBox::toggled, [osd, metric, cbAll, metricCbs](bool checked) {
+                osd->setMetricVisible(metric, checked);
+                if (checked) osd->show();
+
+                // Update 'All' checkbox state
+                bool allChecked = true;
+                for(auto p : metricCbs) {
+                    if(!p.second->isChecked()) { allChecked = false; break; }
+                }
+                cbAll->blockSignals(true);
+                cbAll->setChecked(allChecked);
+                cbAll->blockSignals(false);
+            });
+        }
+
+        cbAll->setChecked(checkedCount == OsdWidget::MetricCount);
+        
+        connect(cbAll, &QCheckBox::toggled, [metricCbs](bool checked) {
+            for(auto p : metricCbs) {
+                if (p.second->isChecked() != checked) {
+                    p.second->setChecked(checked);
+                }
+            }
+        });
+
+        QPoint globalPos = btnSettings->mapToGlobal(QPoint(0, btnSettings->height()));
+        popup->move(globalPos);
+        popup->show();
+    });
 
     connect(btnClose, &QPushButton::clicked, this, &FullScreenView::closeRequested);
 
@@ -139,6 +249,7 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     topLayout->addSpacing(10);
     topLayout->addWidget(liveBadge);
     topLayout->addStretch();
+    topLayout->addWidget(btnSettings); // [New] Add to layout
     topLayout->addWidget(btnClose);
 
     // Add TopBar to VBox
@@ -239,7 +350,25 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     });
 
     rubberBand = nullptr;
-    controlOverlay = nullptr;
+    controlOverlay = new ControlOverlay(this);
+    controlOverlay->hide();
+
+    // [New] 글로벌 애플리케이션 포커스 상태 변경 감지
+    connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state != Qt::ApplicationActive) {
+            if (controlOverlay) controlOverlay->hide();
+        } else {
+            if (currentMode == ControlMode && controlOverlay && this->isVisible()) {
+                controlOverlay->show();
+            }
+        }
+    });
+
+    // [New] Timer to constantly sync ControlOverlay position when app moves
+    syncTimer = new QTimer(this);
+    connect(syncTimer, &QTimer::timeout, this, &FullScreenView::syncOverlayPosition);
+    syncTimer->start(16); // ~60fps sync rate
+
     isSettingDirection = false;
     isDrawing = false;
     isPanning = false;
@@ -578,12 +707,40 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
             }
         }
     }
-    else if (obj == videoWidget && event->type() == QEvent::Resize && controlOverlay) {
-        // resize 이벤트 발생 시 오버레이의 위치 조절
-        QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
-        controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+    else if (obj == videoWidget && event->type() == QEvent::Resize) {
+        if (controlOverlay && currentMode == ControlMode && isVisible()) {
+            QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+            controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+        }
     }
     return QWidget::eventFilter(obj, event);
 }
 
+void FullScreenView::syncOverlayPosition() {
+    if (controlOverlay && currentMode == ControlMode && controlOverlay->isVisible() && this->isVisible() && videoWidget) {
+        QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+        QRect currentRect = controlOverlay->geometry();
+        QRect newRect(globalTopLeft, videoWidget->size());
+        if (currentRect != newRect) {
+            controlOverlay->setGeometry(newRect);
+        }
+    }
+}
 
+void FullScreenView::updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs)
+{
+    int expectedChannel = (currentChannelId < 4) ? (currentChannelId + 1) : 9;
+    if (channelId == expectedChannel && videoWidget && videoWidget->getOsdWidget()) {
+        OsdWidget *osd = videoWidget->getOsdWidget();
+        
+        if (osd->isMetricVisible(OsdWidget::FPS)) {
+            osd->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
+        }
+        if (osd->isMetricVisible(OsdWidget::Bitrate)) {
+            osd->setMetricValue(OsdWidget::Bitrate, QString::number(bitrateKbps / 1024.0, 'f', 2) + " Mbps");
+        }
+        if (osd->isMetricVisible(OsdWidget::Latency)) {
+            osd->setMetricValue(OsdWidget::Latency, QString::number(proxyLatencyMs, 'f', 3) + " ms");
+        }
+    }
+}

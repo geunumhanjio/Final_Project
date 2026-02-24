@@ -42,6 +42,7 @@ private:
 
 private slots:
     void processInput();
+    void onConfigChanged(); // [New]
 
 private:
     TopBar *m_topBar;

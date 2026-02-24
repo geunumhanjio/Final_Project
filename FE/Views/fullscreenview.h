@@ -22,6 +22,7 @@ public:
     explicit FullScreenView(QWidget *parent = nullptr);
     void play(const QString &url, int index);
     void stop();
+    void updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs); // [New]
  // Theme Support
 
 signals:
@@ -51,12 +52,16 @@ private:
     QWidget *topBar;
     QLabel *titleLabel;
     QLabel *liveBadge;
+    QPushButton *btnSettings; // [New]
     QPushButton *btnClose;
 
     // [수정] QRubberBand* -> QWidget* 으로 변경
     QWidget *rubberBand;
 
     QWidget *controlOverlay;
+    QTimer *syncTimer; // [New]
+    void syncOverlayPosition(); // [New]
+
     bool isSettingDirection;
     QPoint goalStartPos;
 

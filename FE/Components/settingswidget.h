@@ -25,6 +25,7 @@ public:
         
         ipEdit = new QLineEdit(this);
         portEdit = new QLineEdit(this);
+        robotIpEdit = new QLineEdit(this); // [New] Robot IP
         
         cctvOptionCheck = new QCheckBox("Use Custom CCTV URL", this); // Initialize cctvOptionCheck
         cctvOptionCheck->setStyleSheet(
@@ -41,6 +42,7 @@ public:
         ConfigManager::instance().loadDefaults(); 
         ipEdit->setText(ConfigManager::instance().getCameraIp());
         portEdit->setText(ConfigManager::instance().getCameraPort());
+        robotIpEdit->setText(ConfigManager::instance().getRobotIp()); // [New]
         cctvOptionCheck->setChecked(ConfigManager::instance().getUseCustomCCTV());
 
         manualControlCheck = new QCheckBox("Enable Manual Control (WASD)", this);
@@ -51,6 +53,7 @@ public:
         QString inputStyle = "QLineEdit { padding: 8px; border: 1px solid #444; border-radius: 4px; color: white; background: #333; }";
         ipEdit->setStyleSheet(inputStyle);
         portEdit->setStyleSheet(inputStyle);
+        robotIpEdit->setStyleSheet(inputStyle);
         
         QLabel *ipLabel = new QLabel("Camera IP:", this);
         ipLabel->setStyleSheet("color: #ddd; font-weight: bold;");
@@ -62,10 +65,14 @@ public:
         QLabel *optionHint = new QLabel("Check to use: rtsp://admin:5hanwha!@<IP>:<PORT>/<ID>/H.264/media.smp", this);
         optionHint->setStyleSheet("color: #888; font-size: 11px; margin-bottom: 8px;");
 
+        QLabel *robotIpLabel = new QLabel("ROS2 Bridge WS:", this); // [New]
+        robotIpLabel->setStyleSheet("color: #ddd; font-weight: bold;");
+
         form->addRow(ipLabel, ipEdit);
         form->addRow(portLabel, portEdit);
         form->addRow(optionLabel, cctvOptionCheck);
         form->addRow("", optionHint);
+        form->addRow(robotIpLabel, robotIpEdit); // [New]
         
         QLabel *controlLabel = new QLabel("Control:", this);
         controlLabel->setStyleSheet("color: #ddd; font-weight: bold;");
@@ -102,6 +109,7 @@ public:
         // 1. 설정 저장
         ConfigManager::instance().setCameraIp(ipEdit->text());
         ConfigManager::instance().setCameraPort(portEdit->text());
+        ConfigManager::instance().setRobotIp(robotIpEdit->text()); // [New]
         ConfigManager::instance().setUseCustomCCTV(cctvOptionCheck->isChecked());
         ConfigManager::instance().setManualControl(manualControlCheck->isChecked());
         
@@ -114,6 +122,7 @@ public:
 private:
     QLineEdit *ipEdit;
     QLineEdit *portEdit;
+    QLineEdit *robotIpEdit; // [New]
     QCheckBox *cctvOptionCheck;
     QCheckBox *manualControlCheck;
 };

@@ -26,6 +26,7 @@ public:
     void playUrl(const QString &url, int latency = 200);
     void stop();
     VideoWidget* videoWidget() const { return m_videoWidget; }
+    void updateStreamStats(double fps, double bitrateKbps, double proxyLatencyMs); // [New]
 
     // UI Setters
     void setChannelName(const QString &name);
@@ -40,6 +41,7 @@ signals:
 
 private slots:
     void toggleRecord();
+    void showSettingsMenu(); // [New] Settings Menu Slot
 
 protected:
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)

@@ -16,10 +16,13 @@ public:
     explicit CameraControlClient(QObject *parent = nullptr);
     ~CameraControlClient();
 
+    // Connects persistently for receiving STREAM_STATS
+    void connectToServer(const QString &cameraIp); // [New]
+
     // Connects to ws://[cameraIp]:9000 and sends the command
     void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
     void requestRecordings(const QString &cameraIp);
-    void requestDownload(const QString &cameraIp, const QString &filename); // [New]
+    void requestDownload(const QString &cameraIp, const QString &filename);
 
 signals:
     void connected();
@@ -27,6 +30,9 @@ signals:
     void errorOccurred(QString error);
     void videoReceived(QString url);
     void recordingListReceived(QJsonArray list);
+    
+    // [New] Stream Stats
+    void streamStatsReceived(int channelId, double fps, double bitrateKbps, double proxyLatencyMs);
     
     // File Transfer Signals
     void downloadProgress(qint64 received, qint64 total);
@@ -42,6 +48,7 @@ private slots:
 private:
     QWebSocket m_webSocket;
     QString m_pendingCommand;
+    QString m_currentIp; // [New]
     bool m_isConnecting;
 
     // File Transfer State

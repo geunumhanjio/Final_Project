@@ -18,7 +18,16 @@ LiveVideoWidget::LiveVideoWidget(QWidget *parent)
     watchdogTimer->setSingleShot(true);
     connect(watchdogTimer, &QTimer::timeout, [this](){
         if(isPlaying()) return; // Base class m_isPlaying
-        stop();
+        qWarning() << "[LiveVideoWidget] Watchdog timeout. Forcing reconnect for:" << currentUrl;
+        
+        QString savedUrl = currentUrl;
+        int savedLatency = currentLatency;
+        
+        VideoWidget::stop(); // Clean up pipeline, doesn't clear currentUrl
+        
+        currentUrl = savedUrl;
+        currentLatency = savedLatency;
+        
         startRetryTimer();
     });
 }
@@ -31,6 +40,7 @@ LiveVideoWidget::~LiveVideoWidget()
 void LiveVideoWidget::playUrl(const QString &url, int latency)
 {
     // Duplicate check
+    // If playing, same URL, same latency, ignore
     if (isPlaying() && currentUrl == url && currentLatency == latency) return;
 
     VideoWidget::stop(); // Stop base pipeline if running
