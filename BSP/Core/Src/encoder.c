@@ -1,5 +1,9 @@
 #include "encoder.h"
 
+#define ENCODER_PPR             1920.0f   // 4x quadrature (480 CPR × 4)
+#define WHEEL_CIRCUMFERENCE_MM  204.2f    // π × 65mm (지름 6.5cm)
+#define ENCODER_DT_S            0.01f     // 10ms 제어 주기
+
 /* 타이머(하드웨어)의 엔코더 인터페이스 시작 */
 void Encoder_Init(void)
 {
@@ -25,4 +29,25 @@ void Encoder_ResetCount(Encoder_Select_t encoder)
     } else {
         __HAL_TIM_SET_COUNTER(&htim4, 0);
     }
+}
+
+/* 10ms마다 호출 — 직전 호출 대비 tick 변화량을 mm/s로 변환 */
+float Encoder_GetSpeed(Encoder_Select_t encoder)
+{
+    static int16_t prev_left  = 0;
+    static int16_t prev_right = 0;
+
+    int16_t current = Encoder_GetCount(encoder);
+    int16_t delta;
+
+    if (encoder == ENCODER_LEFT) {
+        delta = current - prev_left;
+        prev_left = current;
+    } else {
+        delta = current - prev_right;
+        prev_right = current;
+    }
+
+    // delta [tick] / PPR [tick/rev] * circumference [mm/rev] / dt [s] = mm/s
+    return ((float)delta / ENCODER_PPR) * WHEEL_CIRCUMFERENCE_MM / ENCODER_DT_S;
 }
