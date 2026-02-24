@@ -21,6 +21,7 @@ public:
 
     // Connects to ws://[cameraIp]:9000 and sends the command
     void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
+    void requestStreamStats(const QString &cameraIp, int channelId, bool start); // [New]
     void requestRecordings(const QString &cameraIp);
     void requestDownload(const QString &cameraIp, const QString &filename);
 

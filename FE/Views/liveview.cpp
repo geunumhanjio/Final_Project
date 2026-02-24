@@ -39,6 +39,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
 
         // Connect record signal
         connect(cctvWidgets[i], &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
+        connect(cctvWidgets[i], &VideoCard::streamStatsRequested, this, &LiveView::streamStatsRequested); // [New]
         
         gridLayout->addWidget(cctvWidgets[i], i / 2, i % 2);
     }
@@ -71,6 +72,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     
     // Connect record signal
     connect(rcCarCamWidget, &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
+    connect(rcCarCamWidget, &VideoCard::streamStatsRequested, this, &LiveView::streamStatsRequested); // [New]
 
     rightLayout->addWidget(rcCarCamWidget);
 

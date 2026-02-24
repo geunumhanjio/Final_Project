@@ -305,18 +305,23 @@ void VideoCard::showSettingsMenu()
         OsdWidget::Metric metric = pair.first;
         QCheckBox *cb = pair.second;
         
-        connect(cb, &QCheckBox::toggled, [osd, metric, cbAll, metricCbs](bool checked) {
+        connect(cb, &QCheckBox::toggled, [this, osd, metric, cbAll, metricCbs](bool checked) {
             osd->setMetricVisible(metric, checked);
             if (checked) osd->show();
             
             // Check if all are checked to update cbAll
             bool allChecked = true;
+            bool anyChecked = false; // [New]
             for(auto p : metricCbs) {
-                if(!p.second->isChecked()) { allChecked = false; break; }
+                if(!p.second->isChecked()) { allChecked = false; }
+                if(p.second->isChecked()) { anyChecked = true; }
             }
             cbAll->blockSignals(true);
             cbAll->setChecked(allChecked);
             cbAll->blockSignals(false);
+            
+            // Emit signal to dynamically connect to camera server WebSocket
+            emit streamStatsRequested(m_channelId, anyChecked);
         });
     }
 

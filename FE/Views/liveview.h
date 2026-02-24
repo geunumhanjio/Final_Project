@@ -20,6 +20,7 @@ public:
 signals:
     void requestFullScreen(int index, QString url);
     void recordCommandRequested(int channelId, bool start);
+    void streamStatsRequested(int channelId, bool start); // [New]
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
