@@ -1,8 +1,12 @@
 #include "motor_control.h"
+#include "pid.h"
 #include "gpio.h"
 #include <stdlib.h>  // abs()
 
 /* Private defines -----------------------------------------------------------*/
+// 가속도 제한 (open-loop 시절 유산 — PID 구현 후 미사용)
+// #define MAX_ACCEL_MMPS_PER_10MS 200
+
 // L298N GPIO 핀 정의
 #define MOTOR_LEFT_IN1_PORT     GPIOC
 #define MOTOR_LEFT_IN1_PIN      GPIO_PIN_0
@@ -18,22 +22,22 @@
 #define MOTOR_LEFT_PWM_CHANNEL  TIM_CHANNEL_1  // ENA
 #define MOTOR_RIGHT_PWM_CHANNEL TIM_CHANNEL_2  // ENB
 
-// 가속도 제한 (100Hz 기준)
-#define MAX_ACCEL_MMPS_PER_10MS 200  // 10ms당 200mm/s 가속 허용
-
 /* Private variables ---------------------------------------------------------*/
-static uint8_t motor_initialized = 0;
-static uint8_t emergency_stop_active = 0;
-static uint32_t last_cmd_time_ms = 0;
+static uint8_t  motor_initialized     = 0;
+static uint8_t  emergency_stop_active = 0;
+static uint32_t last_cmd_time_ms      = 0;
 
-// 현재 속도 (가속도 제한용)
-static int16_t current_left_speed = 0;
-static int16_t current_right_speed = 0;
+// PID 목표 속도 (Motor_SetVelocity가 저장, Motor_PID_Update가 소비)
+static float target_left_mmps  = 0.0f;
+static float target_right_mmps = 0.0f;
+
+// PID 인스턴스
+static PID_t pid_left;
+static PID_t pid_right;
 
 /* Private function prototypes -----------------------------------------------*/
 static uint16_t SpeedMMPS_To_PWM(uint16_t speed_mmps);
 static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps);
-static int16_t Motor_LimitAcceleration(int16_t current, int16_t target, int16_t max_delta);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -105,26 +109,6 @@ static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps)
     __HAL_TIM_SET_COMPARE(&htim2, pwm_channel, pwm_value);
 }
 
-/**
- * @brief  가속도 제한 적용
- * @param  current: 현재 속도
- * @param  target: 목표 속도
- * @param  max_delta: 최대 변화량
- * @retval 제한된 속도
- */
-static int16_t Motor_LimitAcceleration(int16_t current, int16_t target, int16_t max_delta)
-{
-    int16_t delta = target - current;
-    
-    if (delta > max_delta) {
-        return current + max_delta;
-    } else if (delta < -max_delta) {
-        return current - max_delta;
-    } else {
-        return target;
-    }
-}
-
 /* Exported functions --------------------------------------------------------*/
 
 /**
@@ -150,53 +134,30 @@ Motor_Status_t Motor_Init(void)
     __HAL_TIM_SET_COMPARE(&htim2, MOTOR_RIGHT_PWM_CHANNEL, 0);
     
     // 초기 상태 설정
-    motor_initialized = 1;
+    motor_initialized     = 1;
     emergency_stop_active = 0;
-    current_left_speed = 0;
-    current_right_speed = 0;
-    last_cmd_time_ms = HAL_GetTick();
-    
+    target_left_mmps      = 0.0f;
+    target_right_mmps     = 0.0f;
+    last_cmd_time_ms      = HAL_GetTick();
+
+    PID_Init(&pid_left,  PID_KP, PID_KI, PID_KD, PID_DT);
+    PID_Init(&pid_right, PID_KP, PID_KI, PID_KD, PID_DT);
+
     return MOTOR_OK;
 }
 
 /**
- * @brief  양쪽 바퀴 속도 설정
+ * @brief  양쪽 바퀴 목표 속도 설정 (PID 루프가 실제 제어)
  */
 Motor_Status_t Motor_SetVelocity(int16_t left_mmps, int16_t right_mmps)
 {
-    if (!motor_initialized) {
-        return MOTOR_ERROR;
-    }
-    
-    // 비상 정지 상태면 명령 무시
-    if (emergency_stop_active) {
-        return MOTOR_ERROR;
-    }
-    
-    // 명령 타임아웃 리셋
-    last_cmd_time_ms = HAL_GetTick();
-    
-    // 가속도 제한 적용
-    int16_t limited_left = Motor_LimitAcceleration(
-        current_left_speed, 
-        left_mmps, 
-        MAX_ACCEL_MMPS_PER_10MS
-    );
-    
-    int16_t limited_right = Motor_LimitAcceleration(
-        current_right_speed, 
-        right_mmps, 
-        MAX_ACCEL_MMPS_PER_10MS
-    );
-    
-    // 현재 속도 업데이트
-    current_left_speed = limited_left;
-    current_right_speed = limited_right;
-    
-    // 모터 제어
-    Motor_SetRaw(MOTOR_LEFT, limited_left);
-    Motor_SetRaw(MOTOR_RIGHT, limited_right);
-    
+    if (!motor_initialized)    return MOTOR_ERROR;
+    if (emergency_stop_active) return MOTOR_ERROR;
+
+    last_cmd_time_ms  = HAL_GetTick();
+    target_left_mmps  = (float)left_mmps;
+    target_right_mmps = (float)right_mmps;
+
     return MOTOR_OK;
 }
 
@@ -205,62 +166,38 @@ Motor_Status_t Motor_SetVelocity(int16_t left_mmps, int16_t right_mmps)
  */
 Motor_Status_t Motor_EmergencyStop(void)
 {
-    if (!motor_initialized) {
-        return MOTOR_ERROR;
-    }
-    
-    // 비상 정지 플래그 설정
+    if (!motor_initialized) return MOTOR_ERROR;
+
     emergency_stop_active = 1;
-    
+    target_left_mmps      = 0.0f;
+    target_right_mmps     = 0.0f;
+    PID_Reset(&pid_left);
+    PID_Reset(&pid_right);
+
     // PWM 즉시 0
     __HAL_TIM_SET_COMPARE(&htim2, MOTOR_LEFT_PWM_CHANNEL, 0);
     __HAL_TIM_SET_COMPARE(&htim2, MOTOR_RIGHT_PWM_CHANNEL, 0);
-    
+
     // 브레이크 모드 (IN1=1, IN2=1)
-    HAL_GPIO_WritePin(MOTOR_LEFT_IN1_PORT, MOTOR_LEFT_IN1_PIN, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(MOTOR_LEFT_IN2_PORT, MOTOR_LEFT_IN2_PIN, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(MOTOR_LEFT_IN1_PORT,  MOTOR_LEFT_IN1_PIN,  GPIO_PIN_SET);
+    HAL_GPIO_WritePin(MOTOR_LEFT_IN2_PORT,  MOTOR_LEFT_IN2_PIN,  GPIO_PIN_SET);
     HAL_GPIO_WritePin(MOTOR_RIGHT_IN1_PORT, MOTOR_RIGHT_IN1_PIN, GPIO_PIN_SET);
     HAL_GPIO_WritePin(MOTOR_RIGHT_IN2_PORT, MOTOR_RIGHT_IN2_PIN, GPIO_PIN_SET);
-    
-    // 현재 속도 0으로 리셋
-    current_left_speed = 0;
-    current_right_speed = 0;
-    
+
     return MOTOR_OK;
 }
 
 /**
- * @brief  부드러운 정지
+ * @brief  부드러운 정지 — 목표 속도를 0으로 설정, PID가 감속 처리
  */
 Motor_Status_t Motor_SoftStop(void)
 {
-    if (!motor_initialized) {
-        return MOTOR_ERROR;
-    }
-    
-    // 비상 정지 상태가 아닐 때만 작동
-    if (emergency_stop_active) {
-        return MOTOR_ERROR;
-    }
-    
-    // 목표 속도를 0으로 설정하고 가속도 제한 적용
-    // Motor_SetVelocity를 주기적으로 호출하면 자동으로 감속됨
-    // 또는 여기서 직접 감속 루프를 실행
-    
-    // 간단한 구현: 즉시 0으로 설정하되 Coast 모드 사용
-    current_left_speed = 0;
-    current_right_speed = 0;
-    
-    // PWM 0
-    __HAL_TIM_SET_COMPARE(&htim2, MOTOR_LEFT_PWM_CHANNEL, 0);
-    __HAL_TIM_SET_COMPARE(&htim2, MOTOR_RIGHT_PWM_CHANNEL, 0);
-    
-    // Coast 모드 (IN1=0, IN2=0) - 관성으로 정지
-    HAL_GPIO_WritePin(MOTOR_LEFT_IN1_PORT, MOTOR_LEFT_IN1_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(MOTOR_LEFT_IN2_PORT, MOTOR_LEFT_IN2_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(MOTOR_RIGHT_IN1_PORT, MOTOR_RIGHT_IN1_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(MOTOR_RIGHT_IN2_PORT, MOTOR_RIGHT_IN2_PIN, GPIO_PIN_RESET);
-    
+    if (!motor_initialized)    return MOTOR_ERROR;
+    if (emergency_stop_active) return MOTOR_ERROR;
+
+    target_left_mmps  = 0.0f;
+    target_right_mmps = 0.0f;
+
     return MOTOR_OK;
 }
 
@@ -295,20 +232,33 @@ bool Motor_CheckTimeout(void)
  */
 Motor_Status_t Motor_ReleaseEmergency(void)
 {
-    if (!motor_initialized) {
-        return MOTOR_ERROR;
-    }
-    
+    if (!motor_initialized) return MOTOR_ERROR;
+
     emergency_stop_active = 0;
-    
+    PID_Reset(&pid_left);
+    PID_Reset(&pid_right);
+
     // Coast 모드로 전환 (안전하게)
-    HAL_GPIO_WritePin(MOTOR_LEFT_IN1_PORT, MOTOR_LEFT_IN1_PIN, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(MOTOR_LEFT_IN2_PORT, MOTOR_LEFT_IN2_PIN, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(MOTOR_LEFT_IN1_PORT,  MOTOR_LEFT_IN1_PIN,  GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(MOTOR_LEFT_IN2_PORT,  MOTOR_LEFT_IN2_PIN,  GPIO_PIN_RESET);
     HAL_GPIO_WritePin(MOTOR_RIGHT_IN1_PORT, MOTOR_RIGHT_IN1_PIN, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(MOTOR_RIGHT_IN2_PORT, MOTOR_RIGHT_IN2_PIN, GPIO_PIN_RESET);
-    
-    // 타임아웃 리셋
+
     last_cmd_time_ms = HAL_GetTick();
-    
+
     return MOTOR_OK;
+}
+
+/**
+ * @brief  PID 속도 제어 루프 — 10ms마다 main.c에서 호출
+ */
+void Motor_PID_Update(float left_measured_mmps, float right_measured_mmps)
+{
+    if (!motor_initialized || emergency_stop_active) return;
+
+    float left_out  = PID_Update(&pid_left,  target_left_mmps,  left_measured_mmps);
+    float right_out = PID_Update(&pid_right, target_right_mmps, right_measured_mmps);
+
+    Motor_SetRaw(MOTOR_LEFT,  (int16_t)left_out);
+    Motor_SetRaw(MOTOR_RIGHT, (int16_t)right_out);
 }

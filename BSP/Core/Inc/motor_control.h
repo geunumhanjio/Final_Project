@@ -8,12 +8,20 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "tim.h"
+#include "pid.h"
 #include <stdbool.h>
 
 /* Exported defines ----------------------------------------------------------*/
 #define MOTOR_MAX_SPEED_MMPS    600   // 최대 속도 (mm/s) - 실측 후 조정
 #define MOTOR_PWM_PERIOD        999   // TIM2 ARR 값과 동일
 #define MOTOR_CMD_TIMEOUT_MS    500   // 명령 타임아웃 (500ms)
+
+// PID 게인 — 하드웨어 튜닝 전 초기값
+// 튜닝 순서: Kp 먼저 (Ki=Kd=0) → 정상 상태 오차 있으면 Ki 추가 → 진동 시 Kd 추가
+#define PID_KP  1.0f
+#define PID_KI  0.0f
+#define PID_KD  0.0f
+#define PID_DT  0.01f   // 10ms (main.c PID 루프 주기와 일치해야 함)
 
 /* Exported types ------------------------------------------------------------*/
 typedef enum {
@@ -71,6 +79,13 @@ bool Motor_CheckTimeout(void);
  * @retval Motor_Status_t
  */
 Motor_Status_t Motor_ReleaseEmergency(void);
+
+/**
+ * @brief  PID 속도 제어 루프 (10ms마다 호출)
+ * @param  left_measured_mmps:  왼쪽 바퀴 실측 속도 (Encoder_GetSpeed 결과)
+ * @param  right_measured_mmps: 오른쪽 바퀴 실측 속도 (Encoder_GetSpeed 결과)
+ */
+void Motor_PID_Update(float left_measured_mmps, float right_measured_mmps);
 
 #ifdef __cplusplus
 }
