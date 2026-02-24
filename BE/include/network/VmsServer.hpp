@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include "media/RtspProxy.hpp" // For ChannelStats
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -18,7 +19,7 @@ using tcp = boost::asio::ip::tcp;
 
 // Callback types
 using OnCoordinateReceived = std::function<void(double x, double y)>;
-using OnCommandReceived = std::function<void(const std::string& cmd, int channel)>;
+using OnCommandReceived = std::function<void(int sessionId, const std::string& cmd, int channel)>;
 
 class VmsSession; // Forward declaration
 
@@ -29,8 +30,11 @@ public:
     // Start accepting connections
     void start();
 
-    // Broadcast file to all connected VMS clients (or specific one ideally, but broadcasting for prototype)
-    void broadcastFile(const std::string& filepath);
+    // Send file to a specific VMS client by session ID
+    void sendFileToClient(int sessionId, const std::string& filepath);
+
+    // Broadcast stream stats
+    void broadcastStats(int channelId, const ChannelStats& stats);
 
     // Setters for callbacks
     void setCoordinateCallback(OnCoordinateReceived cb) { coordCb = cb; }
