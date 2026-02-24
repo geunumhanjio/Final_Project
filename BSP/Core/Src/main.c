@@ -118,6 +118,13 @@ int main(void)
   } else {
       printf("MPU6050 init failed! Check wiring.\r\n");
   }
+
+  /* ---- 최대 속도 측정용 임시 코드 (측정 완료 후 삭제) ----
+   * 목표값을 int16 최대로 설정 → PID 출력이 항상 MOTOR_MAX_SPEED_MMPS로
+   * 클램핑 → 풀 PWM 유지. USART2 출력에서 spd L/R 값을 확인.
+   * 안정화까지 약 3~5초 대기. */
+  Motor_SetVelocity(32767, 32767);
+  /* -------------------------------------------------------- */
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -130,9 +137,23 @@ int main(void)
     Protocol_Process();
     Motor_CheckTimeout();
 
+    uint32_t now = HAL_GetTick();
+
+    /* PID 속도 제어 루프 — 10ms 주기
+     * Encoder_GetSpeed()는 호출할 때마다 이전 카운트를 갱신하므로
+     * 여기서만 호출하고 결과를 변수에 저장한다. */
+    static uint32_t last_pid  = 0;
+    static float    last_spd_L = 0.0f;
+    static float    last_spd_R = 0.0f;
+    if (now - last_pid >= 10) {
+        last_pid   = now;
+        last_spd_L = Encoder_GetSpeed(ENCODER_LEFT);
+        last_spd_R = Encoder_GetSpeed(ENCODER_RIGHT);
+        Motor_PID_Update(last_spd_L, last_spd_R);
+    }
+    
     /* Send sensor data to RPi every 50ms via USART1 */
     static uint32_t last_send = 0;
-    uint32_t now = HAL_GetTick();  // HAL_GetTick()은 1ms 마다 증가하는 시스템 타이머 값을 읽어옴 (Non-blocking)
     if (now - last_send >= 50) {
         last_send = now;
 
@@ -151,9 +172,9 @@ int main(void)
         last_print = now;
 
         const ProtoStats_t *st = Protocol_GetStats();
-        printf("[DIAG] rx_pkt:%lu err:%lu chk_err:%lu unk:%lu  enc L:%d R:%d\r\n",
+        printf("[DIAG] rx_pkt:%lu err:%lu  spd L:%.1f R:%.1f mm/s  enc L:%d R:%d\r\n",
                st->rx_packets, Protocol_GetErrorCount(),
-               st->rx_checksum_errors, st->rx_unknown_cmd,
+               last_spd_L, last_spd_R,
                Encoder_GetCount(ENCODER_LEFT),
                Encoder_GetCount(ENCODER_RIGHT));
     }
