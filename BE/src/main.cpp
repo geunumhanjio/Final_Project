@@ -47,8 +47,8 @@ int main(int argc, char *argv[]) {
         std::cout << "📤 [Core -> ROS] Published Goal" << std::endl;
     });
 
-    vmsServer->setCommandCallback([&](const std::string& cmd, int channel) {
-        std::cout << "🎮 [VMS -> Core] Command: " << cmd << " for Ch: " << channel << std::endl;
+    vmsServer->setCommandCallback([&](int sessionId, const std::string& cmd, int channel) {
+        std::cout << "🎮 [VMS -> Core] Command: " << cmd << " for Ch: " << channel << " from Session " << sessionId << std::endl;
         
         if (cmd == "start") {
             if (proxy.startRecording(channel)) {
@@ -61,14 +61,18 @@ int main(int argc, char *argv[]) {
             if (!filename.empty()) {
                 std::cout << "✅ [Core] Recording stopped. File saved: " << filename << std::endl;
 
-                // Transfer file via WebSocket
-                std::cout << "📤 [Core -> VMS] Starting transfer: " << filename << std::endl;
-                vmsServer->broadcastFile(filename);
+                // Transfer file ONLY to the requesting session
+                std::cout << "📤 [Core -> VMS] Sending to session " << sessionId << ": " << filename << std::endl;
+                vmsServer->sendFileToClient(sessionId, filename);
                 
             } else {
                 std::cerr << "❌ [Core] Failed to stop recording (or not recording) for Ch " << channel << std::endl;
             }
         }
+    });
+
+    proxy.setStatsCallback([&](int channelId, const ChannelStats& stats) {
+        vmsServer->broadcastStats(channelId, stats);
     });
 
     // 4. Start Services
