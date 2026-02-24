@@ -26,6 +26,7 @@ public:
     QString getCameraIp() const { return m_settings->value("Network/CameraIP", "192.168.0.39").toString(); }
     QString getCameraPort() const { return m_settings->value("Network/CameraPort", "8554").toString(); }
     bool getUseCustomCCTV() const { return m_settings->value("Network/UseCustomCCTV", false).toBool(); }
+    bool getManualControl() const { return m_settings->value("Control/ManualControl", false).toBool(); }
 
     // Setter (저장)
     void setCameraIp(const QString &ip) {
@@ -38,6 +39,10 @@ public:
     }
     void setUseCustomCCTV(bool use) {
         m_settings->setValue("Network/UseCustomCCTV", use);
+        emit configChanged();
+    }
+    void setManualControl(bool use) {
+        m_settings->setValue("Control/ManualControl", use);
         emit configChanged();
     }
 

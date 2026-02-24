@@ -42,6 +42,10 @@ public:
         ipEdit->setText(ConfigManager::instance().getCameraIp());
         portEdit->setText(ConfigManager::instance().getCameraPort());
         cctvOptionCheck->setChecked(ConfigManager::instance().getUseCustomCCTV());
+
+        manualControlCheck = new QCheckBox("Enable Manual Control (WASD)", this);
+        manualControlCheck->setStyleSheet(cctvOptionCheck->styleSheet());
+        manualControlCheck->setChecked(ConfigManager::instance().getManualControl());
         
         // 스타일링
         QString inputStyle = "QLineEdit { padding: 8px; border: 1px solid #444; border-radius: 4px; color: white; background: #333; }";
@@ -62,6 +66,10 @@ public:
         form->addRow(portLabel, portEdit);
         form->addRow(optionLabel, cctvOptionCheck);
         form->addRow("", optionHint);
+        
+        QLabel *controlLabel = new QLabel("Control:", this);
+        controlLabel->setStyleSheet("color: #ddd; font-weight: bold;");
+        form->addRow(controlLabel, manualControlCheck);
         
         // 저장 버튼
         QPushButton *saveBtn = new QPushButton("Save Settings", this);
@@ -89,23 +97,25 @@ public:
         mainLayout->setContentsMargins(50, 20, 50, 20);
     }
 
-private slots:
+    private slots:
     void saveSettings() {
         // 1. 설정 저장
         ConfigManager::instance().setCameraIp(ipEdit->text());
         ConfigManager::instance().setCameraPort(portEdit->text());
         ConfigManager::instance().setUseCustomCCTV(cctvOptionCheck->isChecked());
+        ConfigManager::instance().setManualControl(manualControlCheck->isChecked());
         
         // 2. 스트림 매니저 리로드 (URL 재생성)
         StreamManager::instance().loadConfig();
         
-        QMessageBox::information(this, "Saved", "Settings saved successfully!\nPlease restart streams to apply.");
+        QMessageBox::information(this, "Saved", "Settings saved successfully!\nManual Control settings applied instantly.");
     }
 
 private:
     QLineEdit *ipEdit;
     QLineEdit *portEdit;
     QCheckBox *cctvOptionCheck;
+    QCheckBox *manualControlCheck;
 };
 
 #endif // SETTINGSWIDGET_H

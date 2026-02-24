@@ -97,6 +97,15 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     btnRectZoom = new QPushButton("⛶ Box Zoom", this);
     btnRectZoom->setCheckable(true);
     
+    btnControlMode = new QPushButton("🎯 조종모드", this);
+    btnControlMode->setCheckable(true);
+    btnControlMode->setObjectName("controlModeBtn");
+    btnControlMode->setStyleSheet(
+        "#controlModeBtn { color: #F59E0B; border: 1px solid #F59E0B; border-radius: 6px; font-weight: bold; background: transparent; }"
+        "#controlModeBtn:checked { background-color: #F59E0B; color: white; }"
+        "#controlModeBtn:hover { background-color: rgba(245, 158, 11, 0.1); }"
+    );
+    
     btnResetZoom = new QPushButton("⟲ Reset", this);
     btnResetZoom->setObjectName("resetBtn");
     btnResetZoom->setStyleSheet(
@@ -111,6 +120,7 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     connect(btnZoomOut, &QPushButton::clicked, this, &FullUnderBar::reqZoomOut);
     connect(btnRectZoom, &QPushButton::toggled, this, &FullUnderBar::reqRectZoom);
     connect(btnResetZoom, &QPushButton::clicked, this, &FullUnderBar::reqResetZoom);
+    connect(btnControlMode, &QPushButton::toggled, this, &FullUnderBar::reqControlMode);
 
     // [New] Record Connection
     connect(btnRecord, &QPushButton::toggled, [this](bool checked){
@@ -139,6 +149,8 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     mainLayout->addWidget(btnZoomOut);
     mainLayout->addWidget(createDivider());
     mainLayout->addWidget(btnRectZoom);
+    mainLayout->addWidget(createDivider());
+    mainLayout->addWidget(btnControlMode);
     mainLayout->addWidget(createDivider());
     mainLayout->addWidget(btnResetZoom);
 }
@@ -187,6 +199,7 @@ void FullUnderBar::setMode(bool isFile)
     m_isFileMode = isFile;
     playbackContainer->setVisible(isFile);
     btnRecord->setVisible(!isFile); // Show Record button only in Live mode
+    btnControlMode->setVisible(!isFile); // Show Control Mode button only in Live mode
     
     // Reset Record Button state when switching modes
     if (isFile && btnRecord->isChecked()) {
