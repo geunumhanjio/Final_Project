@@ -213,18 +213,24 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
             OsdWidget::Metric metric = pair.first;
             QCheckBox *cb = pair.second;
             
-            connect(cb, &QCheckBox::toggled, [osd, metric, cbAll, metricCbs](bool checked) {
+            connect(cb, &QCheckBox::toggled, [this, osd, metric, cbAll, metricCbs](bool checked) {
                 osd->setMetricVisible(metric, checked);
                 if (checked) osd->show();
 
                 // Update 'All' checkbox state
                 bool allChecked = true;
+                bool anyChecked = false; // [New]
                 for(auto p : metricCbs) {
-                    if(!p.second->isChecked()) { allChecked = false; break; }
+                    if(!p.second->isChecked()) { allChecked = false; }
+                    if(p.second->isChecked()) { anyChecked = true; }
                 }
                 cbAll->blockSignals(true);
                 cbAll->setChecked(allChecked);
                 cbAll->blockSignals(false);
+                
+                // Emit signal to trigger stream stats
+                int expectedChannel = (currentChannelId < 4) ? (currentChannelId + 1) : 9;
+                emit streamStatsRequested(expectedChannel, anyChecked);
             });
         }
 

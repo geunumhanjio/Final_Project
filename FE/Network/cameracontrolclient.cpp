@@ -52,6 +52,24 @@ void CameraControlClient::sendRecordCommand(const QString &cameraIp, int channel
     safeSend(jsonString, cameraIp);
 }
 
+void CameraControlClient::requestStreamStats(const QString &cameraIp, int channelId, bool start)
+{
+    // Ensure we are connected
+    connectToServer(cameraIp);
+
+    QJsonObject payload;
+    payload["action"] = start ? "start" : "stop";
+    payload["channel_id"] = channelId;
+
+    QJsonObject msg;
+    msg["type"] = "REQUEST_STREAM_STATS";
+    msg["payload"] = payload;
+    msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+
+    QString jsonString = QJsonDocument(msg).toJson(QJsonDocument::Compact);
+    safeSend(jsonString, cameraIp);
+}
+
 void CameraControlClient::requestRecordings(const QString &cameraIp)
 {
     QJsonObject msg;

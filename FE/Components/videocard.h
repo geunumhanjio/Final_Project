@@ -38,6 +38,7 @@ public:
 signals:
     void fullScreenRequested();
     void recordRequested(int channelId, bool start);
+    void streamStatsRequested(int channelId, bool start); // [New]
 
 private slots:
     void toggleRecord();

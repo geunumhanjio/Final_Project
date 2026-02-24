@@ -29,6 +29,7 @@ signals:
     void closeRequested();
     void recordRequested(int channelId, bool start); // [New]
     void reqGoalPose(double x, double y, double theta);
+    void streamStatsRequested(int channelId, bool start); // [New]
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
