@@ -31,6 +31,7 @@ struct ChannelContext {
     int id;
     std::string path;
     std::string url;
+    class RtspProxy* parent; // Pointer back to parent for callbacks
     
     GstElement *receiver_pipeline;
     std::vector<GstElement*> clients;
@@ -45,10 +46,18 @@ struct ChannelContext {
     GstElement *record_appsrc;
     std::string current_filename;
 
-    ChannelContext(int i, std::string p, std::string u) 
-        : id(i), path(p), url(u), receiver_pipeline(nullptr), saved_caps(nullptr),
+    // Stats tracking
+    uint64_t frameCount;
+    uint64_t byteCount;
+    double totalLatencyMs;
+    std::chrono::steady_clock::time_point lastStatTime;
+
+    ChannelContext(int i, std::string p, std::string u, RtspProxy* par) 
+        : id(i), path(p), url(u), parent(par), receiver_pipeline(nullptr), saved_caps(nullptr),
           is_recording(false), need_keyframe(false), record_start_pts(GST_CLOCK_TIME_NONE),
-          record_pipeline(nullptr), record_appsrc(nullptr) {}
+          record_pipeline(nullptr), record_appsrc(nullptr),
+          frameCount(0), byteCount(0), totalLatencyMs(0),
+          lastStatTime(std::chrono::steady_clock::now()) {}
 };
 
 // ==================================================================================
@@ -56,6 +65,7 @@ struct ChannelContext {
 // ==================================================================================
 static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
     ChannelContext *ctx = (ChannelContext*)user_data;
+    auto frame_start_time = std::chrono::high_resolution_clock::now();
 
     GstSample *sample = gst_app_sink_pull_sample(GST_APP_SINK(sink));
     if (!sample) return GST_FLOW_ERROR;
@@ -65,9 +75,16 @@ static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
     bool is_recording_copy = false;
     GstElement* record_appsrc_copy = nullptr;
 
-    // 1. Critical Section: Capture state quickly
+    GstBuffer *buffer = gst_sample_get_buffer(sample);
+    size_t buffer_size = buffer ? gst_buffer_get_size(buffer) : 0;
+
+    // 1. Critical Section: Capture state and update counters
     {
         std::lock_guard<std::mutex> lock(ctx->mutex);
+
+        // Update stats counters
+        ctx->frameCount++;
+        ctx->byteCount += buffer_size;
 
         // Capture Caps if needed
         if (!ctx->saved_caps) {
@@ -99,7 +116,6 @@ static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
         }
     }
 
-    GstBuffer *buffer = gst_sample_get_buffer(sample);
     if (buffer) {
         // 2. Push to RTSP clients (Outside Mutex)
         for (auto* client_appsrc : clients_copy) {
@@ -111,7 +127,6 @@ static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
         // 3. Push to Recorder (Outside Mutex)
         if (is_recording_copy && record_appsrc_copy) {
              // Check for keyframe (I-Frame)
-             // GST_BUFFER_FLAG_DELTA_UNIT is set for P/B frames. If NOT set, it's a keyframe.
              bool is_keyframe = !GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
 
              if (ctx->need_keyframe) {
@@ -122,8 +137,7 @@ static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
                  } else {
                      // Drop packets until first keyframe
                      gst_object_unref(record_appsrc_copy);
-                     // Don't unref sample here, it's unreffed at end of function
-                     goto done; 
+                     goto calc_latency; 
                  }
              }
 
@@ -147,7 +161,37 @@ static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
         if (record_appsrc_copy) gst_object_unref(record_appsrc_copy);
     }
 
-done:
+calc_latency:
+    // Calculate Proxy Latency for this frame
+    auto frame_end_time = std::chrono::high_resolution_clock::now();
+    double latency = std::chrono::duration<double, std::milli>(frame_end_time - frame_start_time).count();
+
+    // 4. Update stats and trigger callback if interval passed
+    {
+        std::lock_guard<std::mutex> lock(ctx->mutex);
+        ctx->totalLatencyMs += latency;
+
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - ctx->lastStatTime).count();
+
+        if (elapsed >= 1000) { // 1 second interval
+            ChannelStats stats;
+            stats.fps = (double)ctx->frameCount / (elapsed / 1000.0);
+            stats.bitrate_kbps = ((double)ctx->byteCount * 8.0) / elapsed; // (bytes * 8) / ms = bits/ms = kbps
+            stats.proxy_latency_ms = ctx->totalLatencyMs / (double)ctx->frameCount;
+            
+            if (ctx->parent) {
+                ctx->parent->triggerStatsCallback(ctx->id, stats);
+            }
+
+            // Reset counters
+            ctx->frameCount = 0;
+            ctx->byteCount = 0;
+            ctx->totalLatencyMs = 0;
+            ctx->lastStatTime = now;
+        }
+    }
+
     gst_sample_unref(sample);
     return GST_FLOW_OK;
 }
@@ -169,19 +213,19 @@ RtspProxy::~RtspProxy() {
 
 void RtspProxy::setupChannels() {
     // 1~4: Mobile
-    channels.push_back(new ChannelContext(1, "/ch1", URL_CH1_MOB));
-    channels.push_back(new ChannelContext(2, "/ch2", URL_CH2_MOB));
-    channels.push_back(new ChannelContext(3, "/ch3", URL_CH3_MOB));
-    channels.push_back(new ChannelContext(4, "/ch4", URL_CH4_MOB));
+    channels.push_back(new ChannelContext(1, "/ch1", URL_CH1_MOB, this));
+    channels.push_back(new ChannelContext(2, "/ch2", URL_CH2_MOB, this));
+    channels.push_back(new ChannelContext(3, "/ch3", URL_CH3_MOB, this));
+    channels.push_back(new ChannelContext(4, "/ch4", URL_CH4_MOB, this));
 
     // 5~8: FHD
-    channels.push_back(new ChannelContext(5, "/ch1_fhd", URL_CH1_FHD));
-    channels.push_back(new ChannelContext(6, "/ch2_fhd", URL_CH2_FHD));
-    channels.push_back(new ChannelContext(7, "/ch3_fhd", URL_CH3_FHD));
-    channels.push_back(new ChannelContext(8, "/ch4_fhd", URL_CH4_FHD));
+    channels.push_back(new ChannelContext(5, "/ch1_fhd", URL_CH1_FHD, this));
+    channels.push_back(new ChannelContext(6, "/ch2_fhd", URL_CH2_FHD, this));
+    channels.push_back(new ChannelContext(7, "/ch3_fhd", URL_CH3_FHD, this));
+    channels.push_back(new ChannelContext(8, "/ch4_fhd", URL_CH4_FHD, this));
 
     // 9: Robot Cam (MJPEG)
-    //channels.push_back(new ChannelContext(9, "/robot_cam", URL_ROBOT_CAM));
+    //channels.push_back(new ChannelContext(9, "/robot_cam", URL_ROBOT_CAM, this));
 }
 
 bool RtspProxy::initialize(int port) {
@@ -403,6 +447,7 @@ void RtspProxy::mediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media
         }
         ctx->clients.push_back(appsrc);
     }
+
     gst_object_unref(element);
 }
 

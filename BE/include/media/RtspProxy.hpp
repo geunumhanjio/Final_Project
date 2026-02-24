@@ -8,9 +8,18 @@
 #include <thread>
 #include <mutex>
 #include <memory>
+#include <functional>
 
 // Forward declaration
 struct ChannelContext;
+
+struct ChannelStats {
+    double fps;
+    double bitrate_kbps;
+    double proxy_latency_ms;
+};
+
+using OnStatsUpdate = std::function<void(int channelId, const ChannelStats& stats)>;
 
 class RtspProxy {
 public:
@@ -36,6 +45,9 @@ public:
     // Main GStreamer loop (blocking) - typically called by main()
     void run();
 
+    void setStatsCallback(OnStatsUpdate cb) { statsCb = cb; }
+    void triggerStatsCallback(int channelId, const ChannelStats& stats) { if (statsCb) statsCb(channelId, stats); }
+
 private:
     void setupChannels();
     static void runReceiverThread(ChannelContext* ctx);
@@ -50,6 +62,7 @@ private:
     std::vector<ChannelContext*> channels;
     std::vector<std::thread> receiverThreads;
     bool running;
+    OnStatsUpdate statsCb;
 };
 
 #endif // RTSP_PROXY_HPP
