@@ -1,17 +1,6 @@
 # Build outputs
 build/
 
-# Object files
-*.o
-*.d
-*.lst
-
-# Executables
-*.elf
-*.hex
-*.bin
-*.map
-
 # IDE settings
 .vscode/
 .idea/
