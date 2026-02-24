@@ -82,6 +82,7 @@ set(PROJECT_SOURCES
         Views/playbackview.h Views/playbackview.cpp
         Utils/configmanager.h
         Components/settingswidget.h
+        Components/osdwidget.h Components/osdwidget.cpp # [New]
 )
 
 # 4. 실행 파일 생성

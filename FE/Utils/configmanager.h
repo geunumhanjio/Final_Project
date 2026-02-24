@@ -19,12 +19,14 @@ public:
     void loadDefaults() {
         if(getCameraIp().isEmpty()) setCameraIp("192.168.0.39");
         if(getCameraPort().isEmpty()) setCameraPort("8554");
+        if(getRobotIp().isEmpty()) setRobotIp("ws://192.168.0.237:9090");
         // getUseCustomCCTV defaults to false if not set, handled by QSettings default value
     }
 
     // Getter
     QString getCameraIp() const { return m_settings->value("Network/CameraIP", "192.168.0.39").toString(); }
     QString getCameraPort() const { return m_settings->value("Network/CameraPort", "8554").toString(); }
+    QString getRobotIp() const { return m_settings->value("Network/RobotIP", "ws://192.168.0.237:9090").toString(); }
     bool getUseCustomCCTV() const { return m_settings->value("Network/UseCustomCCTV", false).toBool(); }
     bool getManualControl() const { return m_settings->value("Control/ManualControl", false).toBool(); }
 
@@ -35,6 +37,10 @@ public:
     }
     void setCameraPort(const QString &port) {
         m_settings->setValue("Network/CameraPort", port);
+        emit configChanged();
+    }
+    void setRobotIp(const QString &ip) {
+        m_settings->setValue("Network/RobotIP", ip);
         emit configChanged();
     }
     void setUseCustomCCTV(bool use) {

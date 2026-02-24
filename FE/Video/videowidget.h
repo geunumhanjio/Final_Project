@@ -8,6 +8,7 @@
 #include <gst/video/videooverlay.h>
 #include <QMutex>
 #include <QRectF>
+#include "osdwidget.h" // [New] Include OSDWidget
 
 class VideoWidget : public QWidget
 {
@@ -37,6 +38,9 @@ public:
 
     virtual void refreshFrame() {} // [New] For forcing update when paused
 
+    // [New] OSD 위젯 접근 (메뉴 연동용)
+    OsdWidget* getOsdWidget() const { return m_osdWidget; }
+
 signals:
     void positionChanged(qint64 positionMs);
     void durationChanged(qint64 durationMs);
@@ -44,6 +48,8 @@ signals:
 
 protected:
     void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override; // [New]
+    void moveEvent(QMoveEvent *event) override; // [New]
     void resizeEvent(QResizeEvent *event) override;
     QPaintEngine *paintEngine() const override { return nullptr; }
 
@@ -68,6 +74,14 @@ private:
     QTimer *busTimer;
 
     bool m_isPlaying;
+
+    // [New] OSD Widget
+    OsdWidget *m_osdWidget;
+    QTimer *m_syncTimer; // [New]
+    void syncOverlayPosition(); // [New]
+
+    QTimer *m_statsTimer; // [New] For pulling GST stats
+    void extractGstStats(); // [New]
 
     static GstBusSyncReply busSyncHandler(GstBus *bus, GstMessage *msg, gpointer user_data);
 };

@@ -277,3 +277,23 @@ void LiveView::stopAll() {
     if (rcCarCamWidget) rcCarCamWidget->stop();
     streamStarted = false; // [Fix] Reset flag so showEvent restarts streams
 }
+
+void LiveView::updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs)
+{
+    // Check CCTV Widgets (Channels 1-4)
+    for (int i = 0; i < 4; i++) {
+        if (channelId == i + 1) {
+            if (cctvWidgets[i]) {
+                cctvWidgets[i]->updateStreamStats(fps, bitrateKbps, proxyLatencyMs);
+            }
+            return;
+        }
+    }
+
+    // Check RC Car Widget (Channel 9)
+    if (channelId == 9) {
+        if (rcCarCamWidget) {
+            rcCarCamWidget->updateStreamStats(fps, bitrateKbps, proxyLatencyMs);
+        }
+    }
+}

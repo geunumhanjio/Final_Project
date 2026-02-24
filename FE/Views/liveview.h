@@ -15,6 +15,7 @@ public:
     explicit LiveView(QWidget *parent = nullptr);
     void setChannelVisible(int index, bool visible);
     void stopAll();
+    void updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs); // [New]
 
 signals:
     void requestFullScreen(int index, QString url);

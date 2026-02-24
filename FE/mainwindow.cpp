@@ -25,7 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
     // [Fix] Initialize Clients BEFORE initConnections
     qDebug() << "[MainWindow] Initializing RosBridgeClient...";
     m_rosClient = new RosBridgeClient(this);
-    m_rosClient->connectToHost("ws://192.168.0.237:9090");
+    m_rosClient->connectToHost(ConfigManager::instance().getRobotIp()); // [Modified] Use config
     
     qDebug() << "[MainWindow] Initializing CameraControlClient...";
     m_cameraClient = new CameraControlClient(this);
@@ -38,6 +38,9 @@ MainWindow::MainWindow(QWidget *parent)
     
     m_inputTimer = new QTimer(this);
     connect(m_inputTimer, &QTimer::timeout, this, &MainWindow::processInput);
+    
+    // Listen to config changes
+    connect(&ConfigManager::instance(), &ConfigManager::configChanged, this, &MainWindow::onConfigChanged);
 }
 
 MainWindow::~MainWindow() { }
@@ -187,6 +190,15 @@ void MainWindow::initUI()
 void MainWindow::initConnections()
 {
     qDebug() << "[MainWindow] initConnections Started...";
+    
+    // [New] Connect STREAM_STATS from WebSocket to UI components
+    if (m_cameraClient) {
+        connect(m_cameraClient, &CameraControlClient::streamStatsReceived, this, [=](int channelId, double fps, double bitrateKbps, double proxyLatencyMs){
+            if (m_livePage) m_livePage->updateStreamStats(channelId, fps, bitrateKbps, proxyLatencyMs);
+            if (m_fullPage) m_fullPage->updateStreamStats(channelId, fps, bitrateKbps, proxyLatencyMs);
+        });
+    }
+
     connect(m_topBar, &TopBar::sidebarToggled, [=](){ m_sidebar->setVisible(!m_sidebar->isVisible()); });
     connect(m_topBar, &TopBar::modeChanged, [=](int index){
         m_centralStack->setCurrentIndex(index);
@@ -351,4 +363,12 @@ void MainWindow::toggleTheme()
     QString qssPath = m_isDark ? "style/theme_dark.qss" : "style/theme_light.qss";
     loadTheme(qssPath);
     // [Mod] Removed manual updateTheme calls
+}
+
+void MainWindow::onConfigChanged() {
+    QString newIp = ConfigManager::instance().getRobotIp();
+    // Reconnect ROS2 Client if IP Changed
+    qDebug() << "[MainWindow] Config changed. Updating Robot IP to:" << newIp;
+    m_rosClient->disconnect();
+    m_rosClient->connectToHost(newIp);
 }
