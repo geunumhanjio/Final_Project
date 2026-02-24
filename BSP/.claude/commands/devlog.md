@@ -2,7 +2,7 @@
 
 ## 작성 규칙
 
-- 파일 경로: `docs/devlog/YYYY-MM-DD.md`
+- 파일 경로: `notes/devlog/YYYY-MM-DD.md`
 - 오늘 대화에서 실제로 작업한 내용만 작성 (추측 금지)
 - 작업 단위별로 섹션을 나눠서 작성
 
