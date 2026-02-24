@@ -32,6 +32,7 @@ signals:
     void reqRectZoom(bool checked);
     void reqResetZoom(); // [신규] 초기화 버튼
     void reqRecord(bool start); // [New] Record Signal
+    void reqControlMode(bool checked); // [New] Control Mode Signal
     
     // [New] Playback Signals
     void reqPlayPause();
@@ -44,6 +45,7 @@ private:
     QPushButton *btnZoomOut;
     QPushButton *btnRectZoom;
     QPushButton *btnResetZoom; // [신규]
+    QPushButton *btnControlMode; // [New]
 
     // [New] Playback Widgets
     QWidget *playbackContainer;

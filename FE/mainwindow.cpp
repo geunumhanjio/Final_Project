@@ -69,6 +69,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
 
 // [New] Shared WASD Logic
 bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress) {
+    if (!ConfigManager::instance().getManualControl()) return false;
     if (event->isAutoRepeat()) return false;
     
     int key = event->key();
@@ -325,6 +326,15 @@ void MainWindow::initConnections()
              else qDebug() << "[FullScreen] Recording Stopped on Channel" << actualChannelId;
         }
     });
+
+    // [New] Connect Goal Pose
+    connect(m_fullPage, &FullScreenView::reqGoalPose, [=](double x, double y, double theta){
+        if (m_rosClient) {
+            qDebug() << "[MainWindow] Sending Goal Pose -> x:" << x << "y:" << y << "theta:" << theta;
+            m_rosClient->sendGoalPose(x, y, theta);
+        }
+    });
+
     qDebug() << "[MainWindow] initConnections Completed.";
 }
 

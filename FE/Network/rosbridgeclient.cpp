@@ -36,6 +36,22 @@ void RosBridgeClient::sendCmdVel(double linear, double angular) {
 
     m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
 }
+void RosBridgeClient::sendGoalPose(double x, double y, double theta, const QString &frame_id) {
+    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
+
+    QJsonObject data;
+    data["x"] = x;
+    data["y"] = y;
+    data["theta"] = theta;
+    data["frame_id"] = frame_id;
+
+    QJsonObject msg;
+    msg["type"] = "goal_pose";
+    msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    msg["data"] = data;
+
+    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+}
 
 void RosBridgeClient::emergencyStop() {
     if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
