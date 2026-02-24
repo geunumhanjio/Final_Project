@@ -64,6 +64,7 @@ Core/Src/usart.c \
 Core/Src/motor_control.c \
 Core/Src/uart_protocol.c \
 Core/Src/encoder.c \
+Core/Src/pid.c \
 Core/Src/i2c.c \
 Core/Src/mpu6050.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c.c \
