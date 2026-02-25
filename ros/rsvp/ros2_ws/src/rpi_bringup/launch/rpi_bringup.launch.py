@@ -65,7 +65,7 @@ def generate_launch_description():
     camera_node = Node(
         package='camera_ros',
         executable='camera_node',
-        name='camera_node',
+        name='camera',
         parameters=[params_file],
         condition=IfCondition(LaunchConfiguration('use_camera')),
         output='screen',

@@ -28,7 +28,7 @@ def generate_launch_description():
         Node(
             package='camera_ros',
             executable='camera_node',
-            name='camera_node',
+            name='camera',
             parameters=[
                 PathJoinSubstitution([pkg_share, 'config', 'rpi_params.yaml']),
                 {
