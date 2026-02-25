@@ -123,7 +123,7 @@ int main(void)
    * 목표값을 int16 최대로 설정 → PID 출력이 항상 MOTOR_MAX_SPEED_MMPS로
    * 클램핑 → 풀 PWM 유지. USART2 출력에서 spd L/R 값을 확인.
    * 안정화까지 약 3~5초 대기. */
-  Motor_SetVelocity(32767, 32767);
+  //Motor_SetVelocity(32767, 32767);
   /* -------------------------------------------------------- */
   /* USER CODE END 2 */
 
