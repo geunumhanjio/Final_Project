@@ -54,7 +54,31 @@ QListWidget::item:hover {
     background-color: #2a3649;
 }
 
-/* Search Bar */
+QListWidget::item:hover {
+    background-color: #2a3649;
+}
+
+/* Category List (Playback Sidebar) */
+#CategoryList {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+#CategoryList::item {
+    padding: 12px 16px; 
+    color: #CBD5E1; 
+    font-size: 14px; 
+    border-bottom: 1px solid #1E293B;
+}
+#CategoryList::item:selected {
+    background-color: #2563EB; 
+    color: white; 
+    font-weight: bold; 
+    border-left: 4px solid #60A5FA;
+}
+#CategoryList::item:hover {
+    background-color: #1E293B;
+}
 QLineEdit {
     background-color: #101622;
     border: 1px solid #2a3649;
@@ -98,6 +122,42 @@ QLineEdit:focus {
     background-color: #135bec;
     color: white;
     font-weight: 600;
+}
+
+#TopBarToggleBtn {
+    color: #94a3b8;
+    font-size: 20px;
+    border: none;
+    background: transparent;
+}
+#TopBarToggleBtn:hover {
+    color: white;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+}
+
+#TopBarTitle {
+    font-weight: bold;
+    font-size: 16px;
+    letter-spacing: 1px;
+    color: #e2e8f0;
+    background-color: transparent;
+}
+
+#DateLabel {
+    color: #64748b;
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: bold;
+    background-color: transparent;
+}
+
+#TimeLabel {
+    color: #135bec;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 14px;
+    background-color: transparent;
 }
 
 /* VideoCard */
@@ -176,4 +236,143 @@ QLineEdit:focus {
 #SidebarItemStatus {
     font-weight: bold;
     font-size: 11px;
+}
+
+#PlaybackHeaderTitle {
+    color: #94A3B8;
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #334155;
+}
+
+/* Playback View Main Area (Dark) */
+#PlaybackTitle {
+    font-size: 24px;
+    font-weight: bold;
+    color: white;
+}
+
+#PlaybackList {
+    background-color: #0F172A; 
+    border-radius: 8px; 
+    border: 1px solid #334155; 
+    color: white; 
+    font-size: 14px;
+    outline: none;
+}
+#PlaybackList::item {
+    padding: 8px; 
+    border-bottom: 1px solid #1E293B;
+    color: white;
+}
+#PlaybackList::item:selected {
+    background-color: #3b82f6;
+    color: white;
+}
+#PlaybackList::item:hover {
+    background-color: #334155;
+}
+
+/* =========================================
+   FullScreen View Styles (Dark)
+   ========================================= */
+
+#FS_TopBar {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(0,0,0,200), stop:1 transparent);
+}
+
+#FS_TitleLabel {
+    color: #EAB308; 
+    font-weight: bold; 
+    font-size: 18px; 
+    background-color: rgba(15, 23, 42, 0.6); 
+    border-radius: 8px; 
+    padding: 4px 12px; 
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#FS_LiveBadge {
+    color: #EF4444; 
+    font-weight: bold; 
+    font-size: 11px; 
+    border: 1px solid rgba(239, 68, 68, 0.5); 
+    background-color: rgba(220, 38, 38, 0.1); 
+    padding: 2px 6px; 
+    border-radius: 4px;
+}
+
+#FS_CloseBtn {
+    background-color: rgba(30, 41, 59, 0.5); 
+    color: #CBD5E1; 
+    border: 1px solid rgba(51, 65, 85, 0.5); 
+    border-radius: 8px; 
+    font-size: 16px;
+}
+#FS_CloseBtn:hover {
+    background-color: rgba(220, 38, 38, 0.9); 
+    color: white; 
+    border-color: #EF4444;
+}
+
+/* UnderBar (Dark) */
+#controlBar {
+    background-color: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+}
+#controlBar QPushButton {
+    background-color: transparent;
+    color: #CBD5E1;
+    border: none;
+    padding: 8px 15px;
+    font-size: 13px; font-weight: 500; font-family: 'Segoe UI', sans-serif;
+}
+#controlBar QPushButton:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #FFFFFF;
+}
+#controlBar QPushButton:checked {
+    color: #0EA5E9; font-weight: bold;
+    background-color: rgba(14, 165, 233, 0.1);
+}
+
+#resetBtn {
+    background-color: #0EA5E9; 
+    color: white; 
+    border-radius: 8px; 
+    font-weight: bold;
+}
+#resetBtn:hover {
+    background-color: #38BDF8;
+}
+
+#FS_PlaybackContainer {
+    background: transparent;
+}
+
+#FS_SeekSlider::groove:horizontal {
+    border: 1px solid #334155; 
+    height: 6px; 
+    background: #1E293B; 
+    margin: 2px 0; 
+    border-radius: 3px;
+}
+#FS_SeekSlider::handle:horizontal {
+    background: #0EA5E9; 
+    border: 1px solid #0EA5E9; 
+    width: 14px; 
+    height: 14px; 
+    margin: -5px 0; 
+    border-radius: 7px;
+}
+#FS_SeekSlider::handle:horizontal:hover {
+    background: #38BDF8;
+}
+
+#timeLabel {
+    color: #E2E8F0; 
+    font-family: monospace; 
+    font-weight: bold;
 }

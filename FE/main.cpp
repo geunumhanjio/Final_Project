@@ -7,6 +7,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <gst/gst.h> // [New] Needed for gst_init
 
 int main(int argc, char *argv[])
 {
@@ -36,6 +37,13 @@ int main(int argc, char *argv[])
     // 0: 없음, 1: 에러만, 2: 경고+에러, 3: 정보+경고+에러, 4: 디버그, 5: 로그
     qputenv("GST_DEBUG", "3");
     qDebug() << "[main] GST_DEBUG level set to: 3";
+
+    // Initialize GStreamer Environment
+    // gst_init must be called before any GStreamer usage.
+    // Passing nullptr allowing GStreamer to parse standard command line args if needed (none passed)
+    qDebug() << "[main] Initializing GStreamer...";
+    gst_init(&argc, &argv); 
+    qDebug() << "[main] GStreamer Initialized.";
 
     // GStreamer 초기화 전에 환경 확인
     QApplication a(argc, argv);

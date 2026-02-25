@@ -26,15 +26,23 @@ public:
     void playUrl(const QString &url, int latency = 200);
     void stop();
     VideoWidget* videoWidget() const { return m_videoWidget; }
+    void updateStreamStats(double fps, double bitrateKbps, double proxyLatencyMs); // [New]
 
     // UI Setters
     void setChannelName(const QString &name);
     void setChannelStatus(bool active);
     void setStreamInfo(const QString &info);
     void showRecIndicator(bool show);
+    void setChannelId(int id) { m_channelId = id; }
 
 signals:
     void fullScreenRequested();
+    void recordRequested(int channelId, bool start);
+    void streamStatsRequested(int channelId, bool start); // [New]
+
+private slots:
+    void toggleRecord();
+    void showSettingsMenu(); // [New] Settings Menu Slot
 
 protected:
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
@@ -68,9 +76,12 @@ private:
     QLabel *m_recLabel;
     QPushButton *m_btnFullscreen;
     QPushButton *m_btnSettings;
+    QPushButton *m_btnRecord; // [New] Record Button
     QLabel *m_streamInfoLabel;
 
     bool m_isHovered;
+    bool m_isRecording; // [New] Recording State
+    int m_channelId;    // [New] Channel ID
 };
 
 #endif // VIDEOCARD_H
