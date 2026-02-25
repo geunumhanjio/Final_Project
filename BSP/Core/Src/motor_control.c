@@ -2,6 +2,7 @@
 #include "pid.h"
 #include "gpio.h"
 #include <stdlib.h>  // abs()
+#include <stdio.h>
 
 /* Private defines -----------------------------------------------------------*/
 // 가속도 제한 (open-loop 시절 유산 — PID 구현 후 미사용)
@@ -105,6 +106,9 @@ static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps)
         HAL_GPIO_WritePin(in2_port, in2_pin, GPIO_PIN_SET);
     }
     
+    /* 테스트 출력 --------------------------------------------------------*/
+    printf("[실제 모터 PWM 값과 속도] %s: pwm = %d, speed = %d [mm/s]\r\n", (motor == MOTOR_LEFT) ? "LEFT" : "RIGHT", pwm_value, speed_mmps);
+
     // PWM 듀티 설정
     __HAL_TIM_SET_COMPARE(&htim2, pwm_channel, pwm_value);
 }
