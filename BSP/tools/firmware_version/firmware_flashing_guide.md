@@ -85,52 +85,12 @@ BSP 팀이 새 펌웨어를 배포할 때는 로봇의 라즈베리파이의 ~/F
 
 ## 6. STM 보드 Load 방법
 
-### 방법 A — 스크립트 사용 (권장)
-
-라즈베리파이의 `~/Final_Project_firmware/flash_stm32.sh` 스크립트를 사용합니다.
-
-```bash
-# 실행 (스크립트와 .bin 파일이 같은 디렉터리에 있을 때)
-cd ~/Final_Project_firmware
-sudo ./flash_stm32.sh ~/<버전>/ROS_Robot_Driver.bin
-```
-
-**정상 출력 예시:**
-
-```
-========================================
-  STM32 Firmware Flash Utility
-  Target: STM32F401RE (NUCLEO-F401RE)
-========================================
-
-[INFO]  Firmware : ROS_Robot_Driver.bin (22280 bytes)
-[INFO]  Address  : 0x08000000
-
-[STEP 1/2] ST-Link 장치 확인...
-Found 1 stlink programmers
-  ...serial: ...
-
-[STEP 2/2] 펌웨어 업로드 중...
-st-flash 1.x.x
-2024-xx-xx ... INFO  ...
-Flash written and verified! jolly good!
-
-========================================
-  [OK] 플래시 완료!
-  STM32가 새 펌웨어로 부팅 중입니다.
-========================================
-```
-
----
-
-### 방법 B — 수동 명령어
-
 ```bash
 # ST-Link 연결 확인
 st-info --probe
 
 # 플래시
-st-flash --reset write ROS_Robot_Driver.bin 0x08000000
+sudo st-flash --reset write ROS_Robot_Driver.bin 0x08000000
 ```
 
 ---
