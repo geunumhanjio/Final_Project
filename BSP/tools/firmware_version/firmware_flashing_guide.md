@@ -92,7 +92,7 @@ BSP 팀이 새 펌웨어를 배포할 때는 로봇의 라즈베리파이의 ~/F
 ```bash
 # 실행 (스크립트와 .bin 파일이 같은 디렉터리에 있을 때)
 cd ~/Final_Project_firmware
-./flash_stm32.sh ~/<버전>/ROS_Robot_Driver.bin
+sudo ./flash_stm32.sh ~/<버전>/ROS_Robot_Driver.bin
 ```
 
 **정상 출력 예시:**
