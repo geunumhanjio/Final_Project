@@ -106,9 +106,13 @@ static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps)
         HAL_GPIO_WritePin(in2_port, in2_pin, GPIO_PIN_SET);
     }
     
-    /* 테스트 출력 --------------------------------------------------------*/
-    printf("[실제 모터 PWM 값과 속도] %s: pwm = %d, speed = %d [mm/s]\r\n", (motor == MOTOR_LEFT) ? "LEFT" : "RIGHT", pwm_value, speed_mmps);
+    /* Debugging --------------------------------------------------------*/
+    printf("[Real Motor PWM Value and Speed] %s: pwm = %d, speed = %d [mm/s]\r\n", (motor == MOTOR_LEFT) ? "LEFT" : "RIGHT", pwm_value, speed_mmps);
 
+    /* Debugging PWM Value ----------------------------------------------------------*/
+    //forward = 1;  // 항상 정방향으로 테스트
+    //pwm_value = 500;  // PWM 절반 (약 300mm/s 예상) 
+    
     // PWM 듀티 설정
     __HAL_TIM_SET_COMPARE(&htim2, pwm_channel, pwm_value);
 }
