@@ -27,9 +27,9 @@ openocd -f "board/st_nucleo_f4.cfg" -c "program build/ROS_Robot_Driver.elf verif
 
 **Layered structure:**
 
-- **Application** (`Core/Src/main.c`) — Entry point, 주변장치 초기화 (GPIO, TIM2, USART1, USART2), 메인 루프에서 `Protocol_Process()` + `Motor_CheckTimeout()` 반복 실행.
+- **Application** (`Core/Src/main.c`) — Entry point, 주변장치 초기화 (GPIO, TIM2, USART1, USART2 등), 메인 루프에서 `Protocol_Process()`(UART 패킷 파싱), `Motor_CheckTimeout()`, `Motor_PID_Update()`(10ms 주기 PID 속도 제어), 50ms 센서 데이터 전송 반복 실행.
 - **UART Protocol** (`Core/Src/uart_protocol.c`, `Core/Inc/uart_protocol.h`) — RPi↔STM32 바이너리 패킷 통신. 인터럽트 기반 바이트 수신 → 상태머신 파싱 → 명령 디스패치. 자세한 내용은 아래 UART Protocol 섹션 참조.
-- **Motor Control** (`Core/Src/motor_control.c`, `Core/Inc/motor_control.h`) — L298N 모터 드라이버 추상화. `Motor_SetVelocity()`, `Motor_EmergencyStop()`, `Motor_SoftStop()`, `Motor_CheckTimeout()`, `Motor_ReleaseEmergency()` 제공. 가속도 제한 및 명령 타임아웃(500ms) 내장.
+- **Motor Control** (`Core/Src/motor_control.c`, `Core/Inc/motor_control.h`) — L298N 모터 드라이버 및 PID 제어 추상화. `Motor_SetVelocity()`, `Motor_EmergencyStop()`, `Motor_SoftStop()`, `Motor_CheckTimeout()`, `Motor_ReleaseEmergency()`, `Motor_PID_Update()` 제공. 가속도 제한(PID 대체) 및 명령 타임아웃(500ms) 내장.
 - **HAL Drivers** (`Drivers/STM32F4xx_HAL_Driver/`) — STMicroelectronics HAL for STM32F4. Do not edit; these are CubeMX-managed.
 - **CMSIS** (`Drivers/CMSIS/`) — ARM Cortex-M4 core definitions and startup code.
 
@@ -99,7 +99,7 @@ USART1 (PA9 TX, PA10 RX), 115200 baud, 인터럽트 기반 수신.
 **속도 범위:** -600 ~ +600 mm/s (int16_t), PWM 0~999 (1000단계)
 
 **주요 동작:**
-- **가속도 제한:** 10ms당 최대 200mm/s 변화
+- **속도 제어:** 엔코더 피드백을 활용한 PID 제어 (`Motor_PID_Update()` 10ms 실행)
 - **명령 타임아웃:** 500ms간 새 명령 없으면 자동 SoftStop (안전장치)
 - **비상 정지:** `Motor_EmergencyStop()` 호출 시 즉시 브레이크, `Motor_ReleaseEmergency()` 전까지 모든 속도 명령 무시
 
@@ -114,8 +114,9 @@ Reference materials live in `docs/`:
 ## Implementation Status
 
 **구현 완료:**
-- Encoder 기본 구현 (TIM3/TIM4 encoder mode, 1920 PPR) — 카운트 읽기/리셋 동작. 오버플로우 처리, 거리 변환은 미구현
-- MPU6050 IMU over I2C — 6축 raw 데이터 읽기 동작. 물리량 변환(deg/s, m/s²)은 미구현
+- Encoder 기본 구현 (TIM3/TIM4 encoder mode, 1920 PPR) — 카운트 읽기/리셋 동작 및 `Encoder_GetSpeed()`를 통한 속도(mm/s) 계산 완료
+- 속도 제어 루프 추가: 10ms 주기로 `Motor_PID_Update()` 실행 완료 (`pid.c`, `pid.h` 추가)
+- MPU6050 IMU over I2C — 6축 raw 데이터 읽기 동작
 - STM32 → RPi 응답 패킷 송신 (RSP_ODOM, RSP_IMU) — 50ms 주기로 엔코더/IMU 데이터 전송 중
 
 **미구현:**
@@ -123,7 +124,6 @@ Reference materials live in `docs/`:
 - IMU 물리량 변환 (raw → deg/s, m/s²)
 - 엔코더 오버플로우 처리
 - ROS topic publishing (/odom, /imu) — RPi 측 노드에서 구현 필요
-- PID speed control — 엔코더 피드백 기반 속도 제어
 
 ## Git
 
