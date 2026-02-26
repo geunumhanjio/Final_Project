@@ -153,12 +153,18 @@ int main(void)
     }
     
     /* Send sensor data to RPi every 50ms via USART1 */
-    static uint32_t last_send = 0;
+    static uint32_t last_send   = 0;
+    static int16_t  prev_odom_L = 0;
+    static int16_t  prev_odom_R = 0;
     if (now - last_send >= 50) {
         last_send = now;
 
-        Protocol_SendOdom(Encoder_GetCount(ENCODER_LEFT),
-                          Encoder_GetCount(ENCODER_RIGHT));
+        int16_t cur_L = Encoder_GetCount(ENCODER_LEFT);
+        int16_t cur_R = Encoder_GetCount(ENCODER_RIGHT);
+        Protocol_SendOdom(cur_L - prev_odom_L,
+                          cur_R - prev_odom_R);
+        prev_odom_L = cur_L;
+        prev_odom_R = cur_R;
 
         MPU6050_Data_t imu;
         if (MPU6050_ReadAll(&imu) == HAL_OK) {
