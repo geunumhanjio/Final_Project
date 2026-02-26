@@ -11,7 +11,7 @@
 
   <xacro:property name="wheel_radius"      value="0.033"/>  <!-- 바퀴 반지름 33mm -->
   <xacro:property name="wheel_width"       value="0.025"/>  <!-- 바퀴 폭 25mm (추정) -->
-  <xacro:property name="wheel_separation"  value="0.100"/>  <!-- 좌우 바퀴 중심 간격 230mm (실측 220~240, 중간값) -->
+  <xacro:property name="wheel_separation"  value="0.100"/>  <!-- 좌우 바퀴 중심 간격 100mm (실측) -->
 
   <!-- base_link 원점 = 로봇 중심, 지면에서 wheel_radius 높이 -->
   <xacro:property name="base_z_offset"     value="${wheel_radius}"/>
