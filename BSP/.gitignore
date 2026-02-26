@@ -12,6 +12,7 @@ build/
 .cproject
 Debug/
 Release/
+Core/Src/STM32CubeMX/
 
 # Backup files
 *~
