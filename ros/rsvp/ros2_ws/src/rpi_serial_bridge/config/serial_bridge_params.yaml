@@ -1,34 +1,33 @@
-/**:
+serial_bridge_node:
   ros__parameters:
     # === 시리얼 포트 설정 ===
     serial_port: "/dev/serial0"  # /dev/ttyAMA0 대신 /dev/serial0 사용
     baud_rate: 115200
-    
-    # === 로봇 물리 파라미터 ===
-    wheel_base: 0.10          # m (바퀴 간격) - URDF wheel_separation 기준 실측값
-    wheel_radius: 0.033       # m (바퀴 반경)
-    encoder_ticks_per_rev: 20 # 엔코더 틱/회전
-    
+
+    # === 로봇 물리 파라미터 (실측값) ===
+    wheel_base: 0.230             # m (바퀴 중심 간격 230mm 실측)
+    wheel_radius: 0.0325          # m (65mm 지름 → 반경 32.5mm)
+    encoder_ticks_per_rev: 1920   # 480 CPR × 4체배
+
     # === IMU 스케일 팩터 ===
-    # MPU6050 설정: ±2g, ±250°/s
-    imu_accel_scale: 0.005875   # m/s² per LSB (9.81 / 16384 * 0.00059875)
-    imu_gyro_scale: 0.0001332   # rad/s per LSB (π/180 * 0.007633)
-    
+    # MPU6050: ±2g, ±250°/s
+    imu_accel_scale: 0.000598     # m/s² per LSB  (9.8 / 16384)
+    imu_gyro_scale: 0.000133      # rad/s per LSB  (250/32768 × π/180)
+
     # === 좌표계 변환 ===
     # true로 설정하면 transformImuData() 함수에서 좌표계 변환 수행
     imu_transform_enabled: false
-    
+
     # === 프레임 ID ===
     odom_frame_id: "odom"
     base_frame_id: "base_footprint"
     imu_frame_id: "imu_link"
-    
+
     # === 타이밍 설정 ===
     # STM32 타임아웃(500ms) 방지를 위해 200ms(5Hz)마다 재전송
     cmd_vel_repeat_rate: 5.0  # Hz
-    
+
     # === 오도메트리 데이터 타입 ===
     # "ticks"    : 엔코더 틱 카운트 (누적)
     # "velocity" : 바퀴 속도 (mm/s)
-    # 모터 테스트 후 확인하여 설정
     odom_data_type: "ticks"

@@ -38,6 +38,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     pkg_share = FindPackageShare('rpi_bringup')
     params_file = PathJoinSubstitution([pkg_share, 'config', 'rpi_params.yaml'])
+    serial_bridge_params = PathJoinSubstitution([pkg_share, 'config', 'serial_bridge_params.yaml'])
 
     # ── Launch Arguments ───────────────────────────────────────────────────────
     use_camera_arg = DeclareLaunchArgument(
@@ -76,7 +77,7 @@ def generate_launch_description():
         package='rpi_serial_bridge',
         executable='serial_bridge_node',
         name='serial_bridge_node',
-        parameters=[params_file],
+        parameters=[params_file, serial_bridge_params],
         condition=IfCondition(LaunchConfiguration('use_serial')),
         output='screen',
     )

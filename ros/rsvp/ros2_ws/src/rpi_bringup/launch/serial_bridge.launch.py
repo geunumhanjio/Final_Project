@@ -32,6 +32,7 @@ def generate_launch_description():
             name='serial_bridge_node',
             parameters=[
                 PathJoinSubstitution([pkg_share, 'config', 'rpi_params.yaml']),
+                PathJoinSubstitution([pkg_share, 'config', 'serial_bridge_params.yaml']),
                 {'serial_port': LaunchConfiguration('serial_port')},
             ],
             output='screen',
