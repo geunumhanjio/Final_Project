@@ -52,6 +52,16 @@ struct ChannelContext {
     double totalLatencyMs;
     std::chrono::steady_clock::time_point lastStatTime;
 
+    // RTPSession (stats 가져올 대상)
+    GstElement *rtpsession = nullptr;
+    GstElement *rtpbin      = nullptr;   // ← 추가
+
+    // RTCP stats (새로 추가)
+    uint64_t rtp_packets_received = 0;
+    int32_t  rtp_packets_lost     = 0;     // docs에 int
+    double   rtp_jitter_ms        = 0.0;
+    uint64_t rtp_bytes_received   = 0;
+
     ChannelContext(int i, std::string p, std::string u, RtspProxy* par) 
         : id(i), path(p), url(u), parent(par), receiver_pipeline(nullptr), saved_caps(nullptr),
           is_recording(false), need_keyframe(false), record_start_pts(GST_CLOCK_TIME_NONE),
@@ -180,10 +190,83 @@ calc_latency:
             stats.bitrate_kbps = ((double)ctx->byteCount * 8.0) / elapsed; // (bytes * 8) / ms = bits/ms = kbps
             stats.proxy_latency_ms = ctx->totalLatencyMs / (double)ctx->frameCount;
             
+        // ===== [추가] RTCP stats 추출 (공식 source-stats 파싱) =====
+        if (ctx->rtpsession) {
+            GstStructure *stats_struct = nullptr;
+            g_object_get(ctx->rtpsession, "stats", &stats_struct, nullptr);
+
+            if (stats_struct) {
+                const GValue *val = gst_structure_get_value(stats_struct, "source-stats");
+                if (val && G_VALUE_HOLDS(val, G_TYPE_VALUE_ARRAY)) {
+                    GValueArray *arr = (GValueArray *)g_value_get_boxed(val);
+
+                    for (guint i = 0; i < arr->n_values; ++i) {
+                        const GValue *sval = g_value_array_get_nth(arr, i);
+                        if (!G_VALUE_HOLDS_BOXED(sval)) continue;
+
+                        GstStructure *src_stats = (GstStructure *)g_value_get_boxed(sval);
+                        if (!src_stats) continue;
+
+                        gboolean internal = FALSE;
+                        gboolean is_sender = FALSE;
+                        gst_structure_get_boolean(src_stats, "internal", &internal);
+                        gst_structure_get_boolean(src_stats, "is-sender", &is_sender);
+
+                        // remote sender (카메라 → proxy)만 관심
+                        if (!internal && is_sender) {
+                            uint64_t packets_received = 0;
+                            int32_t  packets_lost     = 0;
+                            uint64_t bytes_received   = 0;
+                            guint    jitter_units     = 0;
+                            gint     clock_rate       = 90000;
+
+                            gst_structure_get_uint64(src_stats, "packets-received", &packets_received);
+                            gst_structure_get_int   (src_stats, "packets-lost",     &packets_lost);
+                            gst_structure_get_uint64(src_stats, "bytes-received",   &bytes_received);
+                            gst_structure_get_uint  (src_stats, "jitter",           &jitter_units);
+                            gst_structure_get_int   (src_stats, "clock-rate",       &clock_rate);
+
+                            double jitter_ms = (clock_rate > 0) ? (jitter_units * 1000.0 / clock_rate) : 0.0;
+
+                            // ChannelStats에 저장 (이미 구조체에 필드 있다고 가정)
+                            stats.rtp_packets_received = packets_received;
+                            stats.rtp_packets_lost     = packets_lost;
+                            stats.rtp_bytes_received   = bytes_received;
+                            stats.rtp_jitter_ms        = jitter_ms;
+
+                            // 콘솔에 1초마다 출력 (테스트용)
+                            // 1초마다 출력 부분 (on_new_sample() 안)
+                            std::cout << "[" << ctx->path << "] RTCP Stats: "
+                                    << "packets_received=" << packets_received
+                                    << ", lost=" << packets_lost
+                                    << ", jitter=" << std::fixed << std::setprecision(3) << jitter_ms << " ms"
+                                    << ", bytes=" << bytes_received
+                                    << std::endl;
+
+                            guint rb_round_trip = 10;
+                            if (gst_structure_get_uint(src_stats, "rb-round-trip", &rb_round_trip)) {
+                                std::cout << "[" << ctx->path << "] Raw rb-round-trip (NTP Short): " << rb_round_trip << std::endl;
+                                double rtt_seconds = (rb_round_trip >> 16) + static_cast<double>(rb_round_trip & 0xFFFF) / 65536.0;
+                                double rtt_ms = rtt_seconds * 1000.0;
+                                stats.rtp_round_trip_ms = rtt_ms;
+
+                                std::cout << "[" << ctx->path << "] Network RTT: "
+                                        << std::fixed << std::setprecision(3) << rtt_ms << " ms"
+                                        << std::endl;
+                            }
+
+                            break;  // 첫 번째 sender source만 사용
+                        }
+                    }
+                }
+                gst_structure_free(stats_struct);
+            }
+        }
+
+        // ===== RTCP 끝 =====
             if (ctx->parent) {
                 ctx->parent->triggerStatsCallback(ctx->id, stats);
             }
-
             // Reset counters
             ctx->frameCount = 0;
             ctx->byteCount = 0;
@@ -203,9 +286,14 @@ calc_latency:
 RtspProxy::RtspProxy() : mainLoop(nullptr), server(nullptr), running(false) {
 }
 
+// channel context 소멸자가 있나?? 체크 필요
 RtspProxy::~RtspProxy() {
     stop();
     for (auto* ctx : channels) {
+        if (ctx->rtpbin)     gst_object_unref(ctx->rtpbin);
+        if (ctx->rtpsession) gst_object_unref(ctx->rtpsession);
+        ctx->rtpbin = nullptr;
+        ctx->rtpsession = nullptr;
         delete ctx;
     }
     channels.clear();
@@ -451,6 +539,47 @@ void RtspProxy::mediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media
     gst_object_unref(element);
 }
 
+// ==================================================================================
+// [RTCP] rtspsrc → rtpbin 얻기 + 세션 대기
+// ==================================================================================
+void RtspProxy::onNewRtpManager(GstElement *rtspsrc, GstElement *manager, gpointer user_data) {
+    ChannelContext *ctx = static_cast<ChannelContext*>(user_data);
+
+    // rtpbin 저장 (refcount 안전)
+    if (ctx->rtpbin) gst_object_unref(ctx->rtpbin);
+    ctx->rtpbin = (GstElement*)gst_object_ref(manager);
+
+    std::cout << "🔄 [" << ctx->path << "] new-manager received → rtpbin ready" << std::endl;
+
+    // on-ssrc-active 신호 연결 (세션이 실제로 생성되는 시점)
+    g_signal_connect(manager, "on-ssrc-active",
+        G_CALLBACK(RtspProxy::onSsrcActive), ctx);
+}
+
+void RtspProxy::onSsrcActive(GstElement *rtpbin, guint session, guint ssrc, gpointer user_data) {
+    ChannelContext *ctx = static_cast<ChannelContext*>(user_data);
+
+    if (session != 0) return;  // 비디오 세션만
+
+    // 이미 세션을 잡은 경우 → 로그 중복 방지
+    if (ctx->rtpsession) {
+        return;  // 이미 잡혔으면 더 이상 처리 안 함
+    }
+
+    GstElement *session_elem = nullptr;
+    g_signal_emit_by_name(rtpbin, "get-internal-session", 0, &session_elem);
+
+    if (session_elem) {
+        ctx->rtpsession = (GstElement*)gst_object_ref(session_elem);
+        gst_object_unref(session_elem);
+
+        std::cout << "✅ [" << ctx->path << "] RTPSession ready (SSRC 0x" 
+                  << std::hex << ssrc << std::dec << ") → RTCP stats enabled" << std::endl;
+    } else {
+        std::cout << "⚠️ [" << ctx->path << "] get-internal-session returned NULL" << std::endl;
+    }
+}
+
 void RtspProxy::runReceiverThread(ChannelContext *ctx) {
     while (true) {
         GMainContext *context = g_main_context_new();
@@ -486,7 +615,7 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
         } else {
             // RTSP H.264 (Passthrough)
             sprintf(pipeline_str,
-                "rtspsrc location=%s protocols=tcp "
+                "rtspsrc name=src location=%s protocols=tcp "
                 "latency=2000 drop-on-latency=false "
                 "tcp-timeout=10000000 "     
                 "do-rtcp=true "             
@@ -500,6 +629,16 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
         ctx->receiver_pipeline = gst_parse_launch(pipeline_str, NULL);
 
         if (ctx->receiver_pipeline) {
+            // ===== [추가] rtspsrc new-manager signal =====
+            if (ctx->url.find("rtsp://") == 0) {   // MJPEG은 skip
+                GstElement *rtspsrc = gst_bin_get_by_name(GST_BIN(ctx->receiver_pipeline), "src");
+                if (rtspsrc) {
+                    g_signal_connect(rtspsrc, "new-manager",
+                        G_CALLBACK(RtspProxy::onNewRtpManager), ctx);
+                    gst_object_unref(rtspsrc);
+                }
+            }
+
             // Bus Watch
             GstBus *bus = gst_element_get_bus(ctx->receiver_pipeline);
             gst_bus_add_watch(bus, [](GstBus *bus, GstMessage *msg, gpointer data) -> gboolean {

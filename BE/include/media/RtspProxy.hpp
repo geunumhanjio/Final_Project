@@ -17,6 +17,13 @@ struct ChannelStats {
     double fps;
     double bitrate_kbps;
     double proxy_latency_ms;
+
+    // RTCP stats (새로 추가)
+    uint64_t rtp_packets_received = 0;
+    int32_t  rtp_packets_lost     = 0;     // docs에 int
+    double   rtp_jitter_ms        = 0.0;
+    uint64_t rtp_bytes_received   = 0;
+    double rtp_round_trip_ms = 0.0;  // ← 새로 추가: RTT (ms)
 };
 
 using OnStatsUpdate = std::function<void(int channelId, const ChannelStats& stats)>;
@@ -52,6 +59,10 @@ private:
     void setupChannels();
     static void runReceiverThread(ChannelContext* ctx);
     static void mediaConfigure(GstRTSPMediaFactory* factory, GstRTSPMedia* media, gpointer user_data);
+
+    // rtcp 콜백
+    static void onNewRtpManager(GstElement *rtspsrc, GstElement *manager, gpointer user_data);
+    static void onSsrcActive(GstElement *rtpbin, guint session, guint ssrc, gpointer user_data);
 
     // Helper to start the receiver thread
     void startReceiverThreads();
