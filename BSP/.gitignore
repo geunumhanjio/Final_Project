@@ -25,3 +25,12 @@ Thumbs.db
 
 # Personal notes
 CLAUDE.md
+GEMINI.md
+.claude/
+.gemini/
+notes/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
