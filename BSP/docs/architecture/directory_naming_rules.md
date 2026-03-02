@@ -35,6 +35,27 @@ docs/hardware/
 
 > **예시:** `actuator_motor_fit0450_module_spec.md` (모터 액추에이터용, DFRobot FIT0450 기어모터가 결합된 모듈 모음의 기계 스펙 문서)
 
+> 예시: RM0090_STM32F405_RefManual.pdf
+
+### 문서 종류 
+| **분류** | **약어** | **설명** |
+| --- | --- | --- |
+| 회로도 | SCH | Schematic. 회로 설계 도면. 펌웨어/BSP 개발 시 MCU 핀 맵, 풀업/풀다운 저항, 인터럽트 라인 연결 상태를 확인할 때 가장 많이 참조한다. |
+| 부품표 | BOM | Bill of Materials. 실장되는 부품 목록. I2C 주소나 특정 부품의 정확한 파트 넘버를 확인할 때 사용한다. |
+| 거버 파일 | GER | Gerber. 실제 PCB 제조를 위한 CAM 데이터. |
+| 배치도 | ASM | Assembly drawing. 실물 PCB 위 부품 실장 위치도. 보드 디버깅 시 오실로스코프나 멀티미터로 프로빙할 테스트 포인트(TP)를 찾을 때 유용하다. |
+| 기구도면 | MECH | Mechanical. 외관 및 기구 설계 도면. 모터나 라이다 같은 외부 장치와의 물리적 체결 구조를 파악할 때 본다. |
+| 데이터시트 | DS | Datasheet. 특정 부품(센서, 모터 드라이버 등)의 스펙 및 레지스터 맵 문서. |
+| 블록도 | BLK | Block Diagram. 시스템 전체 전원 트리나 주요 칩 간의 인터페이스(UART, SPI 등) 구조도. |
+| **문서 약어** | **풀네임** | **설명** |
+| --- | --- | --- |
+| DS | Datasheet | 칩의 핀 맵, 패키지 물리적 규격, 전압 및 전류 등 전기적 특성(Electrical characteristics)을 명시한다. |
+| RM | Reference Manual | 하드웨어 레지스터 맵, 메모리 맵, 각 주변장치(Peripheral)의 상세한 하드웨어 동작 원리를 설명한다. 펌웨어 제어 시 가장 많이 본다. |
+| PM | Programming Manual | Cortex-M 코어 아키텍처, 어셈블리어 명령어 셋, 시스템 타이머(SysTick) 등 코어 레벨의 정보를 제공한다. |
+| UM | User Manual | ST가 제공하는 개발 보드(평가 보드)의 하드웨어 회로도, 핀 헤더 배치, 점퍼 설정 방법 등을 설명한다. |
+| AN | Application Note | 특정 센서 인터페이스, 모터 제어, 부트로더 작성 등 특정 주제에 대한 하드웨어 및 소프트웨어 설계 가이드라인을 제공한다. |
+| ES | Errata Sheet | 칩 설계상 발생한 하드웨어 버그(Silicon Limitation)와 이를 소프트웨어적으로 회피하는 방법(Workaround)을 명시한다. |
+
 ---
 
 ## 2. 도구 및 스크립트 (`tools/`) 규칙
