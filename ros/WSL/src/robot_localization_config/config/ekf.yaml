@@ -63,5 +63,6 @@ ekf_filter_node:
     imu0_queue_size: 10
     imu0_remove_gravitational_acceleration: true
 
-    publish_tf: false
+    publish_tf: true
     print_diagnostics: true
+    reset_on_time_jump: true

@@ -427,9 +427,7 @@ void SerialBridgeNode::publishWheelOdom()
   );
 
   wheel_odom_pub_->publish(odom_msg);
-  
-  // TF 발행
-  publishTransform(odom_msg);
+  // TF는 EKF(ekf_filter_node)가 발행 → 여기서 중복 발행 금지
 }
 
 void SerialBridgeNode::publishTransform(const nav_msgs::msg::Odometry& odom)
