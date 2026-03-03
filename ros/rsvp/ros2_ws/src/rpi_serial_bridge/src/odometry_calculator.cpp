@@ -57,14 +57,10 @@ int32_t OdometryCalculator::calculateTickDelta(int16_t current, int16_t previous
 
 void OdometryCalculator::updateFromTicks(int16_t left_ticks, int16_t right_ticks, double dt)
 {
-  // 틱 차분 계산 (오버플로우 고려)
-  int32_t delta_left = calculateTickDelta(left_ticks, prev_left_ticks_);
-  int32_t delta_right = calculateTickDelta(right_ticks, prev_right_ticks_);
-  
-  // 이전 값 저장
-  prev_left_ticks_ = left_ticks;
-  prev_right_ticks_ = right_ticks;
-  
+  // STM32가 누적 틱이 아닌 주기별 delta 틱을 전송
+  int32_t delta_left = static_cast<int32_t>(left_ticks);
+  int32_t delta_right = static_cast<int32_t>(right_ticks);
+
   // 거리 계산
   double distance_left = delta_left * meters_per_tick_;
   double distance_right = delta_right * meters_per_tick_;
