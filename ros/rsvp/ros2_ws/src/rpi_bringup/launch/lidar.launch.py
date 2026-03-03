@@ -37,6 +37,8 @@ def generate_launch_description():
             # port는 yaml보다 나중에 오므로 오버라이드됨
             {'port': LaunchConfiguration('lidar_port')},
         ],
+        # WSL의 scan_relay 노드가 /scan_raw를 받아 timestamp 교체 후 /scan으로 재발행
+        remappings=[('/scan', '/scan_raw')],
         output='screen',
     )
 

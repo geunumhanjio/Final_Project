@@ -39,6 +39,7 @@ from launch.conditions import IfCondition, LaunchConfigurationEquals
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
+from launch_ros.actions import Node
 
 
 def generate_launch_description():
@@ -97,6 +98,14 @@ def generate_launch_description():
                 condition=condition,
             )
         return inc
+
+    # ── Nodes ──────────────────────────────────────────────────────────────────
+    scan_relay_node = Node(
+        package='scan_relay',
+        executable='scan_relay',
+        name='scan_relay',
+        output='screen',
+    )
 
     # ── Includes ───────────────────────────────────────────────────────────────
     includes = [
@@ -157,4 +166,4 @@ def generate_launch_description():
         ),
     ]
 
-    return LaunchDescription(args + includes)
+    return LaunchDescription(args + [scan_relay_node] + includes)
