@@ -21,6 +21,7 @@ include_directories(${Boost_INCLUDE_DIRS})
 set(SOURCES
     src/main.cpp
     src/media/RtspProxy.cpp
+    src/media/GstQualityMonitor.cpp
     src/calibration/CalibrationManager.cpp
     src/network/VmsServer.cpp 
     src/network/RosClient.cpp
