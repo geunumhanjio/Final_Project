@@ -6,6 +6,8 @@
 #include <QApplication>
 #include <QDebug>
 #include <QDir>
+#include <QFile>
+#include <gst/gst.h> // [New] Needed for gst_init
 
 int main(int argc, char *argv[])
 {
@@ -36,10 +38,21 @@ int main(int argc, char *argv[])
     qputenv("GST_DEBUG", "3");
     qDebug() << "[main] GST_DEBUG level set to: 3";
 
+    // Initialize GStreamer Environment
+    // gst_init must be called before any GStreamer usage.
+    // Passing nullptr allowing GStreamer to parse standard command line args if needed (none passed)
+    qDebug() << "[main] Initializing GStreamer...";
+    gst_init(&argc, &argv); 
+    qDebug() << "[main] GStreamer Initialized.";
+
     // GStreamer 초기화 전에 환경 확인
     QApplication a(argc, argv);
 
     qDebug() << "[main] Qt application created";
+
+    // Main window will load the theme
+    // qApp->setStyleSheet(...) moved to MainWindow
+
     qDebug() << "[main] Opening main window...";
 
     MainWindow w;

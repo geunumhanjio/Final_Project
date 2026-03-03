@@ -1,0 +1,383 @@
+/* Global Light Theme */
+QMainWindow, QWidget {
+    background-color: #f8fafc; /* Slate 50 */
+    color: #0f172a;        /* Slate 900 */
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Scrollbar */
+QScrollBar:vertical {
+    border: none;
+    background: transparent;
+    width: 8px;
+    margin: 0px;
+}
+QScrollBar::handle:vertical {
+    background: #cbd5e1;
+    min-height: 20px;
+    border-radius: 4px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #94a3b8;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+/* Sidebar List */
+/* Sidebar List */
+#SidebarList {
+    background-color: #ffffff;
+    border: none;
+    border-right: 1px solid #e2e8f0;
+    outline: none;
+}
+#SidebarList::item {
+    padding: 0px;
+    background-color: transparent;
+    border-bottom: 1px solid #f1f5f9;
+}
+#SidebarList::item:selected {
+    background-color: #fff7ed;
+    border-left: 3px solid #ff6b00;
+}
+#SidebarList::item:hover {
+    background-color: #f8fafc;
+}
+QListWidget::item {
+    padding: 12px;
+    color: black; /* Slate 800 (Darker) -> Black */
+    border-bottom: 1px solid #f1f5f9;
+}
+QListWidget::item:selected {
+    background-color: #fff7ed; /* Orange-50 (Light primary bg) */
+    color: #0f172a;
+    border-left: 3px solid #ff6b00; /* Orange Primary */
+}
+QListWidget::item:hover {
+    background-color: #f8fafc;
+}
+
+/* Category List (Playback Sidebar) */
+#CategoryList {
+    background-color: transparent;
+    border: none;
+    outline: none;
+}
+#CategoryList::item {
+    padding: 12px 16px;
+    color: black; /* Explicit Black */
+    font-size: 14px;
+    border-bottom: 1px solid #f1f5f9;
+}
+#CategoryList::item:selected {
+    background-color: #fff7ed;
+    color: black;
+    font-weight: bold;
+    border-left: 4px solid #ff6b00;
+}
+#CategoryList::item:hover {
+    background-color: #f8fafc;
+}
+
+/* Search Bar */
+QLineEdit {
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 6px;
+    color: #0f172a;
+}
+QLineEdit:focus {
+    border: 1px solid #ff6b00; /* Orange focus */
+    background-color: #ffffff;
+}
+
+/* TopBar */
+#TopBar {
+    background-color: #ffffff;
+    border-bottom: 1px solid #e2e8f0;
+}
+#TopBarTitle {
+    color: #0f172a;
+}
+#TopBarNavContainer {
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+}
+
+/* TopBar Navigation Buttons */
+#TopBarNavBtn {
+    background-color: transparent;
+    color: #64748b;
+    border: none;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 4px 12px;
+    border-radius: 4px;
+}
+#TopBarNavBtn:hover {
+    background-color: #ffffff;
+    color: #ff6b00;
+}
+#TopBarNavBtn[active="true"] {
+    background-color: #ff6b00; /* Orange Primary */
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+#TopBarToggleBtn {
+    color: #475569;
+    font-size: 20px;
+    border: none;
+    background: transparent;
+}
+#TopBarToggleBtn:hover {
+    color: #1e293b;
+    background: rgba(0,0,0,0.05);
+    border-radius: 4px;
+}
+
+#TopBarTitle {
+    font-weight: bold;
+    font-size: 16px;
+    letter-spacing: 1px;
+    color: #1e293b;
+    background-color: transparent;
+}
+
+#DateLabel {
+    color: #64748b;
+    font-family: monospace;
+    font-size: 11px;
+    font-weight: bold;
+    background-color: transparent;
+}
+
+#TimeLabel {
+    color: #135bec;
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 14px;
+    background-color: transparent;
+}
+
+/* VideoCard */
+#VideoCardStatusBar {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-top: none;
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+#VideoCardChannelLabel {
+    color: #0f172a;
+}
+
+/* Right Panel Cards */
+#SensorCard {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+}
+#SensorHeader {
+    background-color: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+}
+#SensorTitle {
+    color: #0f172a;
+}
+#SensorValue {
+    color: #0f172a;
+}
+
+/* Sidebar Specifics */
+#SidebarContainer {
+    background-color: #ffffff;
+    border-right: 1px solid #e2e8f0;
+}
+#SidebarSearchArea {
+    border-bottom: 1px solid #e2e8f0;
+}
+#SidebarSearchBar {
+    background-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 8px;
+    color: #0f172a;
+    font-size: 12px;
+}
+#SidebarSearchBar:focus {
+    border: 1px solid #ff6b00;
+}
+
+/* Sidebar Headers */
+#SidebarHeaderTitle {
+    color: black; 
+    font-weight: bold;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+#SidebarHeaderCount {
+    background-color: rgba(255, 107, 0, 0.1); /* Orange alpha */
+    color: #ff6b00;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+/* Sidebar Items */
+#SidebarItemIcon {
+    color: black; /* Darker -> Black */
+    font-size: 14px;
+}
+#SidebarItemText {
+    color: black;
+    font-size: 12px;
+}
+#SidebarItemStatus {
+    font-weight: bold;
+    font-size: 11px;
+}
+
+#PlaybackHeaderTitle {
+    color: black;
+    font-weight: bold;
+    font-size: 14px;
+    letter-spacing: 1px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Playback View Main Area (Light) */
+#PlaybackTitle {
+    font-size: 24px;
+    font-weight: bold;
+    color: black; /* [Req] Black */
+}
+
+/* Force Dark Style for Playback List in Light Mode as per user request */
+#PlaybackList {
+    background-color: #0F172A; 
+    border-radius: 8px; 
+    border: 1px solid #334155; 
+    color: white; 
+    font-size: 14px;
+    outline: none;
+}
+#PlaybackList::item {
+    padding: 8px; 
+    border-bottom: 1px solid #1E293B;
+    color: white;
+}
+#PlaybackList::item:selected {
+    background-color: #3b82f6;
+    color: white;
+}
+#PlaybackList::item:hover {
+    background-color: #334155;
+}
+
+/* =========================================
+   FullScreen View Styles (Light)
+   ========================================= */
+
+#FS_TopBar {
+    background: transparent;
+}
+
+#FS_TitleLabel {
+    color: #111827; 
+    font-weight: bold; 
+    font-size: 18px; 
+    background-color: rgba(255,255,255,0.8); 
+    border-radius: 8px; 
+    padding: 4px 12px; 
+    border: 1px solid rgba(255,255,255,0.6);
+}
+
+#FS_LiveBadge {
+    color: #F98006; 
+    font-weight: bold; 
+    font-size: 11px; 
+    border: 1px solid rgba(249, 128, 6, 0.3); 
+    background-color: rgba(249, 128, 6, 0.1); 
+    padding: 2px 6px; 
+    border-radius: 4px;
+}
+
+#FS_CloseBtn {
+    background-color: rgba(255, 255, 255, 0.9); 
+    color: #374151; 
+    border: 1px solid rgba(255, 255, 255, 0.5); 
+    border-radius: 18px; 
+    font-size: 16px;
+}
+#FS_CloseBtn:hover {
+    background-color: #FFFFFF; 
+    color: #111827;
+}
+
+/* UnderBar (Light) */
+#controlBar {
+    background-color: rgba(255, 255, 255, 0.60);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+}
+#controlBar QPushButton {
+    background-color: transparent;
+    color: #374151;
+    border: none;
+    padding: 8px 15px;
+    font-size: 13px; font-weight: 500; font-family: 'Segoe UI', sans-serif;
+}
+#controlBar QPushButton:hover {
+    background-color: rgba(255, 255, 255, 1.0);
+    border-radius: 8px;
+    color: #F98006;
+}
+#controlBar QPushButton:checked {
+    color: #F98006; font-weight: bold;
+    background-color: rgba(249, 128, 6, 0.1);
+}
+
+#resetBtn {
+    background-color: #F98006; 
+    color: white; 
+    border-radius: 8px; 
+    font-weight: bold;
+}
+#resetBtn:hover {
+    background-color: #FB923C;
+}
+
+#FS_PlaybackContainer {
+    background: transparent;
+}
+
+#FS_SeekSlider::groove:horizontal {
+    border: 1px solid #CBD5E1; 
+    height: 6px; 
+    background: #E2E8F0; 
+    margin: 2px 0; 
+    border-radius: 3px;
+}
+#FS_SeekSlider::handle:horizontal {
+    background: #F98006; 
+    border: 1px solid #F98006; 
+    width: 14px; 
+    height: 14px; 
+    margin: -5px 0; 
+    border-radius: 7px;
+}
+#FS_SeekSlider::handle:horizontal:hover {
+    background: #FB923C;
+}
+
+#timeLabel {
+    color: #334155; 
+    font-family: monospace; 
+    font-weight: bold;
+}

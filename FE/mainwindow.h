@@ -1,21 +1,27 @@
-/**
- * @file mainwindow.h
- * @brief 메인 윈도우 헤더. 모든 모듈의 컨트롤러 역할.
- */
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 #include <QMainWindow>
 #include <QStackedWidget>
 #include <QLabel>
+#include <QCloseEvent>
 #include "topbar.h"
 #include "sidebar.h"
 #include "liveview.h"
-#include "fullscreenview.h"
+#include "rosbridgeclient.h"
+#include "cameracontrolclient.h" // [New]
+#include <QSet>
+#include <QTimer>
+#include <QKeyEvent>
 
 QT_BEGIN_NAMESPACE
-namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
+
+#include "videowidget.h"
+#include "playbackview.h" // [New]
+
+class SettingsWidget;
+class FullScreenView;
 
 class MainWindow : public QMainWindow
 {
@@ -24,21 +30,46 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
-protected:
-    void closeEvent(QCloseEvent *event) override; // 창 닫기 이벤트 오버라이드
-private:
-    Ui::MainWindow *ui;
 
-    // 모듈 객체들
+protected:
+    void closeEvent(QCloseEvent *event) override;
+    bool eventFilter(QObject *obj, QEvent *event) override; // [New]
+    void keyPressEvent(QKeyEvent *event) override;   // Kept for backup/other keys
+    void keyReleaseEvent(QKeyEvent *event) override; // Kept for backup/other keys
+
+private:
+    bool handleWasdKey(QKeyEvent *event, bool isPress); // [New] Shared logic
+
+private slots:
+    void processInput();
+    void onConfigChanged(); // [New]
+
+private:
     TopBar *m_topBar;
     Sidebar *m_sidebar;
     QStackedWidget *m_centralStack; // 페이지 전환 컨테이너
     LiveView *m_livePage;
     FullScreenView *m_fullPage;
-    QLabel *m_playbackPage;         // 임시 페이지
-    QLabel *m_settingsPage;         // 임시 페이지
+    PlaybackView *m_playbackPage;   // [Modified] VideoWidget -> PlaybackView
+    SettingsWidget *m_settingsPage; // Settings Widget
 
     void initUI();          // UI 초기화
     void initConnections(); // 시그널/슬롯 연결
+    void toggleTheme();     // Theme toggle method
+    void loadTheme(const QString &path); // Robust theme loader
+
+    
+private:
+    bool m_isDark; // Current theme state
+    
+    // ROS2 Control
+    RosBridgeClient *m_rosClient;
+    CameraControlClient *m_cameraClient;
+    
+    QTimer *m_inputTimer;
+    QSet<int> m_pressedKeys;
+    
+    // [New] Widget to return to after closing FullScreenView
+    QWidget* m_returnToWidget = nullptr; 
 };
 #endif // MAINWINDOW_H
