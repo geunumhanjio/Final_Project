@@ -41,8 +41,9 @@ class ScanRelayNode(Node):
         self.pub = self.create_publisher(LaserScan, '/scan', 10)
 
         # TF가 scan stamp보다 약간 늦게 도착하므로 stamp를 과거로 offset
-        # 실측 최대 오차 28ms → 50ms로 충분
-        self._stamp_offset = Duration(nanoseconds=50_000_000)
+        # EKF TF 지연 ~6ms → 20ms 여유
+        # 이동 중 위치 오차 = speed × offset (0.3m/s × 0.02s = 6mm)
+        self._stamp_offset = Duration(nanoseconds=20_000_000)
 
         self.get_logger().info('Scan relay ready: /scan_raw (BEST_EFFORT) → /scan (RELIABLE)')
 
