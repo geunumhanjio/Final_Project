@@ -142,7 +142,10 @@ void SerialBridgeNode::declareParameters()
   RCLCPP_INFO(this->get_logger(), "  serial_port: %s", serial_port_.c_str());
   RCLCPP_INFO(this->get_logger(), "  baud_rate: %d", baud_rate_);
   RCLCPP_INFO(this->get_logger(), "  wheel_base: %.3f m", wheel_base_);
-  RCLCPP_INFO(this->get_logger(), "  wheel_radius: %.3f m", wheel_radius_);
+  RCLCPP_INFO(this->get_logger(), "  wheel_radius: %.4f m", wheel_radius_);
+  RCLCPP_INFO(this->get_logger(), "  encoder_ticks_per_rev: %d  (meters_per_tick=%.7f)",
+              encoder_ticks_per_rev_,
+              (2.0 * M_PI * wheel_radius_) / encoder_ticks_per_rev_);
   RCLCPP_INFO(this->get_logger(), "  odom_data_type: %s", odom_data_type_.c_str());
 }
 

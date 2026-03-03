@@ -28,6 +28,6 @@ serial_bridge_node:
     cmd_vel_repeat_rate: 5.0  # Hz
 
     # === 오도메트리 데이터 타입 ===
-    # "ticks"    : 엔코더 틱 카운트 (누적)
+    # "ticks"    : 엔코더 틱 카운트 (STM32가 50ms 주기 delta 전송)
     # "velocity" : 바퀴 속도 (mm/s)
     odom_data_type: "ticks"
