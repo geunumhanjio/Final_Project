@@ -70,7 +70,7 @@ void LiveVideoWidget::playUrl(const QString &url, int latency)
 
     // RTSP Pipeline (Using UDP for better quality monitoring)
     QString pipelineStr = QString(
-        "rtspsrc location=%1 protocols=udp latency=%2 %3 ! "
+        "rtspsrc name=src location=%1 protocols=udp latency=%2 %3 ! "
         "qualitymonitor name=qmon ! "
         "rtph264depay ! h264parse ! avdec_h264 ! "
         "videoconvert ! videocrop name=crop ! videoconvert ! "

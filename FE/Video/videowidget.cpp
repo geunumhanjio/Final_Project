@@ -318,20 +318,23 @@ void VideoWidget::extractGstStats() {
             GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
             bool fpsSet = false;
             if (sink) {
-                GstStructure *stats = nullptr;
-                g_object_get(sink, "stats", &stats, NULL);
-                if (stats) {
-                    guint rendered = 0;
-                    if (gst_structure_get_uint(stats, "rendered", &rendered)) {
-                        // Using rendered frame count difference for FPS
-                        if (rendered >= m_lastRendered) {
-                            double fps = (rendered - m_lastRendered) / elapsedSec;
-                            m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
-                            fpsSet = true;
+                // Check if 'stats' property exists to avoid GObject warnings
+                if (g_object_class_find_property(G_OBJECT_GET_CLASS(sink), "stats")) {
+                    GstStructure *stats = nullptr;
+                    g_object_get(sink, "stats", &stats, NULL);
+                    if (stats) {
+                        guint rendered = 0;
+                        if (gst_structure_get_uint(stats, "rendered", &rendered)) {
+                            // Using rendered frame count difference for FPS
+                            if (rendered >= m_lastRendered) {
+                                double fps = (rendered - m_lastRendered) / elapsedSec;
+                                m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
+                                fpsSet = true;
+                            }
+                            m_lastRendered = rendered;
                         }
-                        m_lastRendered = rendered;
+                        gst_structure_free(stats);
                     }
-                    gst_structure_free(stats);
                 }
                 gst_object_unref(sink);
             }
