@@ -7,3 +7,5 @@ log/
 docker/.env
 
 dds_test_*
+
+backup/
