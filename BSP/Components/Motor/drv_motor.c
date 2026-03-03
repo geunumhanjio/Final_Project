@@ -1,12 +1,10 @@
-#include "motor_control.h"
-#include "pid.h"
+#include "drv_motor.h"
+#include "algo_pid.h"
 #include "gpio.h"
 #include <stdlib.h>  // abs()
 #include <stdio.h>
 
 /* Private defines -----------------------------------------------------------*/
-// 가속도 제한 (open-loop 시절 유산 — PID 구현 후 미사용)
-// #define MAX_ACCEL_MMPS_PER_10MS 200
 
 // L298N GPIO 핀 정의
 #define MOTOR_LEFT_IN1_PORT     GPIOC
@@ -107,11 +105,11 @@ static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps)
     }
     
     /* Debugging --------------------------------------------------------*/
-    printf("[Real Motor PWM Value and Speed] %s: pwm = %d, speed = %d [mm/s]\r\n", (motor == MOTOR_LEFT) ? "LEFT" : "RIGHT", pwm_value, speed_mmps);
+    //printf("[Real Motor PWM Value and Speed] %s: pwm = %d, speed = %d [mm/s]\r\n", (motor == MOTOR_LEFT) ? "LEFT" : "RIGHT", pwm_value, speed_mmps);
 
     /* Debugging PWM Value ----------------------------------------------------------*/
     //forward = 1;  // 항상 정방향으로 테스트
-    //pwm_value = 500;  // PWM 절반 (약 300mm/s 예상) 
+    //pwm_value = 0;  // PWM 절반 (약 300mm/s 예상) 
     
     // PWM 듀티 설정
     __HAL_TIM_SET_COMPARE(&htim2, pwm_channel, pwm_value);

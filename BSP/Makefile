@@ -61,12 +61,12 @@ Core/Src/syscalls.c \
 Core/Src/gpio.c \
 Core/Src/tim.c \
 Core/Src/usart.c \
-Core/Src/motor_control.c \
-Core/Src/uart_protocol.c \
-Core/Src/encoder.c \
-Core/Src/pid.c \
+Components/Motor/drv_motor.c \
+Components/Comms/app_packet_parser.c \
+Components/Motor/drv_encoder.c \
+Components/Motor/algo_pid.c \
 Core/Src/i2c.c \
-Core/Src/mpu6050.c \
+Components/Sensor/drv_mpu6050.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c.c \
 Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_i2c_ex.c
 
@@ -131,6 +131,9 @@ AS_INCLUDES =
 # C includes
 C_INCLUDES =  \
 -ICore/Inc \
+-IComponents/Motor \
+-IComponents/Sensor \
+-IComponents/Comms \
 -IDrivers/STM32F4xx_HAL_Driver/Inc \
 -IDrivers/STM32F4xx_HAL_Driver/Inc/Legacy \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \

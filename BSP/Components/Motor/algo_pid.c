@@ -1,5 +1,5 @@
-#include "pid.h"
-#include "motor_control.h"  // MOTOR_MAX_SPEED_MMPS
+#include "algo_pid.h"
+#include "drv_motor.h"  // MOTOR_MAX_SPEED_MMPS
 
 void PID_Init(PID_t *pid, float Kp, float Ki, float Kd, float dt)
 {

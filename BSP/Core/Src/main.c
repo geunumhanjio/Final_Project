@@ -25,10 +25,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "motor_control.h"
-#include "uart_protocol.h"
-#include "encoder.h"
-#include "mpu6050.h"
+#include "drv_motor.h"
+#include "app_packet_parser.h"
+#include "drv_encoder.h"
+#include "drv_mpu6050.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 

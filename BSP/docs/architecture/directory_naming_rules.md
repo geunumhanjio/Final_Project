@@ -79,3 +79,27 @@ tools/
 > **예시:** 
 > - `rpi_script_serial_monitor.py` (RPi에서 시리얼 통신을 관찰하는 파이썬 코드)
 > - `stm32_fw_FinalProject_BaseCtrl_260301_v1.bin` (STM32에 구워 넣을 26년 3월 1일 자 베이스컨트롤러 펌웨어 v1)
+
+---
+
+## 3. C/C++ 소스코드 아키텍처 (`Core/`, `Components/`) 규칙
+
+STM32CubeMX가 생성한 자동화 코드와 사용자가 직접 작성한 어플리케이션 코드가 섞여 손실되는 것을 방지하기 위해 **컴포넌트 중심 아키텍처(Component-based Architecture)** 를 채택합니다.
+
+### 3-1. 폴더 구조
+```text
+BSP/
+├── Core/       (접근 금지 구역: STM32CubeMX 자동생성 전용 코드 - main.c, gpio.c 등)
+├── Drivers/    (ST 배포용 기초 HAL 라이브러리들)
+└── Components/ (사용자 전용 구역: 도메인 기능별로 분리된 어플리케이션 코드)
+    ├── Motor/  (모터 제어, 엔코더 펄스 리딩, PID 제어 등)
+    ├── Sensor/ (IMU 등 센서 통신 및 파싱)
+    └── Comms/  (UART/CAN 등을 통한 외부 통신 및 프로토콜 로직)
+```
+
+### 3-2. 소스코드 접두사 규칙 
+해당 파일이 하드웨어를 직접 제어하는지, 아니면 순수 수학/논리 부분인지 식별하기 위해 파일명 앞에 다음 접두사를 의무적으로 붙입니다.
+
+- **`drv_` (Driver)**: 센서 통신(I2C/SPI), 모터 핀 제어(PWM) 등 실제 **하드웨어를 직접 건드리는** 최하단 코드 (예: `drv_motor.c`, `drv_mpu6050.c`, `drv_encoder.c`)
+- **`algo_` (Algorithm)**: PID 공식, 역운동학 계산 등 하드웨어 핀 번호와 무관한 **순수 수학 연산** 코드 (예: `algo_pid.c`)
+- **`app_` (Application)**: 하단 Driver와 알고리즘을 가져다 결합하여 **상위 로봇 동작(명령 해석 등)을 결정**하는 뇌 역할의 코드 (예: `app_packet_parser.c`)

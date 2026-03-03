@@ -1,4 +1,4 @@
-#include "encoder.h"
+#include "drv_encoder.h"
 
 #define ENCODER_PPR             1920.0f   // 4x quadrature (480 CPR × 4)
 #define WHEEL_CIRCUMFERENCE_MM  204.2f    // π × 65mm (지름 6.5cm)
@@ -31,7 +31,7 @@ void Encoder_ResetCount(Encoder_Select_t encoder)
     }
 }
 
-/* 10ms마다 호출 — 직전 호출 대비 tick 변화량을 mm/s로 변환 */
+/* 10ms마다 호출되며 직전 호출 대비 tick 변화량을 mm/s로 변환 */
 float Encoder_GetSpeed(Encoder_Select_t encoder)
 {
     static int16_t prev_left  = 0;

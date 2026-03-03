@@ -1,4 +1,4 @@
-#include "mpu6050.h"
+#include "drv_mpu6050.h"
 
 #define MPU6050_TIMEOUT  100  /* ms */
 

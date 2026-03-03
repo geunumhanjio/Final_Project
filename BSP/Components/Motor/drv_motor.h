@@ -8,11 +8,11 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "tim.h"
-#include "pid.h"
+#include "algo_pid.h"
 #include <stdbool.h>
 
 /* Exported defines ----------------------------------------------------------*/
-#define MOTOR_MAX_SPEED_MMPS    600   // 최대 속도 (mm/s) - 실측 후 조정
+#define MOTOR_MAX_SPEED_MMPS    500   // 최대 속도 (mm/s) - 실측 후 조정 (이론적으로는 모터 RPM과 바퀴 지름 기반으로 계산)
 #define MOTOR_PWM_PERIOD        999   // TIM2 ARR 값과 동일
 #define MOTOR_CMD_TIMEOUT_MS    500   // 명령 타임아웃 (500ms)
 

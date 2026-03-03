@@ -7,7 +7,7 @@ extern "C" {
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "mpu6050.h"
+#include "drv_mpu6050.h"
 #include <stdbool.h>
 
 /* Protocol constants --------------------------------------------------------*/
