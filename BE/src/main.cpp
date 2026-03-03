@@ -6,10 +6,14 @@
 #include "network/VmsServer.hpp"
 #include "network/RosClient.hpp"
 #include "calibration/CalibrationManager.h"
+#include "media/GstQualityMonitor.hpp"
 
 int main(int argc, char *argv[]) {
     // Initialize GStreamer
     gst_init(&argc, &argv);
+
+    // Register Custom Elements
+    gst_quality_monitor_register(NULL);
 
     std::cout << "=================================================" << std::endl;
     std::cout << " 🚀 Proxy Server (Hybrid Architecture)" << std::endl;
