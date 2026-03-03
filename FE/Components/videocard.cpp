@@ -344,17 +344,9 @@ void VideoCard::showSettingsMenu()
 
 void VideoCard::updateStreamStats(double fps, double bitrateKbps, double proxyLatencyMs)
 {
-    if (m_videoWidget && m_videoWidget->getOsdWidget()) {
-        OsdWidget *osd = m_videoWidget->getOsdWidget();
-        
-        if (osd->isMetricVisible(OsdWidget::FPS)) {
-            osd->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
-        }
-        if (osd->isMetricVisible(OsdWidget::Bitrate)) {
-            osd->setMetricValue(OsdWidget::Bitrate, QString::number(bitrateKbps / 1024.0, 'f', 2) + " Mbps");
-        }
-        if (osd->isMetricVisible(OsdWidget::Latency)) {
-            osd->setMetricValue(OsdWidget::Latency, QString::number(proxyLatencyMs, 'f', 3) + " ms");
-        }
-    }
+    // [Mod] External stats rendering removed.
+    // Relying solely on local qualitymonitor (qmon) in VideoWidget::extractGstStats.
+    Q_UNUSED(fps);
+    Q_UNUSED(bitrateKbps);
+    Q_UNUSED(proxyLatencyMs);
 }

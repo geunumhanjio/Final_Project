@@ -307,30 +307,45 @@ void VideoWidget::extractGstStats() {
             m_osdWidget->setMetricValue(OsdWidget::Jitter, QString::number(m.jitter_ms, 'f', 2) + " ms");
 
             // 3. Bitrate (Mbps)
-            if (m.bytes_received > m_lastBytes) {
-                double diffBits = (m.bytes_received - m_lastBytes) * 8.0;
-                double mbps = (diffBits / (1024.0 * 1024.0)) / elapsedSec;
+            if (m.bytes_received >= m_lastBytes) {
+                double mbps = ((m.bytes_received - m_lastBytes) * 8.0 / (1024.0 * 1024.0)) / elapsedSec;
                 m_osdWidget->setMetricValue(OsdWidget::Bitrate, QString::number(mbps, 'f', 2) + " Mbps");
             }
             m_lastBytes = m.bytes_received;
 
-            // 4. FPS (Estimated from packet rate if precise frame count not available)
-            if (m.packets_received > m_lastPackets) {
-                double fps = (m.packets_received - m_lastPackets) / elapsedSec;
-                // Note: This is an estimation. For precise FPS, sink element 'stats' could be used.
-                m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)) + " fps");
+            // 4. FPS Calculation
+            // Attempt to get precise rendered frames from sink first
+            GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
+            bool fpsSet = false;
+            if (sink) {
+                GstStructure *stats = nullptr;
+                g_object_get(sink, "stats", &stats, NULL);
+                if (stats) {
+                    guint rendered = 0;
+                    if (gst_structure_get_uint(stats, "rendered", &rendered)) {
+                        // Using rendered frame count difference for FPS
+                        if (rendered >= m_lastRendered) {
+                            double fps = (rendered - m_lastRendered) / elapsedSec;
+                            m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
+                            fpsSet = true;
+                        }
+                        m_lastRendered = rendered;
+                    }
+                    gst_structure_free(stats);
+                }
+                gst_object_unref(sink);
+            }
+            // Fallback to packet-based estimation if sink stats failed or not available
+            if (!fpsSet && m.packets_received >= m_lastPackets) {
+                double fps_est = (m.packets_received - m_lastPackets) / elapsedSec;
+                m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps_est)));
             }
             m_lastPackets = m.packets_received;
 
-            // 5. Latency (RTT)
-            // Show both RTT (Network) and existing Server latency if available
-            QString latencyStr = QString("%1 ms (RTT)").arg(QString::number(m.rtt_ms, 'f', 1));
-            m_osdWidget->setMetricValue(OsdWidget::Latency, latencyStr);
+            // 5. Latency (RTT) - Clean, stable label
+            m_osdWidget->setMetricValue(OsdWidget::Latency, QString::number(m.rtt_ms, 'f', 1) + " ms (RTT)");
         }
         gst_object_unref(qmon);
-    } else {
-        // Fallback for elements without qualitymonitor (e.g. Recorded playback)
-        // Keep previous values or clear them
     }
 }
 

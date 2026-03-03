@@ -86,6 +86,7 @@ private:
 
     uint64_t m_lastBytes = 0;
     uint64_t m_lastPackets = 0;
+    guint m_lastRendered = 0;
     QElapsedTimer m_statsClock;
 
     static GstBusSyncReply busSyncHandler(GstBus *bus, GstMessage *msg, gpointer user_data);
