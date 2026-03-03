@@ -55,6 +55,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/Views"
     "${CMAKE_CURRENT_SOURCE_DIR}/Components"
     "${CMAKE_CURRENT_SOURCE_DIR}/Video"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Video/Gst"
     "${CMAKE_CURRENT_SOURCE_DIR}/Network"
     "${CMAKE_CURRENT_SOURCE_DIR}/Utils"
 )
@@ -75,6 +76,8 @@ set(PROJECT_SOURCES
         Video/videowidget.h Video/videowidget.cpp
         Video/livevideowidget.h Video/livevideowidget.cpp
         Video/recordedvideowidget.h Video/recordedvideowidget.cpp
+        Video/Gst/GstQualityMonitor.hpp Video/Gst/GstQualityMonitor.cpp
+        Video/Gst/GstStatsCollector.hpp
         Components/videocard.h Components/videocard.cpp
         Network/streammanager.h Network/streammanager.cpp
         Network/rosbridgeclient.h Network/rosbridgeclient.cpp

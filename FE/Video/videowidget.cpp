@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QMutexLocker>
 #include <QFile>
+#include "Gst/GstQualityMonitor.hpp"
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
 {
@@ -55,6 +56,8 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     m_statsTimer = new QTimer(this);
     connect(m_statsTimer, &QTimer::timeout, this, &VideoWidget::extractGstStats);
     m_statsTimer->start(1000); // 1Hz update
+
+    m_statsClock.start(); // Start the clock for rate measurements
 
     pipeline = nullptr;
     cropper = nullptr;
@@ -286,63 +289,48 @@ void VideoWidget::syncOverlayPosition() {
 void VideoWidget::extractGstStats() {
     if (!pipeline || !m_isPlaying || !m_osdWidget) return;
 
-    // We only care if OSD metrics for Loss or Jitter are visible (Optimization)
-    if (!m_osdWidget->isMetricVisible(OsdWidget::PacketLoss) && 
-        !m_osdWidget->isMetricVisible(OsdWidget::Jitter)) {
-        return;
-    }
+    // 1. Find the qualitymonitor element by name
+    GstElement* qmon = gst_bin_get_by_name(GST_BIN(pipeline), "qmon");
+    if (qmon) {
+        GstQualityMonitor* monitor = GST_QUALITY_MONITOR(qmon);
+        if (monitor->collector) {
+            RtpQualityMetrics m = monitor->collector->getMetrics();
 
-    GstIterator* it = gst_bin_iterate_recurse(GST_BIN(pipeline));
-    GValue item = G_VALUE_INIT;
-    GstElement* jbuf = nullptr;
-    
-    while (gst_iterator_next(it, &item) == GST_ITERATOR_OK) {
-        GstElement* elem = GST_ELEMENT(g_value_get_object(&item));
-        if (elem && g_str_has_prefix(GST_ELEMENT_NAME(elem), "rtpjitterbuffer")) {
-            jbuf = elem;
-            gst_object_ref(jbuf); // Ref it before we break
-            g_value_reset(&item);
-            break;
-        }
-        g_value_reset(&item);
-    }
-    gst_iterator_free(it);
+            // Calculate elapsed time for rate-based metrics
+            double elapsedSec = m_statsClock.isValid() ? m_statsClock.restart() / 1000.0 : 1.0;
+            if (elapsedSec <= 0) elapsedSec = 1.0;
 
-    if (jbuf) {
-        GstStructure* stats = nullptr;
-        g_object_get(jbuf, "stats", &stats, NULL);
+            // 1. Packet Loss
+            m_osdWidget->setMetricValue(OsdWidget::PacketLoss, QString::number(m.packets_lost) + " pkts");
 
-        if (stats) {
-            guint64 num_lost = 0, num_pushed = 0;
-            guint64 avg_jitter = 0; 
+            // 2. Jitter
+            m_osdWidget->setMetricValue(OsdWidget::Jitter, QString::number(m.jitter_ms, 'f', 2) + " ms");
 
-            gst_structure_get_uint64(stats, "num-lost",   &num_lost);
-            gst_structure_get_uint64(stats, "num-pushed", &num_pushed);
-
-            // Packet Loss
-            double loss_rate = 0.0;
-            if (num_lost + num_pushed > 0) {
-                loss_rate = (double)num_lost / (num_lost + num_pushed) * 100.0;
+            // 3. Bitrate (Mbps)
+            if (m.bytes_received > m_lastBytes) {
+                double diffBits = (m.bytes_received - m_lastBytes) * 8.0;
+                double mbps = (diffBits / (1024.0 * 1024.0)) / elapsedSec;
+                m_osdWidget->setMetricValue(OsdWidget::Bitrate, QString::number(mbps, 'f', 2) + " Mbps");
             }
-            m_osdWidget->setMetricValue(OsdWidget::PacketLoss, QString::number(loss_rate, 'f', 2) + " %");
+            m_lastBytes = m.bytes_received;
 
-            // Jitter
-            double jitter_ms = 0.0;
-            if (gst_structure_get_uint64(stats, "avg-jitter", &avg_jitter)) {
-                // GStreamer 1.16+ (nanoseconds)
-                jitter_ms = (double)avg_jitter / 1000000.0; 
-            } else {
-                // Fallback for GStreamer < 1.18
-                guint32 jitter_rtp = 0;
-                if (gst_structure_get_uint(stats, "jitter", &jitter_rtp)) {
-                    jitter_ms = (double)jitter_rtp / 90000.0 * 1000.0; // Assuming 90kHz H.264
-                }
+            // 4. FPS (Estimated from packet rate if precise frame count not available)
+            if (m.packets_received > m_lastPackets) {
+                double fps = (m.packets_received - m_lastPackets) / elapsedSec;
+                // Note: This is an estimation. For precise FPS, sink element 'stats' could be used.
+                m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)) + " fps");
             }
-            m_osdWidget->setMetricValue(OsdWidget::Jitter, QString::number(jitter_ms, 'f', 2) + " ms");
+            m_lastPackets = m.packets_received;
 
-            gst_structure_free(stats);
+            // 5. Latency (RTT)
+            // Show both RTT (Network) and existing Server latency if available
+            QString latencyStr = QString("%1 ms (RTT)").arg(QString::number(m.rtt_ms, 'f', 1));
+            m_osdWidget->setMetricValue(OsdWidget::Latency, latencyStr);
         }
-        gst_object_unref(jbuf);
+        gst_object_unref(qmon);
+    } else {
+        // Fallback for elements without qualitymonitor (e.g. Recorded playback)
+        // Keep previous values or clear them
     }
 }
 

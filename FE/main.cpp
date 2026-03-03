@@ -8,6 +8,7 @@
 #include <QDir>
 #include <QFile>
 #include <gst/gst.h> // [New] Needed for gst_init
+#include "Video/Gst/GstQualityMonitor.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -43,6 +44,10 @@ int main(int argc, char *argv[])
     // Passing nullptr allowing GStreamer to parse standard command line args if needed (none passed)
     qDebug() << "[main] Initializing GStreamer...";
     gst_init(&argc, &argv); 
+    
+    // Register Custom Element
+    gst_quality_monitor_register(NULL);
+    
     qDebug() << "[main] GStreamer Initialized.";
 
     // GStreamer 초기화 전에 환경 확인

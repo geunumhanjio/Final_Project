@@ -8,6 +8,7 @@
 #include <gst/video/videooverlay.h>
 #include <QMutex>
 #include <QRectF>
+#include <QElapsedTimer>
 #include "osdwidget.h" // [New] Include OSDWidget
 
 class VideoWidget : public QWidget
@@ -82,6 +83,10 @@ private:
 
     QTimer *m_statsTimer; // [New] For pulling GST stats
     void extractGstStats(); // [New]
+
+    uint64_t m_lastBytes = 0;
+    uint64_t m_lastPackets = 0;
+    QElapsedTimer m_statsClock;
 
     static GstBusSyncReply busSyncHandler(GstBus *bus, GstMessage *msg, gpointer user_data);
 };
