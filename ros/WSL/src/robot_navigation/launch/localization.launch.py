@@ -24,8 +24,10 @@ def generate_launch_description():
 
     pkg_dir = get_package_share_directory('robot_navigation')
 
-    # 맵 파일 경로 (인자로 변경 가능)
-    default_map = os.path.join(pkg_dir, 'maps', 'my_map.yaml')
+    # SLAM Toolbox 직렬화 맵 경로 (확장자 없이 지정)
+    # 필요 파일: my_map.posegraph + my_map.data
+    # 저장 방법: ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap "{name: {data: '/path/to/my_map'}}"
+    default_map = os.path.join(pkg_dir, 'maps', 'my_map')
 
     declare_map_arg = DeclareLaunchArgument(
         'map',
@@ -47,6 +49,7 @@ def generate_launch_description():
                 'use_sim_time': False,
                 'mode': 'localization',
                 'map_file_name': LaunchConfiguration('map'),
+                'map_start_at_dock': True,
             }
         ],
     )

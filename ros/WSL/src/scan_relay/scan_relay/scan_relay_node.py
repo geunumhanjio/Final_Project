@@ -23,7 +23,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPo
 
 
 _TRANSMISSION_EST_NS = 15_000_000   # 15ms: 예상 평균 전송 지연
-_SAFETY_BUFFER_NS    = 15_000_000   # 15ms: EKF TF 발행 안전 마진
+_SAFETY_BUFFER_NS    = 80_000_000   # 80ms: EKF TF 발행 안전 마진 (실측 TF 지연 ~56ms 기준)
 _FALLBACK_OFFSET_NS  = 30_000_000   # 30ms: EMA 수렴 전 폴백
 _EMA_ALPHA           = 0.02         # odom 50Hz → ~50샘플(1초)에 수렴
 # Pi-WSL 클럭 오프셋 유효 범위
