@@ -51,6 +51,10 @@ slam_toolbox:
     correlation_search_space_resolution: 0.01
     correlation_search_space_smear_deviation: 0.1
 
+    # PID 부정확으로 인한 큰 yaw 편향(~20°) 대응: 각도 검색 범위 확대
+    coarse_search_angle_offset: 0.524   # 30° (기존 20°)
+    coarse_angle_resolution: 0.0175     # 1° (기존 2°, 더 세밀하게)
+
     # 루프 클로져 검색
     loop_search_space_dimension: 8.0
     loop_search_space_resolution: 0.05
@@ -62,8 +66,6 @@ slam_toolbox:
 
     # 파인 검색
     fine_search_angle_offset: 0.00349
-    coarse_search_angle_offset: 0.349
-    coarse_angle_resolution: 0.0349
     minimum_angle_penalty: 0.9
     minimum_distance_penalty: 0.5
     use_response_expansion: true
