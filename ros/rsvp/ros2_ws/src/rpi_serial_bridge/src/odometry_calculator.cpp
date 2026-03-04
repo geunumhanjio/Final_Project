@@ -58,8 +58,14 @@ int32_t OdometryCalculator::calculateTickDelta(int16_t current, int16_t previous
 void OdometryCalculator::updateFromTicks(int16_t left_ticks, int16_t right_ticks, double dt)
 {
   // STM32가 누적 틱이 아닌 주기별 delta 틱을 전송
-  int32_t delta_left = static_cast<int32_t>(left_ticks);
+  int32_t delta_left  = static_cast<int32_t>(left_ticks);
   int32_t delta_right = static_cast<int32_t>(right_ticks);
+
+  // 실속(stall) 노이즈 필터: PWM 인가된 모터가 실속 시 진동으로 소량 틱 발생
+  // 1920 ticks/rev → 1tick ≈ 0.1mm, 2틱 이하는 노이즈로 간주
+  constexpr int32_t TICK_DEADZONE = 2;
+  if (std::abs(delta_left)  <= TICK_DEADZONE) delta_left  = 0;
+  if (std::abs(delta_right) <= TICK_DEADZONE) delta_right = 0;
 
   // 거리 계산
   double distance_left = delta_left * meters_per_tick_;
