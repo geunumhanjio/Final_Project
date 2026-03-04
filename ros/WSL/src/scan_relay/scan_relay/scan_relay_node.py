@@ -26,8 +26,11 @@ _TRANSMISSION_EST_NS = 15_000_000   # 15ms: 예상 평균 전송 지연
 _SAFETY_BUFFER_NS    = 15_000_000   # 15ms: EKF TF 발행 안전 마진
 _FALLBACK_OFFSET_NS  = 30_000_000   # 30ms: EMA 수렴 전 폴백
 _EMA_ALPHA           = 0.02         # odom 50Hz → ~50샘플(1초)에 수렴
-_OFFSET_MIN_NS       = 0
-_OFFSET_MAX_NS       = 60_000_000_000  # 60초 이내만 유효
+# Pi-WSL 클럭 오프셋 유효 범위
+# Pi에 RTC 배터리 없으면 클럭이 수년 단위로 차이날 수 있음
+# 60s 제한 시 모든 샘플이 rejected → EMA 수렴 불가 → scan이 로봇에 붙어서 이동하는 현상
+_OFFSET_MIN_NS       = -int(365 * 24 * 3600 * 1_000_000_000)  # -1년 (Pi가 WSL보다 앞선 경우)
+_OFFSET_MAX_NS       =  int(365 * 24 * 3600 * 1_000_000_000)  # +1년 (Pi가 WSL보다 뒤처진 경우)
 
 
 class ScanRelayNode(Node):
