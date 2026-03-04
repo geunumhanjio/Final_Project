@@ -154,6 +154,7 @@ Reference materials live in `docs/`:
 | :test_tube: | `:test_tube:` | [Test] 테스트 관련 코드 |
 | :zap: | `:zap:` | [Perf] 성능 개선 |
 | :see_no_evil: | `:see_no_evil:` | [Git] gitignore 추가 |
+| :recycle: | `:recycle:` | [Refactor] 코드 리팩토링 |
 
 **커밋 메시지 형식:** `:깃모지코드: [타입] 설명`
 

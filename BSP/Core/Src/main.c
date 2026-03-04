@@ -152,11 +152,11 @@ int main(void)
         Motor_PID_Update(last_spd_L, last_spd_R);
     }
     
-    /* Send sensor data to RPi every 50ms via USART1 */
+    /* Send sensor data to RPi every 20ms via USART1 */
     static uint32_t last_send   = 0;
     static int16_t  prev_odom_L = 0;
     static int16_t  prev_odom_R = 0;
-    if (now - last_send >= 50) {
+    if (now - last_send >= 20) {
         last_send = now;
 
         int16_t cur_L = Encoder_GetCount(ENCODER_LEFT);
@@ -184,10 +184,40 @@ int main(void)
                Encoder_GetCount(ENCODER_LEFT),
                Encoder_GetCount(ENCODER_RIGHT));
     }
+
+
+    /* 모터 속도 테스트 */
+     // static int16_t test_speed = 800;  // 테스트용 속도 (mm/s)
+    // static uint8_t motor_running = 0;
+    // static uint8_t blue_button_pressed = 0; 
+    // if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET) {
+    //     if (!blue_button_pressed) {
+    //         motor_running = !motor_running;
+    //         blue_button_pressed = 1; // 버튼이 눌렸음을 기록
+    //         printf("Button Pressed!\r\n");
+    //     }
+    // } 
+    // else {
+    //     blue_button_pressed = 0; // 버튼이 떼어졌음을 기록
+    // }
+    // if (motor_running) {
+    //       Motor_SetRaw(MOTOR_LEFT, test_speed);
+    //       Motor_SetRaw(MOTOR_RIGHT, test_speed);
+    //       // printf("Motor ON: Speed = %d mm/s\r\n", test_speed);
+    // } 
+    // else {
+    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
+    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
+    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
+    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
+    // }
+    // HAL_Delay(100); 
+
+
   }
   /* USER CODE END 3 */
 }
-
+    
 /**
   * @brief System Clock Configuration
   * @retval None

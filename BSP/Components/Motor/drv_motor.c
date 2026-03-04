@@ -36,7 +36,7 @@ static PID_t pid_right;
 
 /* Private function prototypes -----------------------------------------------*/
 static uint16_t SpeedMMPS_To_PWM(uint16_t speed_mmps);
-static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps);
+void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps);
 
 /* Private functions ---------------------------------------------------------*/
 
@@ -58,7 +58,7 @@ static uint16_t SpeedMMPS_To_PWM(uint16_t speed_mmps)
  * @param  motor: MOTOR_LEFT 또는 MOTOR_RIGHT
  * @param  speed_mmps: -600 ~ +600 (mm/s)
  */
-static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps)
+void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps)
 {
     GPIO_TypeDef* in1_port;
     GPIO_TypeDef* in2_port;
@@ -109,7 +109,7 @@ static void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps)
 
     /* Debugging PWM Value ----------------------------------------------------------*/
     //forward = 1;  // 항상 정방향으로 테스트
-    //pwm_value = 0;  // PWM 절반 (약 300mm/s 예상) 
+    //pwm_value = 900;  // PWM 절반 (약 300mm/s 예상) 
     
     // PWM 듀티 설정
     __HAL_TIM_SET_COMPARE(&htim2, pwm_channel, pwm_value);

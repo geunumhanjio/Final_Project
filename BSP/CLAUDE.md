@@ -141,7 +141,6 @@ Reference materials live in `docs/`:
 | `<역할>/fix/#이슈번호` | fix 브랜치 | `BSP/fix/#13` |
 
 ### 커밋 컨벤션
-ㄴ
 - 커밋은 기능별로 나눠서 순서대로 진행한다. 
 
 | 깃모지 | 코드 | 커밋내용 |
@@ -154,6 +153,7 @@ Reference materials live in `docs/`:
 | :test_tube: | `:test_tube:` | [Test] 테스트 관련 코드 |
 | :zap: | `:zap:` | [Perf] 성능 개선 |
 | :see_no_evil: | `:see_no_evil:` | [Git] gitignore 추가 |
+| :recycle: | `:recycle:` | [Refactor] 코드 리팩토링 |
 
 **커밋 메시지 형식:** `:깃모지코드: [타입] 설명`
 

@@ -45,7 +45,27 @@ docs/hardware/
 | 거버 파일 | GER | Gerber. 실제 PCB 제조를 위한 CAM 데이터. |
 | 배치도 | ASM | Assembly drawing. 실물 PCB 위 부품 실장 위치도. 보드 디버깅 시 오실로스코프나 멀티미터로 프로빙할 테스트 포인트(TP)를 찾을 때 유용하다. |
 | 기구도면 | MECH | Mechanical. 외관 및 기구 설계 도면. 모터나 라이다 같은 외부 장치와의 물리적 체결 구조를 파악할 때 본다. |
-| 데이터시트 | DS | Datasheet. 특정 부품(센서, 모터 드라이버 등)의 스펙 및 레지스터 맵 문서. |
+| 데이터시트 | DS | Datasheet. 특정 부품(센서, 모터 드라이버 등)의 스펙 및 레지스터 맵 
+
+
+
+
+
+
+
+
+Ran command
+~/…/BSP $ git commit -m "refactor: 파일 의미 전달 향상을 위한 소스코드 리팩토링 및 네이밍 변경" -m "- \`drv_\`, \`algo_\`, \`app_\` 등의 접두사를 사용하여 각 소스코드의 역할(드라이버, 알고리즘, 어플리케이션 등)을 명확하게 드러내도록 파일명 분리 및 변경" -m "- \`docs/architecture/directory_naming_rules.md\` 구조에 맞추어 \`Components/\` 하위 폴더(Comms, Motor, Sensor)로 분류 및 이동" -m "- 코드 분석 가이드라인 문서(\`docs/guides/code_analysis_guideline.md\`) 추가 및 불필요한 기존 마크다운 파일 제거"
+Exit code 0
+2
+Executing git commit
+
+
+
+
+
+Analyzed
+Generating문서. |
 | 블록도 | BLK | Block Diagram. 시스템 전체 전원 트리나 주요 칩 간의 인터페이스(UART, SPI 등) 구조도. |
 | **문서 약어** | **풀네임** | **설명** |
 | --- | --- | --- |

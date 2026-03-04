@@ -43,6 +43,32 @@ typedef enum {
  */
 Motor_Status_t Motor_Init(void);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps);
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * @brief  양쪽 바퀴 속도 설정 (ROS2 /cmd_vel 처리용)
  * @param  left_mmps: 왼쪽 바퀴 목표 속도 (-600 ~ +600 mm/s)
