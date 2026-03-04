@@ -35,7 +35,8 @@ slam_toolbox:
     # 스캔 버퍼
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
-    link_match_minimum_response_fine: 0.1
+    # 회전 중 왜곡된 scan의 잘못된 매칭 방지: 0.1은 너무 낮아 어떤 매칭도 수락함
+    link_match_minimum_response_fine: 0.35
     distance_decomposition_radius: 3.5
     scan_sensor_offset: 0.0
 

@@ -52,8 +52,17 @@ ekf_filter_node:
     odom0_relative: false
     odom0_queue_size: 10
 
-    # imu0: /imu/data  ← STM32 IMU 미발행 중, wheel_odom만으로 운용
-    # imu0_config: ...
+    # IMU: orientation_covariance[0]=-1이므로 EKF는 angular_velocity만 사용
+    # orientation (절대각)은 무시, gyro angular_velocity.z만 yaw rate로 융합
+    imu0: /imu/data
+    imu0_config: [false, false, false,
+                  false, false, false,
+                  false, false, false,
+                  true,  true,  true,
+                  false, false, false]
+    imu0_differential: false
+    imu0_remove_gravitational_acceleration: true
+    imu0_queue_size: 10
 
     publish_tf: true
     print_diagnostics: true
