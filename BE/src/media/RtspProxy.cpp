@@ -8,6 +8,10 @@
 #include <ctime>
 #include <sstream>
 #include <iomanip>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <cstring>
 
 // ==================================================================================
 // [Constants] CCTV URLs
@@ -122,6 +126,12 @@ static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
 
     if (buffer) {
         // 2. Push to RTSP clients (Outside Mutex)
+        if (!clients_copy.empty()) {
+            static int log_counter = 0;
+            if (log_counter++ % 100 == 0) { // 매 100프레임마다 출력
+                std::cout << "📡 [" << ctx->path << "] Pushing data to " << clients_copy.size() << " clients." << std::endl;
+            }
+        }
         for (auto* client_appsrc : clients_copy) {
             GstBuffer *push_buffer = gst_buffer_copy(buffer);
             gst_app_src_push_buffer(GST_APP_SRC(client_appsrc), push_buffer);
@@ -194,13 +204,14 @@ calc_latency:
                 gst_object_unref(qmon);
             }
 
-            // 콘솔 출력
+            /* 콘솔 출력 - 주석 처리
             std::cout << "[" << ctx->path << "] RTCP Stats (via Element): "
                       << "pkts=" << stats.rtp.packets_received
                       << ", lost=" << stats.rtp.packets_lost
                       << ", jitter=" << std::fixed << std::setprecision(3) << stats.rtp.jitter_ms << " ms"
                       << ", rtt=" << stats.rtp.rtt_ms << " ms"
                       << std::endl;
+            */
 
             if (ctx->parent) {
                 ctx->parent->triggerStatsCallback(ctx->id, stats);
@@ -221,7 +232,7 @@ calc_latency:
 // [Class] RtspProxy Implementation
 // ==================================================================================
 
-RtspProxy::RtspProxy() : mainLoop(nullptr), server(nullptr), running(false) {
+RtspProxy::RtspProxy() : mainLoop(nullptr), server(nullptr), secure_server(nullptr), ssl_ctx(nullptr), rtsps_listen_fd(-1), running(false) {
 }
 
 // channel context 소멸자가 있나?? 체크 필요
@@ -231,6 +242,14 @@ RtspProxy::~RtspProxy() {
         delete ctx;
     }
     channels.clear();
+    
+    if (ssl_ctx) {
+        SSL_CTX_free(ssl_ctx);
+    }
+
+    if (secure_server) {
+        g_object_unref(secure_server);
+    }
 }
 
 void RtspProxy::setupChannels() {
@@ -248,6 +267,193 @@ void RtspProxy::setupChannels() {
 
     // 9: Robot Cam (MJPEG)
     //channels.push_back(new ChannelContext(9, "/robot_cam", URL_ROBOT_CAM, this));
+}
+
+bool RtspProxy::initSSLContext() {
+    // Legacy SSL Context Initialization (Keep for manual testing if needed)
+    SSL_library_init();
+    SSL_load_error_strings();
+    OpenSSL_add_all_algorithms();
+
+    ssl_ctx = SSL_CTX_new(TLS_server_method());
+    if (!ssl_ctx) return false;
+
+    // TLS 1.2 미만 차단
+    SSL_CTX_set_min_proto_version(ssl_ctx, TLS1_2_VERSION);
+
+    if (SSL_CTX_use_certificate_file(ssl_ctx, "/etc/rtsps/certs/server.crt", SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        return false;
+    }
+
+    if (SSL_CTX_use_PrivateKey_file(ssl_ctx, "/etc/rtsps/certs/server.key", SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        return false;
+    }
+
+    if (!SSL_CTX_check_private_key(ssl_ctx)) {
+        fprintf(stderr, "[SSL] cert/key mismatch\n");
+        return false;
+    }
+
+    printf("[SSL] Context initialized OK\n");
+    return true;
+}
+
+bool RtspProxy::startRTSPS(int port) {
+    std::cout << "🛡️ [RTSPS] Starting Native Secure RTSP Server on port " << port << "..." << std::endl;
+    
+    // GStreamer Native TLS Implementation
+    secure_server = gst_rtsp_server_new();
+    
+    gchar* port_str = g_strdup_printf("%d", port);
+    gst_rtsp_server_set_service(secure_server, port_str);
+    g_free(port_str);
+    
+    gst_rtsp_server_set_address(secure_server, "0.0.0.0");
+
+    // Load TLS Certificate for GStreamer
+    GError *error = NULL;
+    GTlsCertificate *cert = g_tls_certificate_new_from_files(
+        "/etc/rtsps/certs/server.crt", 
+        "/etc/rtsps/certs/server.key", 
+        &error
+    );
+
+    if (error) {
+        std::cerr << "❌ [RTSPS] Failed to load TLS certificate: " << error->message << std::endl;
+        g_error_free(error);
+        return false;
+    }
+
+    // Modern GStreamer 1.18+ TLS Setup via GstRTSPAuth
+    GstRTSPAuth *auth = gst_rtsp_auth_new();
+    gst_rtsp_auth_set_tls_certificate(auth, cert);
+    g_object_unref(cert);
+
+    // [Anonymous Access Setup]
+    // Create a default token with 'anonymous' role
+    GstRTSPToken *token = gst_rtsp_token_new(GST_RTSP_TOKEN_MEDIA_FACTORY_ROLE, G_TYPE_STRING, "anonymous", NULL);
+    gst_rtsp_auth_set_default_token(auth, token);
+    gst_rtsp_token_unref(token);
+
+    // Apply Auth (including TLS) to the server
+    gst_rtsp_server_set_auth(secure_server, auth);
+    g_object_unref(auth);
+
+    GstRTSPMountPoints *mounts = gst_rtsp_server_get_mount_points(secure_server);
+
+    for (auto* ctx : channels) {
+        GstRTSPMediaFactory *factory = gst_rtsp_media_factory_new();
+        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! rtph264pay name=pay0 pt=96 config-interval=-1 )");
+        gst_rtsp_media_factory_set_shared(factory, FALSE);
+        
+        // Explicitly allow 'anonymous' role to access and construct this media without password
+        gst_rtsp_media_factory_add_role(factory, "anonymous",
+            GST_RTSP_PERM_MEDIA_FACTORY_ACCESS, G_TYPE_BOOLEAN, TRUE,
+            GST_RTSP_PERM_MEDIA_FACTORY_CONSTRUCT, G_TYPE_BOOLEAN, TRUE,
+            NULL);
+        
+        // Connect signal to static member
+        g_signal_connect(factory, "media-configure", G_CALLBACK(RtspProxy::mediaConfigure), ctx);
+        
+        gst_rtsp_mount_points_add_factory(mounts, ctx->path.c_str(), factory);
+        
+        std::cout << "✅ [RTSPS] Registered secure path: rtsps://IP:" << port << ctx->path << std::endl;
+    }
+    g_object_unref(mounts);
+
+    if (gst_rtsp_server_attach(secure_server, NULL) == 0) {
+        std::cerr << "❌ [RTSPS] Failed to bind port " << port << "!" << std::endl;
+        return false;
+    }
+
+    std::cout << "✅ [RTSPS] Native Secure RTSP Server is operational (Anonymous Allowed)." << std::endl;
+
+    return true;
+}
+
+void RtspProxy::runRTSPSLoop(int port) {
+    rtsps_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(rtsps_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_port        = htons(port);
+    addr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(rtsps_listen_fd, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+        perror("bind RTSPS");
+        return;
+    }
+    
+    listen(rtsps_listen_fd, 64);
+    printf("[RTSPS] Listening on port %d\n", port);
+    fflush(stdout);
+
+    while (running) {
+        struct sockaddr_in client_addr{};
+        socklen_t len = sizeof(client_addr);
+        int client_fd = accept(rtsps_listen_fd, (struct sockaddr*)&client_addr, &len);
+        if (client_fd < 0) {
+            if (running) perror("accept RTSPS");
+            continue;
+        }
+
+        SSL* ssl = SSL_new(ssl_ctx);
+        SSL_set_fd(ssl, client_fd);
+
+        if (SSL_accept(ssl) <= 0) {
+            ERR_print_errors_fp(stderr);
+            SSL_free(ssl);
+            close(client_fd);
+            continue;
+        }
+
+        printf("[RTSPS] Secure connection accepted from %s, cipher: %s\n", 
+               inet_ntoa(client_addr.sin_addr), SSL_get_cipher(ssl));
+        fflush(stdout);
+
+        SecureClient* sclient = new SecureClient{client_fd, ssl};
+        std::thread clientThread(&RtspProxy::handleSecureClient, this, sclient);
+        clientThread.detach();
+    }
+}
+
+void RtspProxy::handleSecureClient(SecureClient* client) {
+    char buffer[4096];
+    
+    while (running) {
+        int bytes = SSL_read(client->ssl, buffer, sizeof(buffer) - 1);
+        if (bytes <= 0) {
+            int err = SSL_get_error(client->ssl, bytes);
+            if (err != SSL_ERROR_ZERO_RETURN) {
+                fprintf(stderr, "[RTSPS] SSL_read error: %d\n", err);
+            }
+            break;
+        }
+        buffer[bytes] = '\0';
+        printf("[RTSPS] Received (%d bytes): %s\n", bytes, buffer);
+        fflush(stdout);
+
+        // 간단한 RTSP OPTIONS 응답 예시 (테스트용)
+        if (strstr(buffer, "OPTIONS")) {
+            const char* response = 
+                "RTSP/1.0 200 OK\r\n"
+                "CSeq: 1\r\n"
+                "Public: DESCRIBE, SETUP, TEARDOWN, PLAY, PAUSE, OPTIONS\r\n"
+                "\r\n";
+            SSL_write(client->ssl, response, strlen(response));
+        }
+    }
+
+    printf("[RTSPS] Closing secure connection\n");
+    fflush(stdout);
+    SSL_shutdown(client->ssl);
+    SSL_free(client->ssl);
+    close(client->fd);
+    delete client;
 }
 
 bool RtspProxy::initialize(int port) {
@@ -457,6 +663,8 @@ std::string RtspProxy::stopRecording(int channelId) {
 
 void RtspProxy::mediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media, gpointer user_data) {
     ChannelContext *ctx = (ChannelContext*)user_data;
+    std::cout << "🎯 [RTSP/S] New client connecting to path: " << ctx->path << std::endl;
+    
     GstElement *element = gst_rtsp_media_get_element(media);
     GstElement *appsrc = gst_bin_get_by_name_recurse_up(GST_BIN(element), "src");
 
@@ -509,7 +717,7 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
             // RTSP H.264 (Passthrough)
             sprintf(pipeline_str,
                 "rtspsrc name=src location=%s protocols=tcp "
-                "latency=2000 drop-on-latency=false "
+                "latency=300 drop-on-latency=true "
                 "tcp-timeout=10000000 "     
                 "do-rtcp=true "             
                 "udp-buffer-size=33554432 ! "     

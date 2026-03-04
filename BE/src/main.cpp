@@ -84,6 +84,12 @@ int main(int argc, char *argv[]) {
         std::cerr << "❌ Failed to initialize RTSP Proxy." << std::endl;
         return -1;
     }
+    
+    // Start RTSPS (SSL)
+    if (!proxy.startRTSPS(8322)) {
+        std::cerr << "⚠️ Failed to start RTSPS Server." << std::endl;
+    }
+    
     proxy.start();
 
     vmsServer->start();
