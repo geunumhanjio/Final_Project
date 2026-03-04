@@ -27,8 +27,11 @@ slam_toolbox:
     map_update_interval: 1.0    # 초 (맵 저장 주기 아님, 내부 업데이트)
     resolution: 0.05            # 맵 해상도 5cm/픽셀
 
+    # 스캔 범위 (YDLiDAR X4 스펙: 최소 0.12m, 최대 10m)
+    minimum_laser_range: 0.15   # 0.12m 미만 근접 노이즈 제거 (로봇 몸체 반사, 블랙 클러스터 원인)
+    max_laser_range: 8.0        # 실내 환경 8m (최대 10m지만 실내 불필요)
+
     # 스캔 매칭 설정
-    max_laser_range: 8.0        # YDLiDAR X4 최대 범위 10m, 여유있게 8m
     minimum_travel_distance: 0.05 # 5cm 이상 이동해야 새 노드 추가
     minimum_travel_heading: 0.1  # ~6도 이상 회전해야 새 노드 추가
 
@@ -40,14 +43,15 @@ slam_toolbox:
     distance_decomposition_radius: 3.5
     scan_sensor_offset: 0.0
 
-    # 루프 클로져
+    # 루프 클로져 (이중 복도 해결 위해 트리거 조건 완화)
     do_loop_closing: true
-    loop_match_minimum_chain_size: 10
+    loop_match_minimum_chain_size: 5       # 10→5: 더 자주 시도 (10이면 0.5m 이동 필요)
     loop_match_maximum_variance_coarse: 3.0
-    loop_match_minimum_response_coarse: 0.35
-    loop_match_minimum_response_fine: 0.45
+    loop_match_minimum_response_coarse: 0.25  # 0.35→0.25: coarse 통과 기준 완화
+    loop_match_minimum_response_fine: 0.35    # 0.45→0.35: fine 통과 기준 완화
 
-    # 상관관계 검색
+    # 상관관계 검색: ±25cm 탐색으로 오차 20cm 커버하되 false optimum 방지
+    # 1.0m는 복도 등 반복적 환경에서 평행이동 오검출 유발
     correlation_search_space_dimension: 0.5
     correlation_search_space_resolution: 0.01
     correlation_search_space_smear_deviation: 0.1
