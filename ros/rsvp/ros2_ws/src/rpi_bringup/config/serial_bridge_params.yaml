@@ -5,7 +5,7 @@ serial_bridge_node:
 
       wheel_base: 0.10
       wheel_radius: 0.0325
-      encoder_ticks_per_rev: 1920
+      encoder_ticks_per_rev: 3840
 
       imu_accel_scale: 0.000598
       imu_gyro_scale: 0.000133
