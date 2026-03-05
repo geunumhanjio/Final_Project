@@ -3,7 +3,7 @@ serial_bridge_node:
       serial_port: "/dev/serial0"
       baud_rate: 115200
 
-      wheel_base: 0.10
+      wheel_base: 0.125
       wheel_radius: 0.0325
       encoder_ticks_per_rev: 3840
 
