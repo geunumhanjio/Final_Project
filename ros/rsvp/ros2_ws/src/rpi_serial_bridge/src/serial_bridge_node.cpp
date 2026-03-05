@@ -310,7 +310,7 @@ void SerialBridgeNode::sendVelocityCommand(double linear_x, double angular_z)
 
   // Twist → 좌/우 바퀴 속도 (m/s)
   
-  const double ANGULAR_GAIN = (std::abs(linear_x) < 1e-3) ? 4.8 : 3.0;
+  const double ANGULAR_GAIN = (std::abs(linear_x) < 1e-3) ? 6.8 : 3.8;
 				   
   double angular_scaled = angular_z * ANGULAR_GAIN;
   
