@@ -1,2 +1,0 @@
-# 실행 명령어
-sudo st-flash --reset write <Version>/ROS_Robot_Driver.bin 0x8000000
