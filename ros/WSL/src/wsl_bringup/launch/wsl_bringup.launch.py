@@ -153,6 +153,18 @@ def generate_launch_description():
             condition=LaunchConfigurationEquals('nav_mode', 'localization'),
         ),
 
+        # Navigation Manager (localization 모드일 때만 실행)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare('navigation_manager'),
+                    'launch',
+                    'navigation_manager.launch.py',
+                ])
+            ]),
+            condition=LaunchConfigurationEquals('nav_mode', 'localization'),
+        ),
+
         # RViz2 / rqt
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([

@@ -1,0 +1,53 @@
+# waypoints.yaml
+# ==============
+# 웨이포인트 및 순찰 경로 정의
+#
+# 좌표계: map frame (SLAM으로 생성된 맵 기준)
+# yaw: 라디안 (0 = 동쪽, π/2 = 북쪽, π = 서쪽, -π/2 = 남쪽)
+#
+# 웨이포인트 추가 방법:
+#   1. RViz2에서 "2D Pose Estimate" 버튼으로 원하는 위치 클릭
+#   2. ros2 topic echo /initialpose 에서 x, y, yaw 확인
+#   3. 아래 waypoints 에 추가
+#
+# 변경 후 navigation_manager 노드 재시작 필요 (colcon build 불필요)
+
+waypoints:
+  # 예시 웨이포인트 - 실제 맵에 맞게 수정하세요
+  home:
+    x: 0.0
+    y: 0.0
+    yaw: 0.0
+    label: "홈 (출발점)"
+
+  point_a:
+    x: 1.0
+    y: 0.0
+    yaw: 0.0
+    label: "포인트 A"
+
+  point_b:
+    x: 1.0
+    y: 1.0
+    yaw: 1.5708    # 90도 (북쪽)
+    label: "포인트 B"
+
+  point_c:
+    x: 0.0
+    y: 1.0
+    yaw: 3.1416    # 180도 (서쪽)
+    label: "포인트 C"
+
+# 순찰 경로 정의 (웨이포인트 이름의 리스트, 순환됨)
+patrol_routes:
+  # 기본 순찰: 사각형 순환
+  default:
+    - point_a
+    - point_b
+    - point_c
+    - home
+
+  # 단순 왕복
+  ab_loop:
+    - point_a
+    - point_b
