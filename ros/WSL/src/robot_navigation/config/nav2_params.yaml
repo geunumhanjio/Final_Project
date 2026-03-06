@@ -116,7 +116,7 @@ planner_server:
     planner_plugins: ["GridBased"]
 
     GridBased:
-      plugin: "nav2_navfn_planner::NavfnPlanner"
+      plugin: "nav2_navfn_planner/NavfnPlanner"
       tolerance: 0.3                    # 목표 근처 도달 허용 오차
       use_astar: false                  # false = Dijkstra (안정적)
       allow_unknown: true               # 미탐색 영역 통과 허용
