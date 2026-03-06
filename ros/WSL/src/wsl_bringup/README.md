@@ -47,6 +47,10 @@ ros2 launch wsl_bringup wsl_bringup.launch.py
 ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=localization
 ```
 
+`nav_mode:=localization` 시 다음이 자동으로 함께 실행된다.
+- `robot_navigation`: localization + Nav2 스택
+- `navigation_manager`: 웨이포인트 / 순찰 미션 컨트롤러
+
 ### RViz2 함께 실행
 ```bash
 # SLAM + RViz2

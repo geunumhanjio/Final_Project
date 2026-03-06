@@ -83,6 +83,7 @@ ros2 launch rpi_bringup rpi_bringup.launch.py
 |------|------|------|
 | `/cmd_vel` | `geometry_msgs/Twist` | 선속도(linear.x), 각속도(angular.z) 명령 |
 | `/emergency_stop` | `std_msgs/Bool` | 비상 정지 / 해제 |
+| `/serial_bridge/cmd_log` | `std_msgs/Bool` | STM32 커맨드 로그 시작/정지 |
 
 ---
 
@@ -90,7 +91,7 @@ ros2 launch rpi_bringup rpi_bringup.launch.py
 
 | 파라미터 | 기본값 | 설명 |
 |----------|--------|------|
-| `serial_port` | `/dev/serial0` | UART 포트 (`/dev/ttyAMA0` 동일) |
+| `serial_port` | `/dev/serial0` | UART 포트 |
 | `baud_rate` | `115200` | 통신 속도 |
 | `wheel_base` | `0.16` m | 좌우 바퀴 간격 |
 | `wheel_radius` | `0.033` m | 바퀴 반지름 |
@@ -98,10 +99,58 @@ ros2 launch rpi_bringup rpi_bringup.launch.py
 | `imu_accel_scale` | `0.005875` | 가속도계 스케일 (m/s² per LSB) |
 | `imu_gyro_scale` | `0.0001332` | 자이로 스케일 (rad/s per LSB) |
 | `cmd_vel_repeat_rate` | `5.0` Hz | STM32 타임아웃 방지용 명령 재전송 주기 |
-| `odom_data_type` | `"ticks"` | `"ticks"` (엔코더 틱) 또는 `"velocity"` (mm/s) |
+| `min_angular_vel` | `0.30` rad/s | angular.z 최소값 강제 적용 (정지 마찰 극복) |
+| `odom_data_type` | `"ticks"` | `"ticks"` 또는 `"velocity"` |
 | `odom_frame_id` | `"odom"` | 오도메트리 기준 프레임 |
 | `base_frame_id` | `"base_footprint"` | 로봇 기준 프레임 |
 | `imu_frame_id` | `"imu_link"` | IMU 프레임 |
+
+---
+
+## angular.z 최소값 강제 적용
+
+로봇의 정지 마찰로 인해 작은 angular.z 값으로는 회전이 불가능하다.
+`cmdVelCallback`에서 `min_angular_vel` 미만의 non-zero angular.z는 자동으로 최소값으로 올려서 STM32에 전송한다.
+
+```
+|angular.z| ≤ 0.001       → 0 (정지 유지)
+0.001 < |angular.z| < 0.30 → ±0.30
+|angular.z| ≥ 0.30        → 그대로
+```
+
+`min_angular_vel` 파라미터로 조정 가능하다.
+
+---
+
+## STM32 커맨드 로그
+
+STM32에 실제로 전송되는 명령을 CSV 파일로 기록한다.
+
+### 로그 시작
+```bash
+ros2 topic pub --once /serial_bridge/cmd_log std_msgs/Bool "{data: true}"
+```
+
+### 로그 정지
+```bash
+ros2 topic pub --once /serial_bridge/cmd_log std_msgs/Bool "{data: false}"
+```
+
+로그 파일 위치: `/root/ros2_ws/log/cmd_stm32_YYYYMMDD_HHMMSS.csv`
+
+CSV 컬럼: `timestamp, linear_x, angular_z, left_mm_s, right_mm_s`
+
+---
+
+## 비상 정지
+
+```bash
+# 비상 정지
+ros2 topic pub --once /emergency_stop std_msgs/Bool "{data: true}"
+
+# 해제
+ros2 topic pub --once /emergency_stop std_msgs/Bool "{data: false}"
+```
 
 ---
 
@@ -111,20 +160,6 @@ STM32와의 통신은 커스텀 바이너리 프로토콜을 사용한다.
 
 - **STM32 → RPi**: 오도메트리 패킷 (좌/우 엔코더 틱 또는 속도), IMU 패킷 (accel 3축 + gyro 3축)
 - **RPi → STM32**: 속도 명령 패킷 (좌/우 바퀴 mm/s, int16_t), 비상 정지 패킷
-
----
-
-## 비상 정지
-
-`/emergency_stop` 토픽에 `True`를 발행하면 즉시 STM32에 정지 명령을 전송하고, 이후 들어오는 `/cmd_vel`을 무시한다. `False`를 발행하면 해제된다.
-
-```bash
-# 비상 정지
-ros2 topic pub /emergency_stop std_msgs/Bool "data: true" --once
-
-# 해제
-ros2 topic pub /emergency_stop std_msgs/Bool "data: false" --once
-```
 
 ---
 
