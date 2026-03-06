@@ -64,6 +64,7 @@ private:
   std::string base_frame_id_;
   std::string imu_frame_id_;
   double cmd_vel_repeat_rate_;
+  double min_angular_vel_;
   std::string odom_data_type_;
 
   // === State ===

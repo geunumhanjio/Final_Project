@@ -119,6 +119,7 @@ void SerialBridgeNode::declareParameters()
 
   // 타이밍
   this->declare_parameter("cmd_vel_repeat_rate", 5.0);
+  this->declare_parameter("min_angular_vel", 0.45);
 
   // 오도메트리 타입
   this->declare_parameter("odom_data_type", "ticks");  // "ticks" or "velocity"
@@ -136,6 +137,7 @@ void SerialBridgeNode::declareParameters()
   base_frame_id_ = this->get_parameter("base_frame_id").as_string();
   imu_frame_id_ = this->get_parameter("imu_frame_id").as_string();
   cmd_vel_repeat_rate_ = this->get_parameter("cmd_vel_repeat_rate").as_double();
+  min_angular_vel_ = this->get_parameter("min_angular_vel").as_double();
   odom_data_type_ = this->get_parameter("odom_data_type").as_string();
 
   RCLCPP_INFO(this->get_logger(), "Parameters loaded:");
@@ -259,10 +261,19 @@ void SerialBridgeNode::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr
     return;
   }
 
+  double linear_x = msg->linear.x;
+  double angular_z = msg->angular.z;
+
+  // angular.z 최소값 강제 적용 (정지 마찰 극복)
+  if (std::abs(angular_z) > 1e-3 && std::abs(angular_z) < min_angular_vel_) {
+    angular_z = std::copysign(min_angular_vel_, angular_z);
+  }
+
   last_cmd_vel_ = *msg;
+  last_cmd_vel_.angular.z = angular_z;
   last_cmd_vel_time_ = this->now();
-  
-  sendVelocityCommand(msg->linear.x, msg->angular.z);
+
+  sendVelocityCommand(linear_x, angular_z);
 }
 
 void SerialBridgeNode::emergencyStopCallback(const std_msgs::msg::Bool::SharedPtr msg)
