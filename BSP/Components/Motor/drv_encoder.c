@@ -1,6 +1,6 @@
 #include "drv_encoder.h"
 
-#define ENCODER_PPR             1920.0f   // 4x quadrature (480 CPR × 4)
+#define ENCODER_PPR             3840.0f   // 4x quadrature (480 CPR × 4)
 #define WHEEL_CIRCUMFERENCE_MM  204.2f    // π × 65mm (지름 6.5cm)
 #define ENCODER_DT_S            0.01f     // 10ms 제어 주기
 

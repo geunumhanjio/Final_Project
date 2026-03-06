@@ -119,12 +119,6 @@ int main(void)
       printf("MPU6050 init failed! Check wiring.\r\n");
   }
 
-  /* ---- 최대 속도 측정용 임시 코드 (측정 완료 후 삭제) ----
-   * 목표값을 int16 최대로 설정 → PID 출력이 항상 MOTOR_MAX_SPEED_MMPS로
-   * 클램핑 → 풀 PWM 유지. USART2 출력에서 spd L/R 값을 확인.
-   * 안정화까지 약 3~5초 대기. */
-  //Motor_SetVelocity(32767, 32767);
-  /* -------------------------------------------------------- */
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -139,55 +133,64 @@ int main(void)
 
     uint32_t now = HAL_GetTick();
 
-    /* PID 속도 제어 루프 — 10ms 주기
-     * Encoder_GetSpeed()는 호출할 때마다 이전 카운트를 갱신하므로
-     * 여기서만 호출하고 결과를 변수에 저장한다. */
-    static uint32_t last_pid  = 0;
-    static float    last_spd_L = 0.0f;
-    static float    last_spd_R = 0.0f;
-    if (now - last_pid >= 10) {
-        last_pid   = now;
-        last_spd_L = Encoder_GetSpeed(ENCODER_LEFT);
-        last_spd_R = Encoder_GetSpeed(ENCODER_RIGHT);
-        Motor_PID_Update(last_spd_L, last_spd_R);
-    }
+    // /* PID 속도 제어 루프 — 10ms 주기
+    //  * Encoder_GetSpeed()는 호출할 때마다 이전 카운트를 갱신하므로
+    //  * 여기서만 호출하고 결과를 변수에 저장한다. */
+    // static uint32_t last_pid  = 0;
+    // static float    last_spd_L = 0.0f;
+    // static float    last_spd_R = 0.0f;
+    // if (now - last_pid >= 10) {
+    //     last_pid   = now;
+    //     last_spd_L = Encoder_GetSpeed(ENCODER_LEFT);
+    //     last_spd_R = Encoder_GetSpeed(ENCODER_RIGHT);
+    //     Motor_PID_Update(last_spd_L, last_spd_R);
+    // }
     
-    /* Send sensor data to RPi every 20ms via USART1 */
-    static uint32_t last_send   = 0;
-    static int16_t  prev_odom_L = 0;
-    static int16_t  prev_odom_R = 0;
-    if (now - last_send >= 20) {
-        last_send = now;
+    // /* Send sensor data to RPi every 20ms via USART1 */
+    // static uint32_t last_send   = 0;
+    // static int16_t  prev_odom_L = 0;
+    // static int16_t  prev_odom_R = 0;
+    // if (now - last_send >= 20) {
+    //     last_send = now;
 
-        int16_t cur_L = Encoder_GetCount(ENCODER_LEFT);
-        int16_t cur_R = Encoder_GetCount(ENCODER_RIGHT);
-        Protocol_SendOdom(cur_L - prev_odom_L,
-                          cur_R - prev_odom_R);
-        prev_odom_L = cur_L;
-        prev_odom_R = cur_R;
+    //     int16_t cur_L = Encoder_GetCount(ENCODER_LEFT);
+    //     int16_t cur_R = Encoder_GetCount(ENCODER_RIGHT);
+    //     Protocol_SendOdom(cur_L - prev_odom_L,
+    //                       cur_R - prev_odom_R);
+    //     prev_odom_L = cur_L;
+    //     prev_odom_R = cur_R;
 
-        MPU6050_Data_t imu;
-        if (MPU6050_ReadAll(&imu) == HAL_OK) {
-            Protocol_SendIMU(&imu);
-        }
-    }
+    //     MPU6050_Data_t imu;
+    //     if (MPU6050_ReadAll(&imu) == HAL_OK) {
+    //         Protocol_SendIMU(&imu);
+    //     }
+    // }
 
-    /* Debug print to PC (USART2) every 500ms */
-    static uint32_t last_print = 0;
-    if (now - last_print >= 500) {
-        last_print = now;
+    // /* Debug print to PC (USART2) every 500ms */
+    // static uint32_t last_print = 0;
+    // if (now - last_print >= 500) {
+    //     last_print = now;
 
-        const ProtoStats_t *st = Protocol_GetStats();
-        printf("[DIAG] rx_pkt:%lu err:%lu  spd L:%.1f R:%.1f mm/s  enc L:%d R:%d\r\n",
-               st->rx_packets, Protocol_GetErrorCount(),
-               last_spd_L, last_spd_R,
-               Encoder_GetCount(ENCODER_LEFT),
-               Encoder_GetCount(ENCODER_RIGHT));
-    }
+    //     const ProtoStats_t *st = Protocol_GetStats();
+    //     printf("[DIAG] rx_pkt:%lu err:%lu  spd L:%.1f R:%.1f mm/s  enc L:%d R:%d\r\n",
+    //            st->rx_packets, Protocol_GetErrorCount(),
+    //            last_spd_L, last_spd_R,
+    //            Encoder_GetCount(ENCODER_LEFT),
+    //            Encoder_GetCount(ENCODER_RIGHT));
+    // }
 
+    /* 모터 속도 테스트 *************************************************************/
+    // /* 1. 엔코더 현재 속도값 읽기 */
+    // static uint32_t last_time  = 0;
+    // static float    spd_L = 0.0f;
+    // static float    spd_R = 0.0f;
+    // if (now - last_time >= 10) {
+    //     last_time   = now;
+    //     spd_L = Encoder_GetSpeed(ENCODER_LEFT);
+    //     spd_R = Encoder_GetSpeed(ENCODER_RIGHT);
+    // }
 
-    /* 모터 속도 테스트 */
-     // static int16_t test_speed = 800;  // 테스트용 속도 (mm/s)
+    // /* 2. 블루 버튼으로 모터 동작 토글 */    
     // static uint8_t motor_running = 0;
     // static uint8_t blue_button_pressed = 0; 
     // if (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_RESET) {
@@ -200,19 +203,26 @@ int main(void)
     // else {
     //     blue_button_pressed = 0; // 버튼이 떼어졌음을 기록
     // }
-    // if (motor_running) {
-    //       Motor_SetRaw(MOTOR_LEFT, test_speed);
-    //       Motor_SetRaw(MOTOR_RIGHT, test_speed);
-    //       // printf("Motor ON: Speed = %d mm/s\r\n", test_speed);
-    // } 
-    // else {
-    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0, GPIO_PIN_RESET);
-    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_1, GPIO_PIN_RESET);
-    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_2, GPIO_PIN_RESET);
-    //     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_3, GPIO_PIN_RESET);
-    // }
-    // HAL_Delay(100); 
 
+    // /* 3. 실제 모터 제어 */
+    // static int16_t test_speed = 500;  // 테스트용 속도
+    // static uint32_t last_send   = 0;
+    // if (motor_running) {
+    //     Motor_SetRaw(MOTOR_LEFT, test_speed);
+    //     Motor_SetRaw(MOTOR_RIGHT, test_speed);
+
+    //     /* 3-1. RPi로 로봇 속력 [mm/s] 전송 - 100ms 주기 */
+    //     if (now - last_send >= 100) {
+    //       last_send = now;
+    //       Protocol_SendOdom((int16_t) spd_L, (int16_t) spd_R);
+    //     }
+    // }
+    // else {
+    //     Motor_SetRaw(MOTOR_LEFT, 0);
+    //     Motor_SetRaw(MOTOR_RIGHT, 0);
+    // }
+
+    
 
   }
   /* USER CODE END 3 */
