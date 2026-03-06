@@ -79,11 +79,10 @@ SerialBridgeNode::SerialBridgeNode(const rclcpp::NodeOptions& options)
   running_ = true;
   serial_read_thread_ = std::thread(&SerialBridgeNode::serialReadLoop, this);
 
-  // STM32 커맨드 로그 서비스
-  log_service_ = this->create_service<std_srvs::srv::SetBool>(
-    "/serial_bridge/cmd_log",
-    std::bind(&SerialBridgeNode::logServiceCallback, this,
-              std::placeholders::_1, std::placeholders::_2));
+  // STM32 커맨드 로그 토픽 (/serial_bridge/cmd_log, std_msgs/Bool)
+  cmd_log_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+    "/serial_bridge/cmd_log", 10,
+    std::bind(&SerialBridgeNode::cmdLogCallback, this, std::placeholders::_1));
 
   RCLCPP_INFO(this->get_logger(), "Serial Bridge Node initialized successfully");
 }
@@ -107,15 +106,12 @@ SerialBridgeNode::~SerialBridgeNode()
   }
 }
 
-void SerialBridgeNode::logServiceCallback(
-  const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
-  std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+void SerialBridgeNode::cmdLogCallback(const std_msgs::msg::Bool::SharedPtr msg)
 {
-  if (request->data) {
+  if (msg->data) {
     // 로그 시작
     if (cmd_log_file_.is_open()) {
-      response->success = true;
-      response->message = "Already logging";
+      RCLCPP_WARN(this->get_logger(), "Already logging");
       return;
     }
     std::time_t t = std::time(nullptr);
@@ -125,12 +121,10 @@ void SerialBridgeNode::logServiceCallback(
     cmd_log_file_.open(log_path, std::ios::out);
     if (cmd_log_file_.is_open()) {
       cmd_log_file_ << "timestamp,linear_x,angular_z,left_mm_s,right_mm_s\n";
-      response->success = true;
-      response->message = "Logging started: " + log_path;
+
       RCLCPP_INFO(this->get_logger(), "STM32 command log started: %s", log_path.c_str());
     } else {
-      response->success = false;
-      response->message = "Failed to open log file: " + log_path;
+
     }
   } else {
     // 로그 정지
@@ -138,8 +132,7 @@ void SerialBridgeNode::logServiceCallback(
       cmd_log_file_.close();
       RCLCPP_INFO(this->get_logger(), "STM32 command log stopped");
     }
-    response->success = true;
-    response->message = "Logging stopped";
+
   }
 }
 
