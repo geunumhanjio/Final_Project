@@ -2,6 +2,7 @@
 #define RPI_SERIAL_BRIDGE__SERIAL_BRIDGE_NODE_HPP_
 
 #include <memory>
+#include <fstream>
 #include <string>
 #include <thread>
 #include <atomic>
