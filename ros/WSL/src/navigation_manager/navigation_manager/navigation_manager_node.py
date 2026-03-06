@@ -59,10 +59,10 @@ class NavigationManagerNode(Node):
         self.declare_parameter('retry_delay_sec', 2.0)
         self.declare_parameter('linear_speed', 0.12)   # m/s (ETA 추정용)
 
-        wp_file             = self.get_parameter('waypoints_file').as_string()
-        self._max_retries   = self.get_parameter('max_retries').as_int()
-        self._retry_delay   = self.get_parameter('retry_delay_sec').as_double()
-        self._linear_speed  = self.get_parameter('linear_speed').as_double()
+        wp_file             = self.get_parameter('waypoints_file').value
+        self._max_retries   = self.get_parameter('max_retries').value
+        self._retry_delay   = self.get_parameter('retry_delay_sec').value
+        self._linear_speed  = self.get_parameter('linear_speed').value
 
         # ── Waypoint store ───────────────────────────────────────────────────
         self._waypoints: dict      = {}
