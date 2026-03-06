@@ -85,15 +85,15 @@ controller_server:
     # Regulated Pure Pursuit (RPP)
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.15          # 목표 속도 15cm/s (작은 로봇, 실내)
+      desired_linear_vel: 0.37          # 목표 속도 37cm/s
       lookahead_dist: 0.4               # 전방 추적 거리
       min_lookahead_dist: 0.25
       max_lookahead_dist: 0.7
       lookahead_time: 1.5
-      rotate_to_heading_angular_vel: 0.8
+      rotate_to_heading_angular_vel: 0.45
       transform_tolerance: 0.2
       use_velocity_scaled_lookahead_dist: false
-      min_approach_linear_velocity: 0.05
+      min_approach_linear_velocity: 0.28
       approach_velocity_scaling_dist: 0.5
       use_collision_detection: true
       max_allowed_time_to_collision_up_to_carrot: 1.0
@@ -144,11 +144,11 @@ behavior_server:
     behavior_plugins: ["spin", "backup", "wait"]
 
     spin:
-      plugin: "nav2_behaviors::Spin"
+      plugin: "nav2_behaviors/Spin"
     backup:
-      plugin: "nav2_behaviors::BackUp"
+      plugin: "nav2_behaviors/BackUp"
     wait:
-      plugin: "nav2_behaviors::Wait"
+      plugin: "nav2_behaviors/Wait"
 
     local_frame: odom
     global_frame: map
@@ -156,7 +156,7 @@ behavior_server:
     transform_tolerance: 0.2
     simulate_ahead_time: 2.0
     max_rotational_vel: 0.8
-    min_rotational_vel: 0.2
+    min_rotational_vel: 0.45
     rotational_acc_lim: 2.0
 
 # ── Waypoint Follower ──────────────────────────────────────
@@ -178,8 +178,8 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "OPEN_LOOP"
-    max_velocity: [0.20, 0.0, 1.0]     # [vx, vy, vyaw] 최대값
-    min_velocity: [-0.20, 0.0, -1.0]
+    max_velocity: [0.40, 0.0, 1.0]     # [vx, vy, vyaw] 최대값
+    min_velocity: [-0.40, 0.0, -1.0]
     max_accel: [0.5, 0.0, 2.5]
     max_decel: [-0.5, 0.0, -2.5]
     odom_topic: "odom"
@@ -227,7 +227,7 @@ local_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.30        # 장애물 팽창 30cm (로봇 반경 12cm + 마진)
+        inflation_radius: 0.20        # 장애물 팽창 30cm (로봇 반경 12cm + 마진)
 
       always_send_full_costmap: true
 
@@ -267,7 +267,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 3.0
-        inflation_radius: 0.30
+        inflation_radius: 0.20
 
       always_send_full_costmap: true
 

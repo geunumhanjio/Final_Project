@@ -8,7 +8,8 @@ localization.launch.py와 함께 실행 (navigation.launch.py에서 호출)
 SLAM Toolbox localization 모드가 map → odom TF를 발행 중이어야 함
 
 cmd_vel 흐름:
-  controller_server → (cmd_vel_nav) → velocity_smoother → /cmd_vel → serial_bridge (Pi)
+  controller_server → /cmd_vel → serial_bridge (Pi)
+  behavior_server   → /cmd_vel → serial_bridge (Pi)
 
 실행:
   ros2 launch robot_navigation nav2.launch.py
@@ -32,7 +33,6 @@ def generate_launch_description():
         'behavior_server',
         'bt_navigator',
         'waypoint_follower',
-        'velocity_smoother',
     ]
 
     # 로컬 플래너 + 로컬 costmap
@@ -42,8 +42,6 @@ def generate_launch_description():
         name='controller_server',
         output='screen',
         parameters=[nav2_params],
-        # velocity_smoother 사용 시: cmd_vel → cmd_vel_nav
-        remappings=[('cmd_vel', 'cmd_vel_nav')],
     )
 
     # 경로 스무딩
@@ -92,19 +90,6 @@ def generate_launch_description():
         parameters=[nav2_params],
     )
 
-    # cmd_vel 스무딩: cmd_vel_nav → /cmd_vel
-    velocity_smoother = Node(
-        package='nav2_velocity_smoother',
-        executable='velocity_smoother',
-        name='velocity_smoother',
-        output='screen',
-        parameters=[nav2_params],
-        remappings=[
-            ('cmd_vel', 'cmd_vel_nav'),           # controller_server 출력 구독
-            ('cmd_vel_smoothed', '/cmd_vel'),     # 스무딩 결과 → serial_bridge
-        ],
-    )
-
     # Lifecycle 관리 (모든 Nav2 노드 autostart)
     lifecycle_manager = Node(
         package='nav2_lifecycle_manager',
@@ -125,6 +110,5 @@ def generate_launch_description():
         behavior_server,
         bt_navigator,
         waypoint_follower,
-        velocity_smoother,
         lifecycle_manager,
     ])
