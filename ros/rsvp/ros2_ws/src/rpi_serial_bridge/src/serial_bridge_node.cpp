@@ -168,7 +168,7 @@ void SerialBridgeNode::declareParameters()
 
   // 타이밍
   this->declare_parameter("cmd_vel_repeat_rate", 5.0);
-  this->declare_parameter("min_angular_vel", 0.30);
+  this->declare_parameter("min_angular_vel", 0.4);
 
   // 오도메트리 타입
   this->declare_parameter("odom_data_type", "ticks");  // "ticks" or "velocity"
