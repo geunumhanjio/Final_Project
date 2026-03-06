@@ -12,6 +12,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 
 #include "rpi_serial_bridge/serial_protocol.hpp"
@@ -40,6 +41,7 @@ private:
 
   // === Timers ===
   rclcpp::TimerBase::SharedPtr cmd_vel_repeat_timer_;
+  rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr log_service_;
 
   // === Serial Communication ===
   int serial_fd_;
@@ -65,6 +67,7 @@ private:
   std::string imu_frame_id_;
   double cmd_vel_repeat_rate_;
   double min_angular_vel_;
+  std::ofstream cmd_log_file_;
   std::string odom_data_type_;
 
   // === State ===
@@ -79,6 +82,9 @@ private:
   void serialReadLoop();
 
   // === ROS2 Callbacks ===
+  void logServiceCallback(
+    const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+    std::shared_ptr<std_srvs::srv::SetBool::Response> response);
   void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
   void emergencyStopCallback(const std_msgs::msg::Bool::SharedPtr msg);
   void repeatCmdVelTimer();

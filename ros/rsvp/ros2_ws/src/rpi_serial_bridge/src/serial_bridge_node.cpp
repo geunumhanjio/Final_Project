@@ -1,4 +1,6 @@
 #include "rpi_serial_bridge/serial_bridge_node.hpp"
+#include <fstream>
+#include <ctime>
 
 #include <fcntl.h>
 #include <termios.h>
@@ -77,6 +79,12 @@ SerialBridgeNode::SerialBridgeNode(const rclcpp::NodeOptions& options)
   running_ = true;
   serial_read_thread_ = std::thread(&SerialBridgeNode::serialReadLoop, this);
 
+  // STM32 커맨드 로그 서비스
+  log_service_ = this->create_service<std_srvs::srv::SetBool>(
+    "/serial_bridge/cmd_log",
+    std::bind(&SerialBridgeNode::logServiceCallback, this,
+              std::placeholders::_1, std::placeholders::_2));
+
   RCLCPP_INFO(this->get_logger(), "Serial Bridge Node initialized successfully");
 }
 
@@ -92,6 +100,47 @@ SerialBridgeNode::~SerialBridgeNode()
 
   // 시리얼 포트 닫기
   closeSerialPort();
+
+  // 로그 파일 닫기
+  if (cmd_log_file_.is_open()) {
+    cmd_log_file_.close();
+  }
+}
+
+void SerialBridgeNode::logServiceCallback(
+  const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+  std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+{
+  if (request->data) {
+    // 로그 시작
+    if (cmd_log_file_.is_open()) {
+      response->success = true;
+      response->message = "Already logging";
+      return;
+    }
+    std::time_t t = std::time(nullptr);
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", std::localtime(&t));
+    std::string log_path = std::string("/root/ros2_ws/log/cmd_stm32_") + buf + ".csv";
+    cmd_log_file_.open(log_path, std::ios::out);
+    if (cmd_log_file_.is_open()) {
+      cmd_log_file_ << "timestamp,linear_x,angular_z,left_mm_s,right_mm_s\n";
+      response->success = true;
+      response->message = "Logging started: " + log_path;
+      RCLCPP_INFO(this->get_logger(), "STM32 command log started: %s", log_path.c_str());
+    } else {
+      response->success = false;
+      response->message = "Failed to open log file: " + log_path;
+    }
+  } else {
+    // 로그 정지
+    if (cmd_log_file_.is_open()) {
+      cmd_log_file_.close();
+      RCLCPP_INFO(this->get_logger(), "STM32 command log stopped");
+    }
+    response->success = true;
+    response->message = "Logging stopped";
+  }
 }
 
 void SerialBridgeNode::declareParameters()
@@ -349,6 +398,17 @@ void SerialBridgeNode::sendVelocityCommand(double linear_x, double angular_z)
   }
   RCLCPP_DEBUG(this->get_logger(), "%s", ss.str().c_str());
   
+  // STM32 커맨드 로그 기록
+  if (cmd_log_file_.is_open()) {
+    double ts = this->now().seconds();
+    cmd_log_file_ << std::fixed << std::setprecision(6)
+                  << ts << ","
+                  << linear_x << ","
+                  << angular_z << ","
+                  << left_mm_s << ","
+                  << right_mm_s << "\n";
+  }
+
   ssize_t written = write(serial_fd_, packet.data(), packet.size());
 
   if (written < 0) {
