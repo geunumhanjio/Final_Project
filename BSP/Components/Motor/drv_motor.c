@@ -146,8 +146,8 @@ Motor_Status_t Motor_Init(void)
     target_right_mmps     = 0.0f;
     last_cmd_time_ms      = HAL_GetTick();
 
-    PID_Init(&pid_left,  PID_KP, PID_KI, PID_KD, PID_DT);
-    PID_Init(&pid_right, PID_KP, PID_KI, PID_KD, PID_DT);
+    PID_Init(&pid_left,  PID_LEFT_KP,  PID_LEFT_KI,  PID_LEFT_KD,  PID_DT);
+    PID_Init(&pid_right, PID_RIGHT_KP, PID_RIGHT_KI, PID_RIGHT_KD, PID_DT);
 
     return MOTOR_OK;
 }
@@ -267,4 +267,13 @@ void Motor_PID_Update(float left_measured_mmps, float right_measured_mmps)
 
     Motor_SetRaw(MOTOR_LEFT,  (int16_t)left_out);
     Motor_SetRaw(MOTOR_RIGHT, (int16_t)right_out);
+}
+
+/**
+ * @brief  모터 PID 제어기 누적 오차(I) 초기화
+ */
+void Motor_PID_Reset(void)
+{
+    PID_Reset(&pid_left);
+    PID_Reset(&pid_right);
 }

@@ -16,11 +16,16 @@ extern "C" {
 #define MOTOR_PWM_PERIOD        999   // TIM2 ARR 값과 동일
 #define MOTOR_CMD_TIMEOUT_MS    500   // 명령 타임아웃 (500ms)
 
-// PID 게인 — 하드웨어 튜닝 전 초기값
+// PID 게인 — 모터별 독립 설정
 // 튜닝 순서: Kp 먼저 (Ki=Kd=0) → 정상 상태 오차 있으면 Ki 추가 → 진동 시 Kd 추가
-#define PID_KP  1.0f
-#define PID_KI  0.0f
-#define PID_KD  0.0f
+#define PID_LEFT_KP   1.0f
+#define PID_LEFT_KI   1.0f
+#define PID_LEFT_KD   0.0f
+
+#define PID_RIGHT_KP  1.0f
+#define PID_RIGHT_KI  1.2f   // 오른쪽 모터 특성 차이 시 조정
+#define PID_RIGHT_KD  0.0f
+
 #define PID_DT  0.01f   // 10ms (main.c PID 루프 주기와 일치해야 함)
 
 /* Exported types ------------------------------------------------------------*/
@@ -112,6 +117,11 @@ Motor_Status_t Motor_ReleaseEmergency(void);
  * @param  right_measured_mmps: 오른쪽 바퀴 실측 속도 (Encoder_GetSpeed 결과)
  */
 void Motor_PID_Update(float left_measured_mmps, float right_measured_mmps);
+
+/**
+ * @brief  모터 PID 제어기 누적 오차(I) 초기화
+ */
+void Motor_PID_Reset(void);
 
 #ifdef __cplusplus
 }
