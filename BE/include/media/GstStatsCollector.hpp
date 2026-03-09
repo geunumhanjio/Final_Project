@@ -4,6 +4,7 @@
 #include <gst/gst.h>
 #include <mutex>
 #include <string>
+#include <vector>
 #include <iostream>
 #include <iomanip>
 
@@ -17,21 +18,20 @@ struct RtpQualityMetrics {
 
 class GstStatsCollector {
 public:
-    GstStatsCollector() : rtp_session_(nullptr) {}
+    GstStatsCollector() {}
     ~GstStatsCollector() {
-        if (rtp_session_) {
-            g_object_unref(rtp_session_);
+        std::lock_guard<std::mutex> lock(mutex_);
+        for (auto* session : rtp_sessions_) {
+            g_object_unref(session);
         }
+        rtp_sessions_.clear();
     }
 
     // 파이프라인 내에서 rtpbin을 찾아 시그널을 연결합니다.
     void attach(GstElement* pipeline) {
-        // rtspsrc를 사용하는 경우 'new-manager' 시그널을 통해 rtpbin을 얻어야 할 수도 있습니다.
-        // 여기서는 일반적인 bin 구조에서 rtpbin을 찾는 방식을 우선 시도합니다.
         GstElement* rtpbin = gst_bin_get_by_name(GST_BIN(pipeline), "rtpbin");
         
         if (!rtpbin) {
-            // 만약 rtpbin이라는 이름이 없다면 rtspsrc 내부의 manager를 찾아야 합니다.
             GstElement* src = gst_bin_get_by_name(GST_BIN(pipeline), "src");
             if (src) {
                 g_signal_connect(src, "new-manager", G_CALLBACK(on_new_manager), this);
@@ -46,54 +46,63 @@ public:
     RtpQualityMetrics getMetrics() {
         std::lock_guard<std::mutex> lock(mutex_);
         RtpQualityMetrics metrics;
-        if (!rtp_session_) return metrics;
+        
+        // 감시 중인 모든 세션을 순회하며 가장 유효한 통계를 찾음
+        for (auto* rtp_session : rtp_sessions_) {
+            GstStructure *stats_struct = nullptr;
+            g_object_get(rtp_session, "stats", &stats_struct, nullptr);
 
-        GstStructure *stats_struct = nullptr;
-        g_object_get(rtp_session_, "stats", &stats_struct, nullptr);
+            if (stats_struct) {
+                const GValue *val = gst_structure_get_value(stats_struct, "source-stats");
+                if (val && G_VALUE_HOLDS(val, G_TYPE_VALUE_ARRAY)) {
+                    GValueArray *arr = (GValueArray *)g_value_get_boxed(val);
 
-        if (stats_struct) {
-            const GValue *val = gst_structure_get_value(stats_struct, "source-stats");
-            if (val && G_VALUE_HOLDS(val, G_TYPE_VALUE_ARRAY)) {
-                GValueArray *arr = (GValueArray *)g_value_get_boxed(val);
+                    for (guint i = 0; i < arr->n_values; ++i) {
+                        const GValue *sval = g_value_array_get_nth(arr, i);
+                        GstStructure *src_stats = (GstStructure *)g_value_get_boxed(sval);
+                        if (!src_stats) continue;
 
-                for (guint i = 0; i < arr->n_values; ++i) {
-                    const GValue *sval = g_value_array_get_nth(arr, i);
-                    GstStructure *src_stats = (GstStructure *)g_value_get_boxed(sval);
-                    if (!src_stats) continue;
+                        gboolean is_sender = FALSE;
+                        gst_structure_get_boolean(src_stats, "is-sender", &is_sender);
 
-                    gboolean internal = FALSE;
-                    gboolean is_sender = FALSE;
-                    gst_structure_get_boolean(src_stats, "internal", &internal);
-                    gst_structure_get_boolean(src_stats, "is-sender", &is_sender);
+                        // 실제 데이터를 쏘고 있는 송신자(카메라)의 통계 수집
+                        if (is_sender) {
+                            uint64_t pkts = 0;
+                            guint jitter_units = 0;
+                            gint clock_rate = 90000;
+                            guint rb_round_trip = 0;
 
-                    // 원격 송신자(카메라 또는 상대방 서버)의 통계만 추출
-                    if (!internal && is_sender) {
-                        uint64_t pkts = 0, bytes = 0;
-                        int32_t lost = 0;
-                        guint jitter_units = 0;
-                        gint clock_rate = 90000;
-                        guint rb_round_trip = 0;
+                            gst_structure_get_uint64(src_stats, "packets-received", &pkts);
+                            if (pkts == 0) continue; 
 
-                        gst_structure_get_uint64(src_stats, "packets-received", &pkts);
-                        gst_structure_get_int(src_stats, "packets-lost", &lost);
-                        gst_structure_get_uint64(src_stats, "bytes-received", &bytes);
-                        gst_structure_get_uint(src_stats, "jitter", &jitter_units);
-                        gst_structure_get_int(src_stats, "clock-rate", &clock_rate);
+                            metrics.packets_received = pkts;
+                            gst_structure_get_int(src_stats, "packets-lost", &metrics.packets_lost);
+                            gst_structure_get_uint64(src_stats, "bytes-received", &metrics.bytes_received);
+                            gst_structure_get_uint(src_stats, "jitter", &jitter_units);
+                            gst_structure_get_int(src_stats, "clock-rate", &clock_rate);
+                            metrics.jitter_ms = (clock_rate > 0) ? (jitter_units * 1000.0 / clock_rate) : 0.0;
 
-                        metrics.packets_received = pkts;
-                        metrics.packets_lost = lost;
-                        metrics.bytes_received = bytes;
-                        metrics.jitter_ms = (clock_rate > 0) ? (jitter_units * 1000.0 / clock_rate) : 0.0;
+                            // RTT 추출
+                            if (gst_structure_get_uint(src_stats, "rb-round-trip", &rb_round_trip) && rb_round_trip > 0) {
+                                double rtt_seconds = (rb_round_trip >> 16) + static_cast<double>(rb_round_trip & 0xFFFF) / 65536.0;
+                                metrics.rtt_ms = rtt_seconds * 1000.0;
+                            }
+                            
+                            // 만약 RTT가 여전히 0이라면, 혹시 rb-round-trip 대신 다른 필드에 정보가 있는지 체크
+                            if (metrics.rtt_ms == 0.0) {
+                                guint sent_rb_lsr = 0;
+                                if (gst_structure_get_uint(src_stats, "sent-rb-lsr", &sent_rb_lsr) && sent_rb_lsr > 0) {
+                                    // LSR 정보가 존재한다면 리포트는 오가고 있음을 의미
+                                }
+                            }
 
-                        if (gst_structure_get_uint(src_stats, "rb-round-trip", &rb_round_trip)) {
-                            double rtt_seconds = (rb_round_trip >> 16) + static_cast<double>(rb_round_trip & 0xFFFF) / 65536.0;
-                            metrics.rtt_ms = rtt_seconds * 1000.0;
+                            gst_structure_free(stats_struct);
+                            return metrics; // 가장 유효한(패킷이 있는) 세션 정보 반환
                         }
-                        break; 
                     }
                 }
+                gst_structure_free(stats_struct);
             }
-            gst_structure_free(stats_struct);
         }
         return metrics;
     }
@@ -110,19 +119,29 @@ private:
 
     static void on_ssrc_active(GstElement* rtpbin, guint sessid, guint ssrc, gpointer data) {
         auto* self = static_cast<GstStatsCollector*>(data);
-        if (sessid != 0) return; // 비디오 세션(보통 0)만 감시
-
+        
         std::lock_guard<std::mutex> lock(self->mutex_);
-        if (!self->rtp_session_) {
-            GstElement *session_elem = nullptr;
-            g_signal_emit_by_name(rtpbin, "get-internal-session", sessid, &session_elem);
-            if (session_elem) {
-                self->rtp_session_ = G_OBJECT(session_elem); // refcount 관리 주의
+        GstElement *session_elem = nullptr;
+        g_signal_emit_by_name(rtpbin, "get-internal-session", sessid, &session_elem);
+        
+        if (session_elem) {
+            bool exists = false;
+            for (auto* s : self->rtp_sessions_) {
+                if (s == G_OBJECT(session_elem)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) {
+                self->rtp_sessions_.push_back(G_OBJECT(session_elem));
+                std::cout << "📈 [Stats] New RTP Session attached: SessID=" << sessid << " (Total: " << self->rtp_sessions_.size() << ")" << std::endl;
+            } else {
+                g_object_unref(session_elem);
             }
         }
     }
 
-    GObject* rtp_session_;
+    std::vector<GObject*> rtp_sessions_;
     std::mutex mutex_;
 };
 
