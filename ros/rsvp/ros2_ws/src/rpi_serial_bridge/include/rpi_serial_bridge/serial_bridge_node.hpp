@@ -2,7 +2,6 @@
 #define RPI_SERIAL_BRIDGE__SERIAL_BRIDGE_NODE_HPP_
 
 #include <memory>
-#include <fstream>
 #include <string>
 #include <thread>
 #include <atomic>
@@ -13,7 +12,6 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
-
 #include "tf2_ros/transform_broadcaster.h"
 
 #include "rpi_serial_bridge/serial_protocol.hpp"
@@ -42,7 +40,6 @@ private:
 
   // === Timers ===
   rclcpp::TimerBase::SharedPtr cmd_vel_repeat_timer_;
-  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr cmd_log_sub_;
 
   // === Serial Communication ===
   int serial_fd_;
@@ -67,8 +64,6 @@ private:
   std::string base_frame_id_;
   std::string imu_frame_id_;
   double cmd_vel_repeat_rate_;
-  double min_angular_vel_;
-  std::ofstream cmd_log_file_;
   std::string odom_data_type_;
 
   // === State ===
@@ -83,7 +78,6 @@ private:
   void serialReadLoop();
 
   // === ROS2 Callbacks ===
-  void cmdLogCallback(const std_msgs::msg::Bool::SharedPtr msg);
   void cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr msg);
   void emergencyStopCallback(const std_msgs::msg::Bool::SharedPtr msg);
   void repeatCmdVelTimer();

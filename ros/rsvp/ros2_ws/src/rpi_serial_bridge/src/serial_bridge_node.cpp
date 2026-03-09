@@ -1,6 +1,4 @@
 #include "rpi_serial_bridge/serial_bridge_node.hpp"
-#include <fstream>
-#include <ctime>
 
 #include <fcntl.h>
 #include <termios.h>
@@ -79,11 +77,6 @@ SerialBridgeNode::SerialBridgeNode(const rclcpp::NodeOptions& options)
   running_ = true;
   serial_read_thread_ = std::thread(&SerialBridgeNode::serialReadLoop, this);
 
-  // STM32 커맨드 로그 토픽 (/serial_bridge/cmd_log, std_msgs/Bool)
-  cmd_log_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-    "/serial_bridge/cmd_log", 10,
-    std::bind(&SerialBridgeNode::cmdLogCallback, this, std::placeholders::_1));
-
   RCLCPP_INFO(this->get_logger(), "Serial Bridge Node initialized successfully");
 }
 
@@ -99,41 +92,6 @@ SerialBridgeNode::~SerialBridgeNode()
 
   // 시리얼 포트 닫기
   closeSerialPort();
-
-  // 로그 파일 닫기
-  if (cmd_log_file_.is_open()) {
-    cmd_log_file_.close();
-  }
-}
-
-void SerialBridgeNode::cmdLogCallback(const std_msgs::msg::Bool::SharedPtr msg)
-{
-  if (msg->data) {
-    // 로그 시작
-    if (cmd_log_file_.is_open()) {
-      RCLCPP_WARN(this->get_logger(), "Already logging");
-      return;
-    }
-    std::time_t t = std::time(nullptr);
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y%m%d_%H%M%S", std::localtime(&t));
-    std::string log_path = std::string("/root/ros2_ws/log/cmd_stm32_") + buf + ".csv";
-    cmd_log_file_.open(log_path, std::ios::out);
-    if (cmd_log_file_.is_open()) {
-      cmd_log_file_ << "timestamp,linear_x,angular_z,left_mm_s,right_mm_s\n";
-
-      RCLCPP_INFO(this->get_logger(), "STM32 command log started: %s", log_path.c_str());
-    } else {
-
-    }
-  } else {
-    // 로그 정지
-    if (cmd_log_file_.is_open()) {
-      cmd_log_file_.close();
-      RCLCPP_INFO(this->get_logger(), "STM32 command log stopped");
-    }
-
-  }
 }
 
 void SerialBridgeNode::declareParameters()
@@ -161,7 +119,6 @@ void SerialBridgeNode::declareParameters()
 
   // 타이밍
   this->declare_parameter("cmd_vel_repeat_rate", 5.0);
-  this->declare_parameter("min_angular_vel", 0.4);
 
   // 오도메트리 타입
   this->declare_parameter("odom_data_type", "ticks");  // "ticks" or "velocity"
@@ -179,17 +136,13 @@ void SerialBridgeNode::declareParameters()
   base_frame_id_ = this->get_parameter("base_frame_id").as_string();
   imu_frame_id_ = this->get_parameter("imu_frame_id").as_string();
   cmd_vel_repeat_rate_ = this->get_parameter("cmd_vel_repeat_rate").as_double();
-  min_angular_vel_ = this->get_parameter("min_angular_vel").as_double();
   odom_data_type_ = this->get_parameter("odom_data_type").as_string();
 
   RCLCPP_INFO(this->get_logger(), "Parameters loaded:");
   RCLCPP_INFO(this->get_logger(), "  serial_port: %s", serial_port_.c_str());
   RCLCPP_INFO(this->get_logger(), "  baud_rate: %d", baud_rate_);
   RCLCPP_INFO(this->get_logger(), "  wheel_base: %.3f m", wheel_base_);
-  RCLCPP_INFO(this->get_logger(), "  wheel_radius: %.4f m", wheel_radius_);
-  RCLCPP_INFO(this->get_logger(), "  encoder_ticks_per_rev: %d  (meters_per_tick=%.7f)",
-              encoder_ticks_per_rev_,
-              (2.0 * M_PI * wheel_radius_) / encoder_ticks_per_rev_);
+  RCLCPP_INFO(this->get_logger(), "  wheel_radius: %.3f m", wheel_radius_);
   RCLCPP_INFO(this->get_logger(), "  odom_data_type: %s", odom_data_type_.c_str());
 }
 
@@ -303,19 +256,10 @@ void SerialBridgeNode::cmdVelCallback(const geometry_msgs::msg::Twist::SharedPtr
     return;
   }
 
-  double linear_x = msg->linear.x;
-  double angular_z = msg->angular.z;
-
-  // angular.z 최소값 강제 적용 (정지 마찰 극복)
-  if (std::abs(angular_z) > 1e-3 && std::abs(angular_z) < min_angular_vel_) {
-    angular_z = std::copysign(min_angular_vel_, angular_z);
-  }
-
   last_cmd_vel_ = *msg;
-  last_cmd_vel_.angular.z = angular_z;
   last_cmd_vel_time_ = this->now();
-
-  sendVelocityCommand(linear_x, angular_z);
+  
+  sendVelocityCommand(msg->linear.x, msg->angular.z);
 }
 
 void SerialBridgeNode::emergencyStopCallback(const std_msgs::msg::Bool::SharedPtr msg)
@@ -363,8 +307,7 @@ void SerialBridgeNode::sendVelocityCommand(double linear_x, double angular_z)
 
   // Twist → 좌/우 바퀴 속도 (m/s)
   
-  const double ANGULAR_GAIN = (std::abs(linear_x) < 1e-3) ? 6.8 : 3.8;
-				   
+  const double ANGULAR_GAIN = 4.8;  // 조정 가능
   double angular_scaled = angular_z * ANGULAR_GAIN;
   
   auto [v_left, v_right] = odom_calc_->twistToWheelVelocities(linear_x, angular_scaled);
@@ -391,17 +334,6 @@ void SerialBridgeNode::sendVelocityCommand(double linear_x, double angular_z)
   }
   RCLCPP_DEBUG(this->get_logger(), "%s", ss.str().c_str());
   
-  // STM32 커맨드 로그 기록
-  if (cmd_log_file_.is_open()) {
-    double ts = this->now().seconds();
-    cmd_log_file_ << std::fixed << std::setprecision(6)
-                  << ts << ","
-                  << linear_x << ","
-                  << angular_z << ","
-                  << left_mm_s << ","
-                  << right_mm_s << "\n";
-  }
-
   ssize_t written = write(serial_fd_, packet.data(), packet.size());
 
   if (written < 0) {
@@ -494,7 +426,9 @@ void SerialBridgeNode::publishWheelOdom()
   );
 
   wheel_odom_pub_->publish(odom_msg);
-  // TF는 EKF(ekf_filter_node)가 발행 → 여기서 중복 발행 금지
+  
+  // TF 발행
+  publishTransform(odom_msg);
 }
 
 void SerialBridgeNode::publishTransform(const nav_msgs::msg::Odometry& odom)
