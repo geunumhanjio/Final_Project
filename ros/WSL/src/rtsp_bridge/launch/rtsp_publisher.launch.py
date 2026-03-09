@@ -14,7 +14,7 @@ def generate_launch_description():
     
     rtsp_host_arg = DeclareLaunchArgument(
         'rtsp_host',
-        default_value='192.168.0.237',
+        default_value='localhost',
         description='RTSP server host address'
     )
     
