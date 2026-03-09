@@ -133,7 +133,7 @@ void SerialBridgeNode::declareParameters()
 
   // CSV 로깅
   this->declare_parameter("csv_log_enabled", false);
-  this->declare_parameter("csv_log_path", "/tmp/serial_bridge_log.csv");
+  this->declare_parameter("csv_log_path", "/root/ros2_ws/log/serial_bridge_log.csv");
 
   // 파라미터 읽기
   serial_port_ = this->get_parameter("serial_port").as_string();
