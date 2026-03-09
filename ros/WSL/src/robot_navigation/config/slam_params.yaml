@@ -32,14 +32,14 @@ slam_toolbox:
     max_laser_range: 8.0        # 실내 환경 8m (최대 10m지만 실내 불필요)
 
     # 스캔 매칭 설정
-    minimum_travel_distance: 0.05 # 5cm 이상 이동해야 새 노드 추가
-    minimum_travel_heading: 0.1  # ~6도 이상 회전해야 새 노드 추가
+    minimum_travel_distance: 0.15 # 5cm 이상 이동해야 새 노드 추가
+    minimum_travel_heading: 0.15  # ~6도 이상 회전해야 새 노드 추가
 
     # 스캔 버퍼
     scan_buffer_size: 10
     scan_buffer_maximum_scan_distance: 10.0
     # 회전 중 왜곡된 scan의 잘못된 매칭 방지: 0.1은 너무 낮아 어떤 매칭도 수락함
-    link_match_minimum_response_fine: 0.35
+    link_match_minimum_response_fine: 0.3
     distance_decomposition_radius: 3.5
     scan_sensor_offset: 0.0
 
@@ -48,7 +48,7 @@ slam_toolbox:
     loop_match_minimum_chain_size: 5       # 10→5: 더 자주 시도 (10이면 0.5m 이동 필요)
     loop_match_maximum_variance_coarse: 3.0
     loop_match_minimum_response_coarse: 0.25  # 0.35→0.25: coarse 통과 기준 완화
-    loop_match_minimum_response_fine: 0.35    # 0.45→0.35: fine 통과 기준 완화
+    loop_match_minimum_response_fine: 0.5
 
     # 상관관계 검색: ±25cm 탐색으로 오차 20cm 커버하되 false optimum 방지
     # 1.0m는 복도 등 반복적 환경에서 평행이동 오검출 유발
@@ -57,8 +57,8 @@ slam_toolbox:
     correlation_search_space_smear_deviation: 0.1
 
     # PID 부정확으로 인한 큰 yaw 편향(~20°) 대응: 각도 검색 범위 확대
-    coarse_search_angle_offset: 0.524   # 30° (기존 20°)
-    coarse_angle_resolution: 0.0175     # 1° (기존 2°, 더 세밀하게)
+    coarse_search_angle_offset: 0.524   # 30 (기존 20°)
+    coarse_angle_resolution: 0.0349     # 1° (기존 2°, 더 세밀하게)
 
     # 루프 클로져 검색
     loop_search_space_dimension: 8.0
@@ -88,4 +88,4 @@ slam_toolbox:
     use_scan_matching: true
     use_scan_barycenter: true
     throttle_scans: 1               # 매 스캔 사용 (2면 격번)
-    minimum_time_interval: 0.2      # 최소 0.2초 간격으로 노드 추가
+    minimum_time_interval: 0.3      # 최소 0.3초 간격으로 노드 추가
