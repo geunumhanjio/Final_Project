@@ -31,3 +31,8 @@ serial_bridge_node:
     # "ticks"    : 엔코더 틱 카운트 (STM32가 50ms 주기 delta 전송)
     # "velocity" : 바퀴 속도 (mm/s)
     odom_data_type: "ticks"
+
+    # === CSV 로깅 ===
+    # true로 설정하면 UART 송수신 내역을 CSV 파일로 저장
+    csv_log_enabled: false
+    csv_log_path: "/tmp/serial_bridge_log.csv"
