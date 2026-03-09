@@ -34,5 +34,5 @@ serial_bridge_node:
 
     # === CSV 로깅 ===
     # true로 설정하면 UART 송수신 내역을 CSV 파일로 저장
-    csv_log_enabled: false
+    csv_log_enabled: true
     csv_log_path: "/root/ros2_ws/log/serial_bridge_log.csv"
