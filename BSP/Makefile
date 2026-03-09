@@ -134,10 +134,26 @@ C_INCLUDES =  \
 -IComponents/Motor \
 -IComponents/Sensor \
 -IComponents/Comms \
+-IComponents/Test \
 -IDrivers/STM32F4xx_HAL_Driver/Inc \
 -IDrivers/STM32F4xx_HAL_Driver/Inc/Legacy \
 -IDrivers/CMSIS/Device/ST/STM32F4xx/Include \
 -IDrivers/CMSIS/Include
+
+# 테스트 모드: make MODE=<값>
+# MODE=MOTOR_RAW    — Raw PWM 모터 테스트
+# MODE=PID_STEP     — 단일 Setpoint 계단 응답 관찰
+# MODE=PID_PC_TUNE  — UART2 → PC 연동 자동 튜닝
+ifeq ($(MODE), MOTOR_RAW)
+C_DEFS    += -DMODE_MOTOR_RAW
+C_SOURCES += Components/Test/test_motor_raw.c
+else ifeq ($(MODE), PID_STEP)
+C_DEFS    += -DMODE_PID_STEP
+C_SOURCES += Components/Test/test_pid_step.c
+else ifeq ($(MODE), PID_PC_TUNE)
+C_DEFS    += -DMODE_PID_PC_TUNE
+C_SOURCES += Components/Test/test_pid_pc_tune.c
+endif
 
 
 # compile gcc flags
