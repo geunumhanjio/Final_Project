@@ -11,6 +11,7 @@
 #include <mutex>
 #include <memory>
 #include <functional>
+#include <atomic>
 #include <netinet/in.h>
 #include "media/GstStatsCollector.hpp"
 
@@ -64,7 +65,7 @@ public:
     void triggerStatsCallback(int channelId, const ChannelStats& stats) { if (statsCb) statsCb(channelId, stats); }
 
 private:
-    void setupChannels();
+    bool setupChannels();
     static void runReceiverThread(ChannelContext* ctx);
     static void mediaConfigure(GstRTSPMediaFactory* factory, GstRTSPMedia* media, gpointer user_data);
 
@@ -85,7 +86,7 @@ private:
     std::thread rtspsThread;
     std::vector<ChannelContext*> channels;
     std::vector<std::thread> receiverThreads;
-    bool running;
+    std::atomic<bool> running;
     OnStatsUpdate statsCb;
 };
 
