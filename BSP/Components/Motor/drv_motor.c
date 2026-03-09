@@ -194,7 +194,9 @@ Motor_Status_t Motor_EmergencyStop(void)
 }
 
 /**
- * @brief  부드러운 정지 — 목표 속도를 0으로 설정, PID가 감속 처리
+ * @brief  부드러운 정지 — 목표 속도를 0으로 설정, PID가 Reset 
+ * - 로봇이 정지된 상태에서도 모터에서 소리가 계속 나면 PWM이 0이 아닐 수 있음 
+ * - ros에서 프로토콜이 끊기면 자동 호출됨 
  */
 Motor_Status_t Motor_SoftStop(void)
 {
@@ -203,6 +205,10 @@ Motor_Status_t Motor_SoftStop(void)
 
     target_left_mmps  = 0.0f;
     target_right_mmps = 0.0f;
+
+    Motor_SetRaw(MOTOR_LEFT,  0);
+    Motor_SetRaw(MOTOR_RIGHT, 0);
+    Motor_PID_Reset(); 
 
     return MOTOR_OK;
 }
@@ -261,6 +267,13 @@ Motor_Status_t Motor_ReleaseEmergency(void)
 void Motor_PID_Update(float left_measured_mmps, float right_measured_mmps)
 {
     if (!motor_initialized || emergency_stop_active) return;
+
+    if (target_left_mmps == 0.0f && target_right_mmps == 0.0f) {
+        Motor_SetRaw(MOTOR_LEFT,  0);
+        Motor_SetRaw(MOTOR_RIGHT, 0);
+        Motor_PID_Reset(); 
+        return;   // ← PID_Update() 호출 자체를 건너뜀
+    }
 
     float left_out  = PID_Update(&pid_left,  target_left_mmps,  left_measured_mmps);
     float right_out = PID_Update(&pid_right, target_right_mmps, right_measured_mmps);
