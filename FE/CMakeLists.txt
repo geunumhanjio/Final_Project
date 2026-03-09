@@ -76,6 +76,7 @@ set(PROJECT_SOURCES
         Video/videowidget.h Video/videowidget.cpp
         Video/livevideowidget.h Video/livevideowidget.cpp
         Video/recordedvideowidget.h Video/recordedvideowidget.cpp
+        Video/rtsppinger.h Video/rtsppinger.cpp
         Video/Gst/GstQualityMonitor.hpp Video/Gst/GstQualityMonitor.cpp
         Video/Gst/GstStatsCollector.hpp
         Components/videocard.h Components/videocard.cpp
@@ -112,6 +113,7 @@ if(MSVC)
     target_link_libraries(VEDA_QT_1 PRIVATE
         "${GST_ROOT}/lib/gstreamer-1.0.lib"
         "${GST_ROOT}/lib/gstvideo-1.0.lib"
+        "${GST_ROOT}/lib/gstrtp-1.0.lib"
         "${GST_ROOT}/lib/gobject-2.0.lib"
         "${GST_ROOT}/lib/glib-2.0.lib"
         "${GST_ROOT}/lib/gstapp-1.0.lib"
@@ -122,6 +124,7 @@ else()
     target_link_libraries(VEDA_QT_1 PRIVATE
         "${GST_ROOT}/lib/libgstreamer-1.0.dll.a"
         "${GST_ROOT}/lib/libgstvideo-1.0.dll.a"
+        "${GST_ROOT}/lib/libgstrtp-1.0.dll.a"
         "${GST_ROOT}/lib/libgobject-2.0.dll.a"
         "${GST_ROOT}/lib/libglib-2.0.dll.a"
         "${GST_ROOT}/lib/libgstapp-1.0.dll.a"
