@@ -20,7 +20,8 @@ public:
         if(getCameraIp().isEmpty()) setCameraIp("192.168.0.39");
         if(getCameraPort().isEmpty()) setCameraPort("8554");
         if(getRobotIp().isEmpty()) setRobotIp("ws://192.168.0.237:9090");
-        // getUseCustomCCTV defaults to false if not set, handled by QSettings default value
+        // getUseCustomCCTV defaults to false if not set
+        // getUseRtsps defaults to false if not set
     }
 
     // Getter
@@ -28,6 +29,7 @@ public:
     QString getCameraPort() const { return m_settings->value("Network/CameraPort", "8554").toString(); }
     QString getRobotIp() const { return m_settings->value("Network/RobotIP", "ws://192.168.0.237:9090").toString(); }
     bool getUseCustomCCTV() const { return m_settings->value("Network/UseCustomCCTV", false).toBool(); }
+    bool getUseRtsps() const { return m_settings->value("Network/UseRtsps", false).toBool(); } // [New]
     bool getManualControl() const { return m_settings->value("Control/ManualControl", false).toBool(); }
 
     // Setter (저장)
@@ -45,6 +47,10 @@ public:
     }
     void setUseCustomCCTV(bool use) {
         m_settings->setValue("Network/UseCustomCCTV", use);
+        emit configChanged();
+    }
+    void setUseRtsps(bool use) { // [New]
+        m_settings->setValue("Network/UseRtsps", use);
         emit configChanged();
     }
     void setManualControl(bool use) {

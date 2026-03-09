@@ -310,7 +310,7 @@ void MainWindow::initConnections()
     connect(m_livePage, &LiveView::requestFullScreen, [=](int index, QString url){
         if (index <= 4 && !url.isEmpty()) {
             qDebug() << "Full Screen Request:" << url;
-            
+
             m_returnToWidget = m_livePage; // [Mod] Return to LiveView on close
             m_centralStack->setCurrentWidget(m_fullPage);
             m_fullPage->play(url, index);

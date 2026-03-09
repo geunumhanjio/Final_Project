@@ -72,7 +72,6 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     
     // Connect record signal
     connect(rcCarCamWidget, &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
-    connect(rcCarCamWidget, &VideoCard::streamStatsRequested, this, &LiveView::streamStatsRequested); // [New]
 
     rightLayout->addWidget(rcCarCamWidget);
 

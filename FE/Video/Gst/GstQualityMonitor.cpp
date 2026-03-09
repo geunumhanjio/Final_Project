@@ -1,4 +1,5 @@
 #include "GstQualityMonitor.hpp"
+#include <gst/rtp/gstrtpbuffer.h>
 
 GST_DEBUG_CATEGORY_STATIC(gst_quality_monitor_debug);
 #define GST_CAT_DEFAULT gst_quality_monitor_debug
@@ -14,6 +15,18 @@ G_DEFINE_TYPE(GstQualityMonitor, gst_quality_monitor, GST_TYPE_ELEMENT);
 /* 패킷이 들어왔을 때 단순히 통과시키는 함수 */
 static GstFlowReturn gst_quality_monitor_chain(GstPad *pad, GstObject *parent, GstBuffer *buf) {
     GstQualityMonitor *self = GST_QUALITY_MONITOR(parent);
+    
+    // [New] Check RTP Marker Bit to count frames
+    GstRTPBuffer rtp = GST_RTP_BUFFER_INIT;
+    if (gst_rtp_buffer_map(buf, GST_MAP_READ, &rtp)) {
+        if (gst_rtp_buffer_get_marker(&rtp)) {
+            if (self->collector) {
+                self->collector->incrementFrames();
+            }
+        }
+        gst_rtp_buffer_unmap(&rtp);
+    }
+
     return gst_pad_push(self->srcpad, buf);
 }
 
@@ -32,7 +45,11 @@ static GstStateChangeReturn gst_quality_monitor_change_state(GstElement *element
     if (transition == GST_STATE_CHANGE_NULL_TO_READY) {
         // 엘리먼트가 시작될 때 파이프라인에서 rtpbin을 찾아 statsCollector를 연결
         self->collector = new GstStatsCollector();
-        self->collector->attach(GST_ELEMENT(gst_object_get_parent(GST_OBJECT(element))));
+        GstElement *parent = GST_ELEMENT(gst_object_get_parent(GST_OBJECT(element)));
+        if (parent) {
+            self->collector->attach(parent);
+            gst_object_unref(parent); // [Fix] Unref parent after use
+        }
     }
 
     return GST_ELEMENT_CLASS(gst_quality_monitor_parent_class)->change_state(element, transition);
