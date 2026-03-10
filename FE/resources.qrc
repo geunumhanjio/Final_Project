@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/crt">
+        <file>env/server.crt</file>
+    </qresource>
+</RCC>
