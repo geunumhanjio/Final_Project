@@ -92,7 +92,8 @@ set(PROJECT_SOURCES
 # 4. 실행 파일 생성
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(VEDA_QT_1 MANUAL_FINALIZATION ${PROJECT_SOURCES}
-        Components/full_underbar.h Components/full_underbar.cpp)
+        Components/full_underbar.h Components/full_underbar.cpp
+        resources.qrc)
 else()
     if(ANDROID)
         add_library(VEDA_QT_1 SHARED ${PROJECT_SOURCES})
