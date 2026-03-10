@@ -191,26 +191,6 @@ void MainWindow::initConnections()
 {
     qDebug() << "[MainWindow] initConnections Started...";
     
-    // [New] Connect STREAM_STATS from WebSocket to UI components
-    if (m_cameraClient) {
-        connect(m_cameraClient, &CameraControlClient::streamStatsReceived, this, [=](int channelId, double fps, double bitrateKbps, double proxyLatencyMs){
-            if (m_livePage) m_livePage->updateStreamStats(channelId, fps, bitrateKbps, proxyLatencyMs);
-            if (m_fullPage) m_fullPage->updateStreamStats(channelId, fps, bitrateKbps, proxyLatencyMs);
-        });
-        
-        // [New] Request STREAM_STATS on OSD Check
-        connect(m_livePage, &LiveView::streamStatsRequested, [=](int channelId, bool start) {
-            ConfigManager::instance().loadDefaults();
-            QString ip = ConfigManager::instance().getCameraIp();
-            m_cameraClient->requestStreamStats(ip, channelId, start);
-        });
-        connect(m_fullPage, &FullScreenView::streamStatsRequested, [=](int channelId, bool start) {
-            ConfigManager::instance().loadDefaults();
-            QString ip = ConfigManager::instance().getCameraIp();
-            m_cameraClient->requestStreamStats(ip, channelId, start);
-        });
-    }
-
     connect(m_topBar, &TopBar::sidebarToggled, [=](){ m_sidebar->setVisible(!m_sidebar->isVisible()); });
     connect(m_topBar, &TopBar::modeChanged, [=](int index){
         m_centralStack->setCurrentIndex(index);

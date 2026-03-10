@@ -228,9 +228,7 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
                 cbAll->setChecked(allChecked);
                 cbAll->blockSignals(false);
                 
-                // Emit signal to trigger stream stats
-                int expectedChannel = (currentChannelId < 4) ? (currentChannelId + 1) : 9;
-                emit streamStatsRequested(expectedChannel, anyChecked);
+                Q_UNUSED(anyChecked);
             });
         }
 
@@ -733,12 +731,3 @@ void FullScreenView::syncOverlayPosition() {
     }
 }
 
-void FullScreenView::updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs)
-{
-    // [Mod] External stats rendering removed.
-    // Relying solely on local qualitymonitor (qmon) in VideoWidget::extractGstStats.
-    Q_UNUSED(channelId);
-    Q_UNUSED(fps);
-    Q_UNUSED(bitrateKbps);
-    Q_UNUSED(proxyLatencyMs);
-}

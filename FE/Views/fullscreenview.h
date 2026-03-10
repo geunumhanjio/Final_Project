@@ -22,14 +22,12 @@ public:
     explicit FullScreenView(QWidget *parent = nullptr);
     void play(const QString &url, int index);
     void stop();
-    void updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs); // [New]
  // Theme Support
 
 signals:
     void closeRequested();
     void recordRequested(int channelId, bool start); // [New]
     void reqGoalPose(double x, double y, double theta);
-    void streamStatsRequested(int channelId, bool start); // [New]
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
