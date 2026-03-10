@@ -7,20 +7,20 @@ using namespace std::chrono_literals;
 ROSBridge::ROSBridge()
     : Node("ros_bridge_node")
 {
-    // Publishers
-    goal_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>(
-        "/goal_pose", 10);
-    
+    // Publishers (Client → ROS2)
+    nav_cmd_pub_ = this->create_publisher<std_msgs::msg::String>(
+        "/nav/command", 10);
+
     cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>(
         "/cmd_vel", 10);
-    
+
     mode_pub_ = this->create_publisher<std_msgs::msg::String>(
         "/mode_control", 10);
-    
+
     estop_pub_ = this->create_publisher<std_msgs::msg::Bool>(
         "/emergency_stop", 10);
 
-    // Subscribers
+    // Subscribers (ROS2 → Client)
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10,
         std::bind(&ROSBridge::odomCallback, this, std::placeholders::_1));
@@ -33,9 +33,13 @@ ROSBridge::ROSBridge()
         "/plan", 10,
         std::bind(&ROSBridge::pathCallback, this, std::placeholders::_1));
 
-    status_sub_ = this->create_subscription<std_msgs::msg::String>(
-        "/robot_status", 10,
-        std::bind(&ROSBridge::statusCallback, this, std::placeholders::_1));
+    nav_status_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/nav/status", 10,
+        std::bind(&ROSBridge::navStatusCallback, this, std::placeholders::_1));
+
+    nav_feedback_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/nav/feedback", 10,
+        std::bind(&ROSBridge::navFeedbackCallback, this, std::placeholders::_1));
 
     last_odom_time_ = this->now();
     last_map_time_ = this->now();
@@ -53,8 +57,8 @@ void ROSBridge::processClientMessage(const Json::Value& message)
     std::string type = message["type"].asString();
     Json::Value data = message["data"];
 
-    if (type == "goal_pose") {
-        handleGoalPose(data);
+    if (type == "nav_command") {
+        handleNavCommand(data);
     } else if (type == "cmd_vel") {
         handleCmdVel(data);
     } else if (type == "mode_control") {
@@ -66,29 +70,18 @@ void ROSBridge::processClientMessage(const Json::Value& message)
     }
 }
 
-void ROSBridge::handleGoalPose(const Json::Value& data)
+void ROSBridge::handleNavCommand(const Json::Value& data)
 {
-    auto pose_msg = geometry_msgs::msg::PoseStamped();
-    pose_msg.header.stamp = this->now();
-    pose_msg.header.frame_id = data.get("frame_id", "map").asString();
+    // data를 그대로 JSON 문자열로 직렬화하여 /nav/command에 발행
+    Json::StreamWriterBuilder writer;
+    writer["indentation"] = "";
+    std::string cmd_str = Json::writeString(writer, data);
 
-    pose_msg.pose.position.x = data["x"].asDouble();
-    pose_msg.pose.position.y = data["y"].asDouble();
-    pose_msg.pose.position.z = 0.0;
+    auto msg = std_msgs::msg::String();
+    msg.data = cmd_str;
+    nav_cmd_pub_->publish(msg);
 
-    // theta → quaternion
-    double theta = data.get("theta", 0.0).asDouble();
-    tf2::Quaternion q;
-    q.setRPY(0, 0, theta);
-    pose_msg.pose.orientation = tf2::toMsg(q);
-
-    goal_pub_->publish(pose_msg);
-    
-    RCLCPP_INFO(this->get_logger(), 
-                "Goal pose published: (%.2f, %.2f, %.2f)", 
-                pose_msg.pose.position.x, 
-                pose_msg.pose.position.y, 
-                theta);
+    RCLCPP_INFO(this->get_logger(), "Nav command published: %s", cmd_str.c_str());
 }
 
 void ROSBridge::handleCmdVel(const Json::Value& data)
@@ -205,20 +198,39 @@ void ROSBridge::pathCallback(const nav_msgs::msg::Path::SharedPtr msg)
     broadcast_callback_(ws_msg);
 }
 
-void ROSBridge::statusCallback(const std_msgs::msg::String::SharedPtr msg)
+void ROSBridge::navStatusCallback(const std_msgs::msg::String::SharedPtr msg)
 {
     if (!broadcast_callback_) return;
 
-    // JSON 파싱 시도
     Json::CharReaderBuilder reader;
     Json::Value status_data;
     std::string errors;
     std::istringstream stream(msg->data);
 
     if (Json::parseFromStream(reader, stream, &status_data, &errors)) {
-        Json::Value ws_msg = createTimestampedMessage("status");
+        Json::Value ws_msg = createTimestampedMessage("nav_status");
         ws_msg["data"] = status_data;
         broadcast_callback_(ws_msg);
+    } else {
+        RCLCPP_WARN(this->get_logger(), "nav_status JSON parse error: %s", errors.c_str());
+    }
+}
+
+void ROSBridge::navFeedbackCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    if (!broadcast_callback_) return;
+
+    Json::CharReaderBuilder reader;
+    Json::Value feedback_data;
+    std::string errors;
+    std::istringstream stream(msg->data);
+
+    if (Json::parseFromStream(reader, stream, &feedback_data, &errors)) {
+        Json::Value ws_msg = createTimestampedMessage("nav_feedback");
+        ws_msg["data"] = feedback_data;
+        broadcast_callback_(ws_msg);
+    } else {
+        RCLCPP_WARN(this->get_logger(), "nav_feedback JSON parse error: %s", errors.c_str());
     }
 }
 
