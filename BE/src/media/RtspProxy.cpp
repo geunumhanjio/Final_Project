@@ -18,7 +18,7 @@
 // [Constants] CCTV Config
 // ==================================================================================
 const std::string TARGET_MAC = "E4:30:22:F2:D1:9B";
-const std::string CCTV_CREDENTIALS = "admin:5hanwha!";
+const std::string CCTV_CREDENTIALS = "admin:23wjdrms%40";
 
 // Robot Cam (HTTP MJPEG) - This one is fixed or found via other means
 const std::string URL_ROBOT_CAM = "http://192.168.0.237:8080/stream?topic=/camera/image_raw&type=mjpeg";
@@ -231,11 +231,13 @@ calc_latency:
             }
 
             /*
-            std::cout << "[" << ctx->path << "] RTCP Stats (via Element): "
-                      << "pkts=" << stats.rtp.packets_received
+            std::cout << "[" << ctx->path << "] Stats: "
+                      << "FPS=" << std::fixed << std::setprecision(1) << stats.fps
+                      << ", Bitrate=" << (int)stats.bitrate_kbps << " kbps"
+                      << ", Latency=" << std::fixed << std::setprecision(2) << stats.proxy_latency_ms << " ms"
+                      << ", RTP(pkts=" << stats.rtp.packets_received
                       << ", lost=" << stats.rtp.packets_lost
-                      << ", jitter=" << std::fixed << std::setprecision(3) << stats.rtp.jitter_ms << " ms"
-                      << ", rtt=" << stats.rtp.rtt_ms << " ms"
+                      << ", jitter=" << stats.rtp.jitter_ms << ")"
                       << std::endl;
             */
            
@@ -398,11 +400,19 @@ bool RtspProxy::startRTSPS(int port) {
     gst_rtsp_server_set_auth(secure_server, auth);
     g_object_unref(auth);
 
+    // [FIX] Add connection log for TLS Handshake phase
+    g_signal_connect(secure_server, "client-connected", G_CALLBACK(+[](GstRTSPServer* server, GstRTSPClient* client, gpointer user_data) {
+        GstRTSPConnection* conn = gst_rtsp_client_get_connection(client);
+        const gchar* ip = gst_rtsp_connection_get_ip(conn);
+        std::cout << "🛡️ [RTSPS] New secure connection attempt from: " << (ip ? ip : "unknown") << std::endl;
+    }), NULL);
+
     GstRTSPMountPoints *mounts = gst_rtsp_server_get_mount_points(secure_server);
 
     for (auto* ctx : channels) {
         GstRTSPMediaFactory *factory = gst_rtsp_media_factory_new();
-        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! rtph264pay name=pay0 pt=96 config-interval=-1 )");
+        // [FIX] Add queue for buffering and set config-interval=1 for frequent header sync
+        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! queue max-size-buffers=30 ! rtph264pay name=pay0 pt=96 config-interval=1 )");
         gst_rtsp_media_factory_set_shared(factory, FALSE);
         
         // Explicitly allow 'anonymous' role to access and construct this media without password
@@ -531,7 +541,8 @@ bool RtspProxy::initialize(int port) {
 
     for (auto* ctx : channels) {
         GstRTSPMediaFactory *factory = gst_rtsp_media_factory_new();
-        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! rtph264pay name=pay0 pt=96 config-interval=-1 )");
+        // [FIX] Add queue for buffering and set config-interval=1 for frequent header sync
+        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! queue max-size-buffers=30 ! rtph264pay name=pay0 pt=96 config-interval=1 )");
         gst_rtsp_media_factory_set_shared(factory, FALSE);
         
         // Connect signal to static member
@@ -757,7 +768,8 @@ void RtspProxy::mediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media
     GstElement *appsrc = gst_bin_get_by_name_recurse_up(GST_BIN(element), "src");
 
     if (appsrc) {
-        g_object_set(G_OBJECT(appsrc), "format", GST_FORMAT_TIME, "do-timestamp", TRUE, "is-live", TRUE, NULL);
+        // [FIX] Ensure no internal byte-limit drops by setting max-bytes=0
+        g_object_set(G_OBJECT(appsrc), "format", GST_FORMAT_TIME, "do-timestamp", TRUE, "is-live", TRUE, "max-bytes", 0, NULL);
         
         std::lock_guard<std::mutex> lock(ctx->mutex);
         if (ctx->saved_caps) {
@@ -812,7 +824,7 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
             // RTSP H.264 (Passthrough)
             sprintf(pipeline_str,
                 "rtspsrc name=src location=%s protocols=tcp "
-                "latency=300 drop-on-latency=true "
+                "latency=1000 drop-on-latency=false "
                 "tcp-timeout=10000000 "     
                 "do-rtcp=true "             
                 "ntp-sync=true ntp-time-source=running-time rtcp-sync-send=true "
@@ -847,6 +859,7 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
                         break;
                     }
                     case GST_MESSAGE_EOS:
+                        std::cout << "ℹ️ [" << pd->ctx->path << "] End of Stream (EOS) received. Reconnecting..." << std::endl;
                         g_main_loop_quit(pd->loop);
                         break;
                     default: break;
@@ -883,7 +896,7 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
                     return FALSE; // Source will be removed
                 }
                 
-                if (wd->checks >= 5) { 
+                if (wd->checks >= 15) { 
                     std::cerr << "🚨 [" << wd->ctx->path << "] Caps timeout -> Reconnecting" << std::endl;
                     g_main_loop_quit(wd->loop);
                     return FALSE; // Source will be removed
