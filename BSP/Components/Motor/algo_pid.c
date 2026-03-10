@@ -21,7 +21,7 @@ float PID_Update(PID_t *pid, float target, float measured)
 {
     // Feedforward: 목표 속도 자체를 일정 비율로 기본 출력에 더해줌
     // (모터가 목표 속도에 도달하기 위해 기본적으로 필요한 PWM 값)
-    float feedforward = target * 0.3f; // 경험적으로 0.8~1.0 사이
+    float feedforward = target * 0.3f * 0; // 경험적으로 0.8~1.0 사이
 
     float error      = target - measured;
     pid->integral   += error * pid->dt;

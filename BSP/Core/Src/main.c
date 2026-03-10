@@ -36,6 +36,12 @@
 #include "test_pid_step.h"
 #elif defined(MODE_PID_PC_TUNE)
 #include "test_pid_pc_tune.h"
+#elif defined(MODE_PKT_ECHO)
+#include "test_pkt_echo.h"
+#elif defined(MODE_HW_VERIFY)
+#include "test_hw_verify.h"
+#elif defined(MODE_WASD)
+#include "test_wasd.h"
 #endif
 /* USER CODE END Includes */
 
@@ -117,6 +123,16 @@ int main(void)
   Protocol_Init(&huart1);
   printf("UART protocol ready. Waiting for RPi commands...\r\n");
 
+  /* 타임아웃 표시 LED (PC7) 초기화 */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  GPIO_InitTypeDef led_gpio = {0};
+  led_gpio.Pin   = GPIO_PIN_7;
+  led_gpio.Mode  = GPIO_MODE_OUTPUT_PP;
+  led_gpio.Pull  = GPIO_NOPULL;
+  led_gpio.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &led_gpio);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET);
+
   Encoder_Init();
   printf("Encoder started (TIM3=Left, TIM4=Right)\r\n");
 
@@ -130,9 +146,15 @@ int main(void)
 #if defined(MODE_MOTOR_RAW)
   Test_MotorRaw_Init(200);
 #elif defined(MODE_PID_STEP)
-  Test_PID_Step_Init(300);
+  Test_PID_Step_Init(200);
 #elif defined(MODE_PID_PC_TUNE)
   Test_PID_PcTune_Init(300);
+#elif defined(MODE_PKT_ECHO)
+  Test_PktEcho_Init();
+#elif defined(MODE_HW_VERIFY)
+  Test_HwVerify_Init();
+#elif defined(MODE_WASD)
+  Test_Wasd_Init();
 #endif
 
   /* USER CODE END 2 */
@@ -153,9 +175,22 @@ int main(void)
 #elif defined(MODE_PID_PC_TUNE)
     Test_PID_PcTune_Loop();
 
+#elif defined(MODE_PKT_ECHO)
+    Test_PktEcho_Loop();
+
+#elif defined(MODE_HW_VERIFY)
+    Test_HwVerify_Loop();
+
+#elif defined(MODE_WASD)
+    Test_Wasd_Loop();
+
 #else   /* 기본값 = 운영 모드 */
-    Protocol_Process();
-    Motor_CheckTimeout();
+    if (Protocol_Process()) {
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_RESET); 
+    }
+    if (Motor_CheckTimeout()) {
+        HAL_GPIO_WritePin(GPIOC, GPIO_PIN_7, GPIO_PIN_SET);   
+    }
 
     uint32_t now = HAL_GetTick();
 
@@ -190,7 +225,7 @@ int main(void)
         }
     }
 
-    /* 진단 출력 (UART2, 500ms 주기) */
+    /* 진단 출력 (UART2, 200ms 주기) */
     static uint32_t last_print = 0;
     if (now - last_print >= 500) {
         last_print = now;

@@ -18,12 +18,12 @@ extern "C" {
 
 // PID 게인 — 모터별 독립 설정
 // 튜닝 순서: Kp 먼저 (Ki=Kd=0) → 정상 상태 오차 있으면 Ki 추가 → 진동 시 Kd 추가
-#define PID_LEFT_KP   0.4f
-#define PID_LEFT_KI   7.0f
+#define PID_LEFT_KP   0.6f
+#define PID_LEFT_KI   4.0f
 #define PID_LEFT_KD   0.0f
 
-#define PID_RIGHT_KP  1.0f
-#define PID_RIGHT_KI  8.0f   // 오른쪽 모터 특성 차이 시 조정
+#define PID_RIGHT_KP  0.6f
+#define PID_RIGHT_KI  4.0f   // 오른쪽 모터 특성 차이 시 조정
 #define PID_RIGHT_KD  0.0f
 
 #define PID_DT  0.01f   // 10ms (main.c PID 루프 주기와 일치해야 함)
@@ -48,31 +48,7 @@ typedef enum {
  */
 Motor_Status_t Motor_Init(void);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 void Motor_SetRaw(Motor_Select_t motor, int16_t speed_mmps);
-
-
-
-
-
-
-
-
-
-
-
 
 /**
  * @brief  양쪽 바퀴 속도 설정 (ROS2 /cmd_vel 처리용)

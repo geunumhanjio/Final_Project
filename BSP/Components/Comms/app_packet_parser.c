@@ -1,5 +1,6 @@
 #include "app_packet_parser.h"
 #include "drv_motor.h"
+#include "main.h" // For LD2_Pin and LD2_GPIO_Port
 #include <stdio.h>
 #include <string.h>
 
@@ -19,6 +20,9 @@ static Packet_t ready_packet;
 
 /* Statistics */
 static ProtoStats_t stats;
+
+/* Last processed packet (for test/debug modes) */
+static Packet_t last_processed_packet;
 
 /* UART error tracking */
 static volatile uint32_t uart_error_count = 0;
@@ -102,6 +106,8 @@ void Protocol_FeedByte(uint8_t byte)
                 packet_ready = true;
             }
             stats.rx_packets++;
+            /* Toggle LD2 to indicate packet reception */
+            HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
         } else {
             stats.rx_checksum_errors++;
         }
@@ -120,6 +126,7 @@ bool Protocol_Process(void)
     memcpy(&pkt, (const void *)&ready_packet, sizeof(Packet_t));
     packet_ready = false;
 
+    memcpy(&last_processed_packet, &pkt, sizeof(Packet_t));
     Protocol_Dispatch(&pkt);
     return true;
 }
@@ -155,6 +162,11 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 uint32_t Protocol_GetErrorCount(void)
 {
     return uart_error_count;
+}
+
+const Packet_t* Protocol_GetLastPacket(void)
+{
+    return &last_processed_packet;
 }
 
 /* Private functions ---------------------------------------------------------*/

@@ -121,8 +121,8 @@ AS_DEFS =
 # C defines
 C_DEFS =  \
 -DUSE_HAL_DRIVER \
--DSTM32F401xE \
--DDEBUG_PACKET
+-DSTM32F401xE 
+# -DDEBUG_PACKET
 
 
 # AS includes
@@ -144,6 +144,8 @@ C_INCLUDES =  \
 # MODE=MOTOR_RAW    — Raw PWM 모터 테스트
 # MODE=PID_STEP     — 단일 Setpoint 계단 응답 관찰
 # MODE=PID_PC_TUNE  — UART2 → PC 연동 자동 튜닝
+# MODE=PKT_ECHO     — RPi 수신 패킷 내용을 UART2(PC)로 출력
+# MODE=HW_VERIFY    — 전체 하드웨어 자동 검증 (IMU/엔코더/모터)
 ifeq ($(MODE), MOTOR_RAW)
 C_DEFS    += -DMODE_MOTOR_RAW
 C_SOURCES += Components/Test/test_motor_raw.c
@@ -153,6 +155,15 @@ C_SOURCES += Components/Test/test_pid_step.c
 else ifeq ($(MODE), PID_PC_TUNE)
 C_DEFS    += -DMODE_PID_PC_TUNE
 C_SOURCES += Components/Test/test_pid_pc_tune.c
+else ifeq ($(MODE), PKT_ECHO)
+C_DEFS    += -DMODE_PKT_ECHO
+C_SOURCES += Components/Test/test_pkt_echo.c
+else ifeq ($(MODE), HW_VERIFY)
+C_DEFS    += -DMODE_HW_VERIFY
+C_SOURCES += Components/Test/test_hw_verify.c
+else ifeq ($(MODE), WASD)
+C_DEFS    += -DMODE_WASD
+C_SOURCES += Components/Test/test_wasd.c
 endif
 
 
@@ -179,7 +190,7 @@ LDSCRIPT = STM32F401XX_FLASH.ld
 # libraries
 LIBS = -lc -lm -lnosys 
 LIBDIR = 
-LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections
+LDFLAGS = $(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(BUILD_DIR)/$(TARGET).map,--cref -Wl,--gc-sections -u _printf_float
 
 # default action: build all
 all: $(BUILD_DIR)/$(TARGET).elf $(BUILD_DIR)/$(TARGET).hex $(BUILD_DIR)/$(TARGET).bin

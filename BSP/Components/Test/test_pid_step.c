@@ -6,7 +6,7 @@
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
 
-static int16_t s_target   = 300;
+static int16_t s_target   = 200;    // 여기서 초기값 설정해도 소용없음 !!!!!!!!! main의 init 함수의 인자로 타겟 속도가 결정됨
 static uint8_t s_running  = 0;
 static uint8_t s_btn_prev = 0;
 
@@ -35,8 +35,7 @@ void Test_PID_Step_Loop(void)
             Motor_SetVelocity(s_target, s_target);
             printf("MOTOR ON  (target=%d mm/s)\r\n", s_target);
         } else {
-            Motor_SetVelocity(0, 0);
-            Motor_PID_Reset();
+            Motor_SoftStop();  // PID_Reset(), 타겟 속도 영으로 설정
             printf("MOTOR OFF\r\n");
         }
     }

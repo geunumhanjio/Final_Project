@@ -86,6 +86,13 @@ const ProtoStats_t* Protocol_GetStats(void);
 uint32_t Protocol_GetErrorCount(void);
 
 /**
+ * @brief  마지막으로 처리된 패킷 조회 (테스트/디버그용)
+ * @note   Protocol_Process()가 true를 반환한 직후에만 유효
+ * @retval 마지막 패킷 포인터
+ */
+const Packet_t* Protocol_GetLastPacket(void);
+
+/**
  * @brief  오도메트리(엔코더 카운트) 응답 패킷 송신
  * @param  left_ticks:  왼쪽 엔코더 카운트 (int16)
  * @param  right_ticks: 오른쪽 엔코더 카운트 (int16)
