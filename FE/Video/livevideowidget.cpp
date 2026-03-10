@@ -64,20 +64,27 @@ void LiveVideoWidget::playUrl(const QString &url, int latency)
 
     QString options = "";
     QString sinkOptions = "";
+    const bool isRtsps = url.startsWith("rtsps://", Qt::CaseInsensitive);
+    const QString transport = isRtsps ? "tcp" : "udp";
+    if (isRtsps) {
+        options = "tls-validation-flags=0";
+    }
     if (latency == 0) {
         sinkOptions = "sync=false";
     }
 
-    // RTSP Pipeline (Using UDP for better quality monitoring)
+    // Keep the existing live pipeline and only force TCP for RTSPS URLs.
     QString pipelineStr = QString(
-        "rtspsrc name=src location=%1 protocols=udp latency=%2 %3 ! "
+        "rtspsrc name=src location=%1 protocols=%2 latency=%3 %4 ! "
         "qualitymonitor name=qmon ! "
         "rtph264depay ! h264parse ! avdec_h264 ! "
         "videoconvert ! videocrop name=crop ! videoconvert ! "
-        "autovideosink name=sink %4"
-    ).arg(url).arg(latency).arg(options).arg(sinkOptions);
+        "autovideosink name=sink %5"
+    ).arg(url).arg(transport).arg(latency).arg(options).arg(sinkOptions);
 
-    qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << url;
+    qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << url
+             << "| transport:" << transport
+             << "| latency:" << latency;
 
     GError *error = nullptr;
     GstElement *pipeline = gst_parse_launch(pipelineStr.toUtf8().constData(), &error);
