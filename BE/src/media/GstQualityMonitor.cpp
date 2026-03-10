@@ -30,9 +30,15 @@ static GstStateChangeReturn gst_quality_monitor_change_state(GstElement *element
     GstQualityMonitor *self = GST_QUALITY_MONITOR(element);
 
     if (transition == GST_STATE_CHANGE_NULL_TO_READY) {
-        // 엘리먼트가 시작될 때 파이프라인에서 rtpbin을 찾아 statsCollector를 연결
-        self->collector = new GstStatsCollector();
-        self->collector->attach(GST_ELEMENT(gst_object_get_parent(GST_OBJECT(element))));
+        // [FIX] Initialize collector only if not already present and fix parent leak
+        if (!self->collector) {
+            self->collector = new GstStatsCollector();
+            GstObject* parent = gst_object_get_parent(GST_OBJECT(element));
+            if (parent) {
+                self->collector->attach(GST_ELEMENT(parent));
+                gst_object_unref(parent); // Release the ref returned by gst_object_get_parent
+            }
+        }
     }
 
     return GST_ELEMENT_CLASS(gst_quality_monitor_parent_class)->change_state(element, transition);

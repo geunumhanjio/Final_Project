@@ -23,6 +23,7 @@ include_directories(${OPENSSL_INCLUDE_DIR})
 set(SOURCES
     src/main.cpp
     src/media/RtspProxy.cpp
+    src/media/CctvScanner.cpp
     src/media/GstQualityMonitor.cpp
     src/calibration/CalibrationManager.cpp
     src/network/VmsServer.cpp 

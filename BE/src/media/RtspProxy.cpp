@@ -1,5 +1,6 @@
 #include "media/RtspProxy.hpp"
 #include "media/GstQualityMonitor.hpp"
+#include "media/CctvScanner.hpp"
 #include <gst/app/gstappsrc.h>
 #include <gst/app/gstappsink.h>
 #include <iostream>
@@ -14,19 +15,12 @@
 #include <cstring>
 
 // ==================================================================================
-// [Constants] CCTV URLs
+// [Constants] CCTV Config
 // ==================================================================================
-const std::string URL_CH1_MOB = "rtsp://admin:5hanwha!@192.168.0.16/0/MOBILE/media.smp";
-const std::string URL_CH2_MOB = "rtsp://admin:5hanwha!@192.168.0.16/1/MOBILE/media.smp";
-const std::string URL_CH3_MOB = "rtsp://admin:5hanwha!@192.168.0.16/2/MOBILE/media.smp";
-const std::string URL_CH4_MOB = "rtsp://admin:5hanwha!@192.168.0.16/3/MOBILE/media.smp";
+const std::string TARGET_MAC = "E4:30:22:F2:D1:9B";
+const std::string CCTV_CREDENTIALS = "admin:23wjdrms%40";
 
-const std::string URL_CH1_FHD = "rtsp://admin:5hanwha!@192.168.0.16/0/H.264/media.smp";
-const std::string URL_CH2_FHD = "rtsp://admin:5hanwha!@192.168.0.16/1/H.264/media.smp";
-const std::string URL_CH3_FHD = "rtsp://admin:5hanwha!@192.168.0.16/2/H.264/media.smp";
-const std::string URL_CH4_FHD = "rtsp://admin:5hanwha!@192.168.0.16/3/H.264/media.smp";
-
-// Robot Cam (HTTP MJPEG)
+// Robot Cam (HTTP MJPEG) - This one is fixed or found via other means
 const std::string URL_ROBOT_CAM = "http://192.168.0.237:8080/stream?topic=/camera/image_raw&type=mjpeg";
 
 // ==================================================================================
@@ -66,6 +60,24 @@ struct ChannelContext {
           record_pipeline(nullptr), record_appsrc(nullptr),
           frameCount(0), byteCount(0), totalLatencyMs(0),
           lastStatTime(std::chrono::steady_clock::now()) {}
+
+    ~ChannelContext() {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (receiver_pipeline) {
+            gst_element_set_state(receiver_pipeline, GST_STATE_NULL);
+            gst_object_unref(receiver_pipeline);
+        }
+        if (saved_caps) gst_caps_unref(saved_caps);
+        for (auto* client : clients) {
+            gst_object_unref(client);
+        }
+        clients.clear();
+        if (record_pipeline) {
+            gst_element_set_state(record_pipeline, GST_STATE_NULL);
+            gst_object_unref(record_pipeline);
+        }
+        if (record_appsrc) gst_object_unref(record_appsrc);
+    }
 };
 
 // ==================================================================================
@@ -126,16 +138,28 @@ static GstFlowReturn on_new_sample(GstElement *sink, gpointer user_data) {
 
     if (buffer) {
         // 2. Push to RTSP clients (Outside Mutex)
-        if (!clients_copy.empty()) {
-            static int log_counter = 0;
-            if (log_counter++ % 100 == 0) { // 매 100프레임마다 출력
-                std::cout << "📡 [" << ctx->path << "] Pushing data to " << clients_copy.size() << " clients." << std::endl;
-            }
-        }
+        std::vector<GstElement*> failed_clients;
         for (auto* client_appsrc : clients_copy) {
             GstBuffer *push_buffer = gst_buffer_copy(buffer);
-            gst_app_src_push_buffer(GST_APP_SRC(client_appsrc), push_buffer);
+            GstFlowReturn ret = gst_app_src_push_buffer(GST_APP_SRC(client_appsrc), push_buffer);
+            
+            if (ret != GST_FLOW_OK && ret != GST_FLOW_FLUSHING) {
+                failed_clients.push_back(client_appsrc);
+            }
             gst_object_unref(client_appsrc); // Release our local ref
+        }
+
+        // Cleanup failed clients if any
+        if (!failed_clients.empty()) {
+            std::lock_guard<std::mutex> lock(ctx->mutex);
+            for (auto* failed : failed_clients) {
+                auto it = std::find(ctx->clients.begin(), ctx->clients.end(), failed);
+                if (it != ctx->clients.end()) {
+                    ctx->clients.erase(it);
+                    gst_object_unref(failed); // Release original ref in vector
+                    std::cout << "⚠️ [Cleanup] Removed non-responsive client from " << ctx->path << std::endl;
+                }
+            }
         }
 
         // 3. Push to Recorder (Outside Mutex)
@@ -194,25 +218,29 @@ calc_latency:
             stats.bitrate_kbps = ((double)ctx->byteCount * 8.0) / elapsed; 
             stats.proxy_latency_ms = ctx->totalLatencyMs / (double)ctx->frameCount;
             
-            // 파이프라인 내부의 qualitymonitor 엘리먼트를 찾아서 통계 획득
-            GstElement* qmon = gst_bin_get_by_name(GST_BIN(ctx->receiver_pipeline), "qmon");
-            if (qmon) {
-                GstQualityMonitor* monitor = GST_QUALITY_MONITOR(qmon);
-                if (monitor->collector) {
-                    stats.rtp = monitor->collector->getMetrics();
+            // [FIX] Ensure receiver_pipeline is valid before use
+            if (ctx->receiver_pipeline) {
+                GstElement* qmon = gst_bin_get_by_name(GST_BIN(ctx->receiver_pipeline), "qmon");
+                if (qmon) {
+                    GstQualityMonitor* monitor = GST_QUALITY_MONITOR(qmon);
+                    if (monitor->collector) {
+                        stats.rtp = monitor->collector->getMetrics();
+                    }
+                    gst_object_unref(qmon);
                 }
-                gst_object_unref(qmon);
             }
 
-            /* 콘솔 출력 - 주석 처리
-            std::cout << "[" << ctx->path << "] RTCP Stats (via Element): "
-                      << "pkts=" << stats.rtp.packets_received
+            /*
+            std::cout << "[" << ctx->path << "] Stats: "
+                      << "FPS=" << std::fixed << std::setprecision(1) << stats.fps
+                      << ", Bitrate=" << (int)stats.bitrate_kbps << " kbps"
+                      << ", Latency=" << std::fixed << std::setprecision(2) << stats.proxy_latency_ms << " ms"
+                      << ", RTP(pkts=" << stats.rtp.packets_received
                       << ", lost=" << stats.rtp.packets_lost
-                      << ", jitter=" << std::fixed << std::setprecision(3) << stats.rtp.jitter_ms << " ms"
-                      << ", rtt=" << stats.rtp.rtt_ms << " ms"
+                      << ", jitter=" << stats.rtp.jitter_ms << ")"
                       << std::endl;
             */
-
+           
             if (ctx->parent) {
                 ctx->parent->triggerStatsCallback(ctx->id, stats);
             }
@@ -252,21 +280,52 @@ RtspProxy::~RtspProxy() {
     }
 }
 
-void RtspProxy::setupChannels() {
+bool RtspProxy::setupChannels() {
+    std::string ip = "";
+    const int max_retries = 10;
+    const int retry_interval_sec = 3;
+
+    for (int i = 1; i <= max_retries; ++i) {
+        ip = CctvScanner::discoverIp(TARGET_MAC);
+        if (!ip.empty()) {
+            std::cout << "✅ [Proxy] CCTV discovered on attempt " << i << " at " << ip << std::endl;
+            break;
+        }
+        
+        std::cerr << "⚠️ [Proxy] CCTV discovery failed (Attempt " << i << "/" << max_retries << "). "
+                  << "Retrying in " << retry_interval_sec << "s..." << std::endl;
+        
+        if (i < max_retries) {
+            std::this_thread::sleep_for(std::chrono::seconds(retry_interval_sec));
+        }
+    }
+
+    if (ip.empty()) {
+        std::cerr << "❌ [Proxy] Critical Error: Failed to discover CCTV IP after " << max_retries << " attempts." << std::endl;
+        return false;
+    }
+
+    std::cout << "🚀 [Proxy] Setting up channels for CCTV at " << ip << std::endl;
+
+    // Base URL template: rtsp://ID:PW@IP/channel/profile/media.smp
+    auto make_url = [&](int channel, bool fhd) {
+        std::string profile = fhd ? "H.264" : "MOBILE";
+        return "rtsp://" + CCTV_CREDENTIALS + "@" + ip + "/" + std::to_string(channel) + "/" + profile + "/media.smp";
+    };
+
     // 1~4: Mobile
-    channels.push_back(new ChannelContext(1, "/ch1", URL_CH1_MOB, this));
-    channels.push_back(new ChannelContext(2, "/ch2", URL_CH2_MOB, this));
-    channels.push_back(new ChannelContext(3, "/ch3", URL_CH3_MOB, this));
-    channels.push_back(new ChannelContext(4, "/ch4", URL_CH4_MOB, this));
+    channels.push_back(new ChannelContext(1, "/ch1", make_url(0, false), this));
+    channels.push_back(new ChannelContext(2, "/ch2", make_url(1, false), this));
+    channels.push_back(new ChannelContext(3, "/ch3", make_url(2, false), this));
+    channels.push_back(new ChannelContext(4, "/ch4", make_url(3, false), this));
 
     // 5~8: FHD
-    channels.push_back(new ChannelContext(5, "/ch1_fhd", URL_CH1_FHD, this));
-    channels.push_back(new ChannelContext(6, "/ch2_fhd", URL_CH2_FHD, this));
-    channels.push_back(new ChannelContext(7, "/ch3_fhd", URL_CH3_FHD, this));
-    channels.push_back(new ChannelContext(8, "/ch4_fhd", URL_CH4_FHD, this));
+    channels.push_back(new ChannelContext(5, "/ch1_fhd", make_url(0, true), this));
+    channels.push_back(new ChannelContext(6, "/ch2_fhd", make_url(1, true), this));
+    channels.push_back(new ChannelContext(7, "/ch3_fhd", make_url(2, true), this));
+    channels.push_back(new ChannelContext(8, "/ch4_fhd", make_url(3, true), this));
 
-    // 9: Robot Cam (MJPEG)
-    //channels.push_back(new ChannelContext(9, "/robot_cam", URL_ROBOT_CAM, this));
+    return true;
 }
 
 bool RtspProxy::initSSLContext() {
@@ -341,11 +400,19 @@ bool RtspProxy::startRTSPS(int port) {
     gst_rtsp_server_set_auth(secure_server, auth);
     g_object_unref(auth);
 
+    // [FIX] Add connection log for TLS Handshake phase
+    g_signal_connect(secure_server, "client-connected", G_CALLBACK(+[](GstRTSPServer* server, GstRTSPClient* client, gpointer user_data) {
+        GstRTSPConnection* conn = gst_rtsp_client_get_connection(client);
+        const gchar* ip = gst_rtsp_connection_get_ip(conn);
+        std::cout << "🛡️ [RTSPS] New secure connection attempt from: " << (ip ? ip : "unknown") << std::endl;
+    }), NULL);
+
     GstRTSPMountPoints *mounts = gst_rtsp_server_get_mount_points(secure_server);
 
     for (auto* ctx : channels) {
         GstRTSPMediaFactory *factory = gst_rtsp_media_factory_new();
-        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! rtph264pay name=pay0 pt=96 config-interval=-1 )");
+        // [FIX] Add queue for buffering and set config-interval=1 for frequent header sync
+        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! queue max-size-buffers=30 ! rtph264pay name=pay0 pt=96 config-interval=1 )");
         gst_rtsp_media_factory_set_shared(factory, FALSE);
         
         // Explicitly allow 'anonymous' role to access and construct this media without password
@@ -457,7 +524,9 @@ void RtspProxy::handleSecureClient(SecureClient* client) {
 }
 
 bool RtspProxy::initialize(int port) {
-    setupChannels();
+    if (!setupChannels()) {
+        return false;
+    }
 
     mainLoop = g_main_loop_new(NULL, FALSE);
     server = gst_rtsp_server_new();
@@ -472,7 +541,8 @@ bool RtspProxy::initialize(int port) {
 
     for (auto* ctx : channels) {
         GstRTSPMediaFactory *factory = gst_rtsp_media_factory_new();
-        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! rtph264pay name=pay0 pt=96 config-interval=-1 )");
+        // [FIX] Add queue for buffering and set config-interval=1 for frequent header sync
+        gst_rtsp_media_factory_set_launch(factory, "( appsrc name=src ! queue max-size-buffers=30 ! rtph264pay name=pay0 pt=96 config-interval=1 )");
         gst_rtsp_media_factory_set_shared(factory, FALSE);
         
         // Connect signal to static member
@@ -494,24 +564,35 @@ bool RtspProxy::initialize(int port) {
 
 void RtspProxy::startReceiverThreads() {
     for (auto* ctx : channels) {
-        std::thread t(RtspProxy::runReceiverThread, ctx);
-        t.detach(); 
+        receiverThreads.emplace_back(RtspProxy::runReceiverThread, ctx);
         
-        std::cout << "⏳ [System] Staggering start... waiting 2s" << std::endl;
+        std::cout << "⏳ [System] Staggering start (" << ctx->path << ")... waiting 2s" << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
 }
 
 void RtspProxy::start() {
-    startReceiverThreads();
     running = true;
+    startReceiverThreads();
 }
 
 void RtspProxy::stop() {
+    if (!running) return;
     running = false;
+
+    std::cout << "⏹️ [Proxy] Stopping all services..." << std::endl;
+
     if (mainLoop && g_main_loop_is_running(mainLoop)) {
         g_main_loop_quit(mainLoop);
     }
+
+    // Join receiver threads
+    for (auto& t : receiverThreads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+    receiverThreads.clear();
 }
 
 void RtspProxy::run() {
@@ -661,6 +742,24 @@ std::string RtspProxy::stopRecording(int channelId) {
     return filename;
 }
 
+// [Helper] 클라이언트 종료 시 호출되는 콜백
+static void on_media_unprepared(GstRTSPMedia *media, gpointer user_data) {
+    auto* pair = (std::pair<ChannelContext*, GstElement*>*)user_data;
+    ChannelContext* ctx = pair->first;
+    GstElement* appsrc = pair->second;
+
+    std::lock_guard<std::mutex> lock(ctx->mutex);
+    auto it = std::find(ctx->clients.begin(), ctx->clients.end(), appsrc);
+    if (it != ctx->clients.end()) {
+        ctx->clients.erase(it);
+        std::cout << "🧹 [Cleanup] Client disconnected from " << ctx->path 
+                  << ". Remaining: " << ctx->clients.size() << std::endl;
+    }
+    
+    gst_object_unref(appsrc);
+    delete pair;
+}
+
 void RtspProxy::mediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media, gpointer user_data) {
     ChannelContext *ctx = (ChannelContext*)user_data;
     std::cout << "🎯 [RTSP/S] New client connecting to path: " << ctx->path << std::endl;
@@ -669,20 +768,28 @@ void RtspProxy::mediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media
     GstElement *appsrc = gst_bin_get_by_name_recurse_up(GST_BIN(element), "src");
 
     if (appsrc) {
-        g_object_set(G_OBJECT(appsrc), "format", GST_FORMAT_TIME, "do-timestamp", TRUE, "is-live", TRUE, NULL);
+        // [FIX] Ensure no internal byte-limit drops by setting max-bytes=0
+        g_object_set(G_OBJECT(appsrc), "format", GST_FORMAT_TIME, "do-timestamp", TRUE, "is-live", TRUE, "max-bytes", 0, NULL);
         
         std::lock_guard<std::mutex> lock(ctx->mutex);
         if (ctx->saved_caps) {
             g_object_set(G_OBJECT(appsrc), "caps", ctx->saved_caps, NULL);
         }
+        
+        // Increase ref for our storage
+        gst_object_ref(appsrc);
         ctx->clients.push_back(appsrc);
+
+        // 클라이언트 종료 시 정리를 위해 시그널 연결
+        auto* cleanup_data = new std::pair<ChannelContext*, GstElement*>(ctx, (GstElement*)gst_object_ref(appsrc));
+        g_signal_connect(media, "unprepared", G_CALLBACK(on_media_unprepared), cleanup_data);
     }
 
     gst_object_unref(element);
 }
 
 void RtspProxy::runReceiverThread(ChannelContext *ctx) {
-    while (true) {
+    while (ctx->parent->running) {
         GMainContext *context = g_main_context_new();
         g_main_context_push_thread_default(context);
         GMainLoop *loop = g_main_loop_new(context, FALSE);
@@ -717,9 +824,10 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
             // RTSP H.264 (Passthrough)
             sprintf(pipeline_str,
                 "rtspsrc name=src location=%s protocols=tcp "
-                "latency=300 drop-on-latency=true "
+                "latency=1000 drop-on-latency=false "
                 "tcp-timeout=10000000 "     
                 "do-rtcp=true "             
+                "ntp-sync=true ntp-time-source=running-time rtcp-sync-send=true "
                 "udp-buffer-size=33554432 ! "     
                 "qualitymonitor name=qmon ! "
                 "rtph264depay ! "
@@ -731,38 +839,50 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
         ctx->receiver_pipeline = gst_parse_launch(pipeline_str, NULL);
 
         if (ctx->receiver_pipeline) {
-            // Bus Watch
+            // [FIX] Bus Watch with correct data
             GstBus *bus = gst_element_get_bus(ctx->receiver_pipeline);
+            struct PipelineData { 
+                ChannelContext *ctx; 
+                GMainLoop *loop; 
+            };
+            PipelineData *p_data = new PipelineData{ctx, loop};
+
             gst_bus_add_watch(bus, [](GstBus *bus, GstMessage *msg, gpointer data) -> gboolean {
-                GMainLoop *loop = (GMainLoop *)data;
+                PipelineData *pd = (PipelineData *)data;
                 switch (GST_MESSAGE_TYPE(msg)) {
                     case GST_MESSAGE_ERROR: {
                         GError *err;
                         gst_message_parse_error(msg, &err, NULL);
-                        std::cerr << "❌ [" << ((ChannelContext*)g_main_loop_get_context(loop))->path 
-                                  << "] Error: " << err->message << std::endl;
+                        std::cerr << "❌ [" << pd->ctx->path << "] Error: " << err->message << std::endl;
                         g_error_free(err);
-                        g_main_loop_quit(loop);
+                        g_main_loop_quit(pd->loop);
                         break;
                     }
                     case GST_MESSAGE_EOS:
-                        g_main_loop_quit(loop);
+                        std::cout << "ℹ️ [" << pd->ctx->path << "] End of Stream (EOS) received. Reconnecting..." << std::endl;
+                        g_main_loop_quit(pd->loop);
                         break;
                     default: break;
                 }
                 return TRUE;
-            }, loop);
+            }, p_data);
             gst_object_unref(bus);
 
             GstElement *appsink = gst_bin_get_by_name(GST_BIN(ctx->receiver_pipeline), "mysink");
             g_signal_connect(appsink, "new-sample", G_CALLBACK(on_new_sample), ctx);
             gst_object_unref(appsink);
 
-            // Watchdog
-            struct WatchdogData { ChannelContext *ctx; GMainLoop *loop; int checks; };
+            // [FIX] Watchdog using thread-local context to avoid dangling pointers
+            GSource *timeout_source = g_timeout_source_new(1000);
+            
+            struct WatchdogData { 
+                ChannelContext *ctx; 
+                GMainLoop *loop; 
+                int checks; 
+            };
             WatchdogData *wd_data = new WatchdogData{ctx, loop, 0};
 
-            g_timeout_add(1000, [](gpointer data) -> gboolean {
+            g_source_set_callback(timeout_source, [](gpointer data) -> gboolean {
                 WatchdogData *wd = (WatchdogData*)data;
                 wd->checks++;
                 
@@ -773,23 +893,36 @@ void RtspProxy::runReceiverThread(ChannelContext *ctx) {
                 }
                 
                 if (has_caps) { 
-                    delete wd; return FALSE;
+                    return FALSE; // Source will be removed
                 }
                 
-                if (wd->checks >= 5) { 
+                if (wd->checks >= 15) { 
                     std::cerr << "🚨 [" << wd->ctx->path << "] Caps timeout -> Reconnecting" << std::endl;
                     g_main_loop_quit(wd->loop);
-                    delete wd; return FALSE;
+                    return FALSE; // Source will be removed
                 }
                 return TRUE;
-            }, wd_data);
+            }, wd_data, [](gpointer data){ 
+                delete (WatchdogData*)data; 
+            });
+
+            g_source_attach(timeout_source, context);
+            g_source_unref(timeout_source);
 
             std::cout << "🔄 [" << ctx->path << "] Connecting..." << std::endl;
             gst_element_set_state(ctx->receiver_pipeline, GST_STATE_PLAYING);
             g_main_loop_run(loop);
 
-            gst_element_set_state(ctx->receiver_pipeline, GST_STATE_NULL);
-            gst_object_unref(ctx->receiver_pipeline);
+            // [FIX] Cleanup p_data and reset pipeline pointer under lock
+            {
+                std::lock_guard<std::mutex> lock(ctx->mutex);
+                if (ctx->receiver_pipeline) {
+                    gst_element_set_state(ctx->receiver_pipeline, GST_STATE_NULL);
+                    gst_object_unref(ctx->receiver_pipeline);
+                    ctx->receiver_pipeline = nullptr;
+                }
+            }
+            delete p_data;
         }
 
         g_main_loop_unref(loop);
