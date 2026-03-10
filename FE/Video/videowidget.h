@@ -84,7 +84,6 @@ private:
     // [New] OSD Widget
     OsdWidget *m_osdWidget;
     RtspPinger *m_pinger; // [New]
-    QTimer *m_syncTimer; // [New]
     void syncOverlayPosition(); // [New]
 
     QTimer *m_statsTimer; // [New] For pulling GST stats

@@ -3,9 +3,6 @@
 #include <QDebug>
 #include <QApplication>
 #include <QMutexLocker>
-#include <QFile>
-#include <QDateTime>
-#include <QTextStream>
 #include "Gst/GstQualityMonitor.hpp"
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
@@ -49,11 +46,6 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
             }
         }
     });
-
-    // [New] Timer to constantly sync OSD position when app moves
-    m_syncTimer = new QTimer(this);
-    connect(m_syncTimer, &QTimer::timeout, this, &VideoWidget::syncOverlayPosition);
-    m_syncTimer->start(16); // ~60fps sync rate
 
     // [New] Timer to extract GStreamer stats (packet loss, jitter)
     m_statsTimer = new QTimer(this);
@@ -397,22 +389,6 @@ void VideoWidget::extractGstStats() {
 
             m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(renderFps, 'f', 1));
 
-            // [Diagnostic Logging] Log to rtp.log if FPS is suspiciously low
-            if (renderFps < 5.0 || sourceFps < 5.0) {
-                QFile logFile("rtp.log");
-                if (logFile.open(QIODevice::Append | QIODevice::Text)) {
-                    QTextStream out(&logFile);
-                    QString timestamp = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss.zzz");
-                    out << "[" << timestamp << "] URL: " << currentUrl << "\n"
-                        << "  - Source(RTP) FPS: " << QString::number(sourceFps, 'f', 2) << "\n"
-                        << "  - Render(Sink) FPS: " << QString::number(renderFps, 'f', 2) << "\n"
-                        << "  - Packet Loss: " << lossText << "\n"
-                        << "  - Jitter: " << QString::number(m.jitter_ms, 'f', 2) << " ms\n"
-                        << "------------------------------------------\n";
-                    logFile.close();
-                }
-            }
-            
             m_lastRendered = m_actualFrameCount;
             m_lastFrames = m.frames_received;
             m_lastPackets = m.packets_received;
