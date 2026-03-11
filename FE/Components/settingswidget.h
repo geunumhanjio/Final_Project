@@ -25,6 +25,14 @@ public:
         
         ipEdit = new QLineEdit(this);
         portEdit = new QLineEdit(this);
+        robotIpEdit = new QLineEdit(this); // [New] Robot bridge host
+        
+        rtspsOptionCheck = new QCheckBox("Use Secure RTSPS (Port 8322)", this); // [New]
+        rtspsOptionCheck->setStyleSheet(
+            "QCheckBox { color: #ffffff; font-weight: bold; font-size: 16px; padding: 5px; background: transparent; }"
+            "QCheckBox::indicator { width: 24px; height: 24px; border: 2px solid #F59E0B; background: #222; border-radius: 4px; }"
+            "QCheckBox::indicator:checked { background-color: #F59E0B; border-color: #F59E0B; }"
+        );
         
         cctvOptionCheck = new QCheckBox("Use Custom CCTV URL", this); // Initialize cctvOptionCheck
         cctvOptionCheck->setStyleSheet(
@@ -41,12 +49,20 @@ public:
         ConfigManager::instance().loadDefaults(); 
         ipEdit->setText(ConfigManager::instance().getCameraIp());
         portEdit->setText(ConfigManager::instance().getCameraPort());
+        robotIpEdit->setText(ConfigManager::instance().getRobotHost()); // [New]
         cctvOptionCheck->setChecked(ConfigManager::instance().getUseCustomCCTV());
+        rtspsOptionCheck->setChecked(ConfigManager::instance().getUseRtsps()); // [New]
+
+        manualControlCheck = new QCheckBox("Enable Manual Control (WASD)", this);
+        manualControlCheck->setStyleSheet(cctvOptionCheck->styleSheet());
+        manualControlCheck->setChecked(ConfigManager::instance().getManualControl());
         
         // 스타일링
         QString inputStyle = "QLineEdit { padding: 8px; border: 1px solid #444; border-radius: 4px; color: white; background: #333; }";
         ipEdit->setStyleSheet(inputStyle);
         portEdit->setStyleSheet(inputStyle);
+        robotIpEdit->setStyleSheet(inputStyle);
+        robotIpEdit->setPlaceholderText("172.20.26.8");
         
         QLabel *ipLabel = new QLabel("Camera IP:", this);
         ipLabel->setStyleSheet("color: #ddd; font-weight: bold;");
@@ -58,10 +74,25 @@ public:
         QLabel *optionHint = new QLabel("Check to use: rtsp://admin:5hanwha!@<IP>:<PORT>/<ID>/H.264/media.smp", this);
         optionHint->setStyleSheet("color: #888; font-size: 11px; margin-bottom: 8px;");
 
+        QLabel *rtspsLabel = new QLabel("Security Mode:", this); // [New]
+        rtspsLabel->setStyleSheet("color: #ddd; font-weight: bold;");
+
+        QLabel *robotIpLabel = new QLabel("ROS2 Bridge Host:", this); // [New]
+        robotIpLabel->setStyleSheet("color: #ddd; font-weight: bold;");
+        QLabel *robotIpHint = new QLabel("Enter only the host/IP. WS becomes ws://<host>:9090 and RC RTSP becomes rtsp://<host>:9554/camera", this);
+        robotIpHint->setStyleSheet("color: #888; font-size: 11px; margin-bottom: 8px;");
+
         form->addRow(ipLabel, ipEdit);
         form->addRow(portLabel, portEdit);
+        form->addRow(rtspsLabel, rtspsOptionCheck); // [New]
         form->addRow(optionLabel, cctvOptionCheck);
         form->addRow("", optionHint);
+        form->addRow(robotIpLabel, robotIpEdit); // [New]
+        form->addRow("", robotIpHint);
+        
+        QLabel *controlLabel = new QLabel("Control:", this);
+        controlLabel->setStyleSheet("color: #ddd; font-weight: bold;");
+        form->addRow(controlLabel, manualControlCheck);
         
         // 저장 버튼
         QPushButton *saveBtn = new QPushButton("Save Settings", this);
@@ -89,23 +120,29 @@ public:
         mainLayout->setContentsMargins(50, 20, 50, 20);
     }
 
-private slots:
+    private slots:
     void saveSettings() {
         // 1. 설정 저장
         ConfigManager::instance().setCameraIp(ipEdit->text());
         ConfigManager::instance().setCameraPort(portEdit->text());
+        ConfigManager::instance().setRobotIp(robotIpEdit->text().trimmed()); // [New]
         ConfigManager::instance().setUseCustomCCTV(cctvOptionCheck->isChecked());
+        ConfigManager::instance().setUseRtsps(rtspsOptionCheck->isChecked()); // [New]
+        ConfigManager::instance().setManualControl(manualControlCheck->isChecked());
         
         // 2. 스트림 매니저 리로드 (URL 재생성)
         StreamManager::instance().loadConfig();
         
-        QMessageBox::information(this, "Saved", "Settings saved successfully!\nPlease restart streams to apply.");
+        QMessageBox::information(this, "Saved", "Settings saved successfully!\nManual Control settings applied instantly.");
     }
 
 private:
     QLineEdit *ipEdit;
     QLineEdit *portEdit;
+    QLineEdit *robotIpEdit; // [New]
+    QCheckBox *rtspsOptionCheck; // [New]
     QCheckBox *cctvOptionCheck;
+    QCheckBox *manualControlCheck;
 };
 
 #endif // SETTINGSWIDGET_H

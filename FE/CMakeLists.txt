@@ -55,6 +55,7 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/Views"
     "${CMAKE_CURRENT_SOURCE_DIR}/Components"
     "${CMAKE_CURRENT_SOURCE_DIR}/Video"
+    "${CMAKE_CURRENT_SOURCE_DIR}/Video/Gst"
     "${CMAKE_CURRENT_SOURCE_DIR}/Network"
     "${CMAKE_CURRENT_SOURCE_DIR}/Utils"
 )
@@ -75,19 +76,25 @@ set(PROJECT_SOURCES
         Video/videowidget.h Video/videowidget.cpp
         Video/livevideowidget.h Video/livevideowidget.cpp
         Video/recordedvideowidget.h Video/recordedvideowidget.cpp
+        Video/rtsppinger.h Video/rtsppinger.cpp
+        Video/Gst/GstQualityMonitor.hpp Video/Gst/GstQualityMonitor.cpp
+        Video/Gst/GstStatsCollector.hpp
         Components/videocard.h Components/videocard.cpp
+        Components/slammapwidget.h Components/slammapwidget.cpp
         Network/streammanager.h Network/streammanager.cpp
         Network/rosbridgeclient.h Network/rosbridgeclient.cpp
         Network/cameracontrolclient.h Network/cameracontrolclient.cpp
         Views/playbackview.h Views/playbackview.cpp
         Utils/configmanager.h
         Components/settingswidget.h
+        Components/osdwidget.h Components/osdwidget.cpp # [New]
 )
 
 # 4. 실행 파일 생성
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(VEDA_QT_1 MANUAL_FINALIZATION ${PROJECT_SOURCES}
-        Components/full_underbar.h Components/full_underbar.cpp)
+        Components/full_underbar.h Components/full_underbar.cpp
+        resources.qrc)
 else()
     if(ANDROID)
         add_library(VEDA_QT_1 SHARED ${PROJECT_SOURCES})
@@ -108,6 +115,7 @@ if(MSVC)
     target_link_libraries(VEDA_QT_1 PRIVATE
         "${GST_ROOT}/lib/gstreamer-1.0.lib"
         "${GST_ROOT}/lib/gstvideo-1.0.lib"
+        "${GST_ROOT}/lib/gstrtp-1.0.lib"
         "${GST_ROOT}/lib/gobject-2.0.lib"
         "${GST_ROOT}/lib/glib-2.0.lib"
         "${GST_ROOT}/lib/gstapp-1.0.lib"
@@ -118,6 +126,7 @@ else()
     target_link_libraries(VEDA_QT_1 PRIVATE
         "${GST_ROOT}/lib/libgstreamer-1.0.dll.a"
         "${GST_ROOT}/lib/libgstvideo-1.0.dll.a"
+        "${GST_ROOT}/lib/libgstrtp-1.0.dll.a"
         "${GST_ROOT}/lib/libgobject-2.0.dll.a"
         "${GST_ROOT}/lib/libglib-2.0.dll.a"
         "${GST_ROOT}/lib/libgstapp-1.0.dll.a"

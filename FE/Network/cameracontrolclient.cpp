@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QDateTime>
 #include <QStandardPaths> // [New]
+#include <QTimer> // [Fix] Include QTimer for singleShot
 
 CameraControlClient::CameraControlClient(QObject *parent) : QObject(parent)
 {
@@ -18,7 +19,21 @@ CameraControlClient::CameraControlClient(QObject *parent) : QObject(parent)
 
 CameraControlClient::~CameraControlClient()
 {
+    m_currentIp.clear();
     m_webSocket.close();
+}
+
+void CameraControlClient::connectToServer(const QString &cameraIp)
+{
+    // If different IP, or not connected, establish connection
+    if (m_currentIp != cameraIp || m_webSocket.state() == QAbstractSocket::UnconnectedState) {
+        m_webSocket.close();
+        m_currentIp = cameraIp;
+        m_isConnecting = true;
+        QString url = QString("ws://%1:9000").arg(cameraIp);
+        qDebug() << "[CameraControl] Persistent connect to" << url;
+        m_webSocket.open(QUrl(url));
+    }
 }
 
 void CameraControlClient::sendRecordCommand(const QString &cameraIp, int channelId, bool start)
@@ -61,6 +76,7 @@ void CameraControlClient::requestDownload(const QString &cameraIp, const QString
 void CameraControlClient::safeSend(const QString &jsonString, const QString &ip)
 {
     QString url = QString("ws://%1:9000").arg(ip);
+    m_currentIp = ip; // Keep track of latest IP
     
     // If connected to the same IP, assume good state and send
     if (m_webSocket.state() == QAbstractSocket::ConnectedState) {
@@ -107,7 +123,17 @@ void CameraControlClient::onDisconnected()
     qDebug() << "[CameraControl] Disconnected!";
     m_isConnecting = false;
     
-    emit disconnected(); // Removed file cleanup logic
+    emit disconnected(); 
+    
+    // Auto Reconnect logic
+    if (!m_currentIp.isEmpty()) {
+        qDebug() << "[CameraControl] Auto reconnecting to" << m_currentIp << "in 3 seconds...";
+        QTimer::singleShot(3000, this, [this]() {
+            if (!m_currentIp.isEmpty() && m_webSocket.state() == QAbstractSocket::UnconnectedState) {
+                connectToServer(m_currentIp);
+            }
+        });
+    }
 }
 
 void CameraControlClient::onError(QAbstractSocket::SocketError error)
@@ -123,7 +149,9 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
     if (doc.isNull()) return;
 
     QJsonObject obj = doc.object();
-    if (obj["type"].toString() == "RECORD_FINISHED") {
+    QString msgType = obj["type"].toString();
+
+    if (msgType == "RECORD_FINISHED") {
         QJsonObject payload = obj["payload"].toObject();
         QString url = payload["url"].toString();
         if (!url.isEmpty()) {
@@ -131,13 +159,13 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
             emit videoReceived(url);
         }
     }
-    else if (obj["type"].toString() == "RECORDING_LIST") {
+    else if (msgType == "RECORDING_LIST") {
         QJsonArray list = obj["payload"].toArray();
         qDebug() << "[CameraControl] Recording List Received:" << list.size() << "items";
         emit recordingListReceived(list);
     }
     // [New] File Transfer Protocol
-    else if (obj["type"].toString() == "FILE_TRANSFER_START") {
+    else if (msgType == "FILE_TRANSFER_START") {
         QJsonObject payload = obj["payload"].toObject();
         QString filename = payload["filename"].toString();
         m_totalFileSize = payload["file_size"].toDouble(); 
@@ -155,7 +183,7 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
             emit errorOccurred("File open failed: " + m_downloadFile.errorString());
         }
     }
-    else if (obj["type"].toString() == "FILE_TRANSFER_COMPLETE") {
+    else if (msgType == "FILE_TRANSFER_COMPLETE") {
         qDebug() << "[Downloader] Transfer Complete Signal Received. Downloaded:" << m_receivedSize;
         if (m_isDownloading) {
             m_downloadFile.close();

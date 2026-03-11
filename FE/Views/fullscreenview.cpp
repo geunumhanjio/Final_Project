@@ -3,6 +3,13 @@
 #include <QCursor>
 #include <QPainter>
 #include <QFileInfo>
+#include <QMenu>         // [New]
+#include <QAction>       // [New]
+#include <QCheckBox>     // [New]
+#include <QLabel>        // [New]
+#include "osdwidget.h"   // [New]
+#include <QGuiApplication>
+#include <QApplication>
 
 // =============================================================
 // [내부 클래스] 직접 그려지는 네모 박스
@@ -40,6 +47,57 @@ protected:
         p.drawRect(rect().adjusted(1, 1, -2, -2));
     }
 };
+
+// =============================================================
+// [내부 클래스] 조종 모드용 직접 그려지는 오버레이 (원, 화살표)
+// =============================================================
+class ControlOverlay : public QWidget {
+public:
+    QPoint startPos;
+    QPoint endPos;
+    bool isDrawingArrow;
+
+    ControlOverlay(QWidget* parent = nullptr) : QWidget(parent) {
+        // [수정] SimpleRubberBand처럼 비디오 위젯 위에 확실히 그려지도록 탑레벨 윈도우 속성 부여
+        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_NoSystemBackground, true);
+        
+        isDrawingArrow = false;
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        if (startPos.isNull()) return;
+
+        QPainter p(this);
+        p.setRenderHint(QPainter::Antialiasing);
+
+        QPen pen(Qt::red);
+        pen.setWidth(4);
+        p.setPen(pen);
+        p.setBrush(Qt::red);
+
+        // 첫 번째 클릭 지점(목표 위치)
+        p.drawEllipse(startPos, 5, 5);
+
+        if (isDrawingArrow && !endPos.isNull() && startPos != endPos) {
+            p.drawLine(startPos, endPos);
+
+            // 화살 촉 계산
+            double angle = std::atan2(endPos.y() - startPos.y(), endPos.x() - startPos.x());
+            double arrowSize = 15;
+            QPointF p1 = endPos - QPointF(arrowSize * std::cos(angle - M_PI / 6),
+                                          arrowSize * std::sin(angle - M_PI / 6));
+            QPointF p2 = endPos - QPointF(arrowSize * std::cos(angle + M_PI / 6),
+                                          arrowSize * std::sin(angle + M_PI / 6));
+            QPolygonF arrowHead;
+            arrowHead << endPos << p1 << p2;
+            p.drawPolygon(arrowHead);
+        }
+    }
+};
 // =============================================================
 
 
@@ -72,14 +130,122 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     
     titleLabel = new QLabel("CCTV Camera", topBar);
     titleLabel->setObjectName("FS_TitleLabel"); // [New]
+    titleLabel->setStyleSheet("color: #F59E0B; font-weight: bold; font-size: 24px;"); // Orange like the control button
     
     liveBadge = new QLabel("LIVE", topBar);
     liveBadge->setObjectName("FS_LiveBadge"); // [New]
+    
+    // [New] Settings Button for OSD Menu
+    btnSettings = new QPushButton("⚙", topBar);
+    btnSettings->setObjectName("FS_SettingsBtn");
+    btnSettings->setFixedSize(36, 36);
+    btnSettings->setCursor(Qt::PointingHandCursor);
     
     btnClose = new QPushButton("✕", topBar);
     btnClose->setObjectName("FS_CloseBtn"); // [New]
     btnClose->setFixedSize(36, 36);
     btnClose->setCursor(Qt::PointingHandCursor);
+
+    // [New] Connect Settings (OSD Menu) Signal
+    connect(btnSettings, &QPushButton::clicked, this, [this](){
+        if (!videoWidget || !videoWidget->getOsdWidget()) return;
+        
+        QWidget *popup = new QWidget(this);
+        popup->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+        popup->setAttribute(Qt::WA_DeleteOnClose);
+        popup->setStyleSheet("QWidget { background-color: #2b2b2b; color: white; border: 1px solid #555; border-radius: 4px; } "
+                             "QCheckBox { spacing: 8px; font-size: 11px; padding: 4px; border: none; } "
+                             "QCheckBox::indicator { width: 14px; height: 14px; } "
+                             "QLabel { border: none; font-weight: bold; font-size: 12px; }");
+
+        QVBoxLayout *layout = new QVBoxLayout(popup);
+        layout->setContentsMargins(8, 8, 8, 8);
+        layout->setSpacing(4);
+
+        // Header with Title and X button
+        QHBoxLayout *headerLayout = new QHBoxLayout();
+        QLabel *title = new QLabel("OSD Settings", popup);
+        QPushButton *closeBtn = new QPushButton("✕", popup);
+        closeBtn->setFixedSize(20, 20);
+        closeBtn->setStyleSheet("QPushButton { border: none; background: transparent; color: #aaa; font-weight: bold; } "
+                                "QPushButton:hover { color: white; background: rgba(255,0,0,150); border-radius: 2px; }");
+        connect(closeBtn, &QPushButton::clicked, popup, &QWidget::close);
+
+        headerLayout->addWidget(title);
+        headerLayout->addStretch();
+        headerLayout->addWidget(closeBtn);
+        layout->addLayout(headerLayout);
+
+        // Divider
+        QFrame *line = new QFrame(popup);
+        line->setFrameShape(QFrame::HLine);
+        line->setStyleSheet("border: 1px solid #555;");
+        layout->addWidget(line);
+
+        OsdWidget *osd = videoWidget->getOsdWidget();
+
+        // [New] All Checkbox
+        QCheckBox *cbAll = new QCheckBox("All", popup);
+        cbAll->setStyleSheet("font-weight: bold; color: #F59E0B;");
+        layout->addWidget(cbAll);
+
+        // Divider
+        QFrame *line2 = new QFrame(popup);
+        line2->setFrameShape(QFrame::HLine);
+        line2->setStyleSheet("border: 1px solid #555;");
+        layout->addWidget(line2);
+
+        QList<QPair<OsdWidget::Metric, QCheckBox*>> metricCbs;
+        int checkedCount = 0;
+
+        for (int i = 0; i < OsdWidget::MetricCount; ++i) {
+            OsdWidget::Metric metric = static_cast<OsdWidget::Metric>(i);
+            QCheckBox *cb = new QCheckBox(OsdWidget::getMetricName(metric), popup);
+            bool isVis = osd->isMetricVisible(metric);
+            cb->setChecked(isVis);
+            if (isVis) checkedCount++;
+            
+            metricCbs.append(qMakePair(metric, cb));
+            layout->addWidget(cb);
+        }
+
+        for (auto pair : metricCbs) {
+            OsdWidget::Metric metric = pair.first;
+            QCheckBox *cb = pair.second;
+            
+            connect(cb, &QCheckBox::toggled, [this, osd, metric, cbAll, metricCbs](bool checked) {
+                osd->setMetricVisible(metric, checked);
+                if (checked) osd->show();
+
+                // Update 'All' checkbox state
+                bool allChecked = true;
+                bool anyChecked = false; // [New]
+                for(auto p : metricCbs) {
+                    if(!p.second->isChecked()) { allChecked = false; }
+                    if(p.second->isChecked()) { anyChecked = true; }
+                }
+                cbAll->blockSignals(true);
+                cbAll->setChecked(allChecked);
+                cbAll->blockSignals(false);
+                
+                Q_UNUSED(anyChecked);
+            });
+        }
+
+        cbAll->setChecked(checkedCount == OsdWidget::MetricCount);
+        
+        connect(cbAll, &QCheckBox::toggled, [metricCbs](bool checked) {
+            for(auto p : metricCbs) {
+                if (p.second->isChecked() != checked) {
+                    p.second->setChecked(checked);
+                }
+            }
+        });
+
+        QPoint globalPos = btnSettings->mapToGlobal(QPoint(0, btnSettings->height()));
+        popup->move(globalPos);
+        popup->show();
+    });
 
     connect(btnClose, &QPushButton::clicked, this, &FullScreenView::closeRequested);
 
@@ -87,6 +253,7 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     topLayout->addSpacing(10);
     topLayout->addWidget(liveBadge);
     topLayout->addStretch();
+    topLayout->addWidget(btnSettings); // [New] Add to layout
     topLayout->addWidget(btnClose);
 
     // Add TopBar to VBox
@@ -129,6 +296,7 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     connect(underBar, &FullUnderBar::reqRectZoom, this, &FullScreenView::onRectZoomToggled);
 
     connect(underBar, &FullUnderBar::reqResetZoom, this, &FullScreenView::onResetZoom);
+    connect(underBar, &FullUnderBar::reqControlMode, this, &FullScreenView::onControlModeToggled);
 
     // [New] Record Connection
     connect(underBar, &FullUnderBar::reqRecord, [this](bool start){
@@ -186,6 +354,26 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     });
 
     rubberBand = nullptr;
+    controlOverlay = new ControlOverlay(this);
+    controlOverlay->hide();
+
+    // [New] 글로벌 애플리케이션 포커스 상태 변경 감지
+    connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
+        if (state != Qt::ApplicationActive) {
+            if (controlOverlay) controlOverlay->hide();
+        } else {
+            if (currentMode == ControlMode && controlOverlay && this->isVisible()) {
+                controlOverlay->show();
+            }
+        }
+    });
+
+    // [New] Timer to constantly sync ControlOverlay position when app moves
+    syncTimer = new QTimer(this);
+    connect(syncTimer, &QTimer::timeout, this, &FullScreenView::syncOverlayPosition);
+    syncTimer->start(16); // ~60fps sync rate
+
+    isSettingDirection = false;
     isDrawing = false;
     isPanning = false;
     currentMode = Normal;
@@ -243,7 +431,11 @@ void FullScreenView::setMode(Mode mode)
     currentMode = mode;
     isDrawing = false;
     isPanning = false;
+    isSettingDirection = false;
     if(rubberBand) rubberBand->hide();
+    if(controlOverlay) {
+        controlOverlay->hide();
+    }
 
     switch(mode) {
     case Normal:
@@ -257,12 +449,19 @@ void FullScreenView::setMode(Mode mode)
     case Drawing:
         videoWidget->setCursor(Qt::CrossCursor);
         underBar->setRectButtonMode(1);
+        videoWidget->setMouseTracking(false);
         // btnClose->show();
+        break;
+
+    case ControlMode:
+        videoWidget->setCursor(Qt::CrossCursor);
+        videoWidget->setMouseTracking(true); // Hover 이벤트 받기 위함
         break;
 
     case Zoomed:
         videoWidget->setCursor(Qt::OpenHandCursor);
         underBar->setRectButtonMode(2);
+        videoWidget->setMouseTracking(false);
         // btnClose->hide(); // Can keep visible if overlay
         break;
     }
@@ -344,9 +543,17 @@ void FullScreenView::onRectZoomToggled(bool checked) {
             isDrawing = false;
         }
     } else {
-        currentMode = Drawing;
-        videoWidget->setCursor(Qt::CrossCursor);
-        underBar->setRectButtonMode(1);
+        setMode(Drawing);
+    }
+}
+
+void FullScreenView::onControlModeToggled(bool checked) {
+    if (checked) {
+        setMode(ControlMode);
+    } else {
+        if (controlOverlay) controlOverlay->hide();
+        if (zoomHistory.isEmpty()) setMode(Normal);
+        else setMode(Zoomed);
     }
 }
 
@@ -439,8 +646,88 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
                 return true;
             }
         }
+        else if (currentMode == ControlMode) {
+            QMouseEvent *me = static_cast<QMouseEvent*>(event);
+            if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
+                if (!controlOverlay) {
+                    controlOverlay = new ControlOverlay(nullptr); // 독립된 윈도우
+                }
+                
+                // [수정] 탑레벨 윈도우이므로 global 좌표 기준으로 Geometry 설정
+                QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+                controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+                
+                if (!isSettingDirection) {
+                    // First click: origin
+                    // 탑레벨 화면의 좌상단 기준 로컬 좌표계와 일치하므로 me->pos()를 그대로 사용해도 무방합니다.
+                    // (단, ControlOverlay가 videoWidget 사이즈와 정확히 일치하므로)
+                    goalStartPos = me->pos(); 
+                    
+                    QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+                    controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+                    
+                    ControlOverlay* overlay = static_cast<ControlOverlay*>(controlOverlay);
+                    overlay->startPos = goalStartPos;
+                    overlay->endPos = overlay->startPos;
+                    overlay->isDrawingArrow = true;
+                    overlay->show();
+                    overlay->raise(); // 다른 자식들 위로
+                    
+                    videoWidget->grabMouse(); // Grab mouse to ensure we receive MouseMove without button pressed
+                    
+                    isSettingDirection = true;
+                } else {
+                    // Second click: finish
+                    QPoint endPos = me->pos(); // 로컬 좌표 사용
+                    ControlOverlay* overlay = static_cast<ControlOverlay*>(controlOverlay);
+                    
+                    // calculate theta
+                    double dy = overlay->startPos.y() - endPos.y(); // Qt Y is inverted relative to standard Cartesian
+                    double dx = endPos.x() - overlay->startPos.x();
+                    double theta = std::atan2(dy, dx);
+                    if (theta < 0) theta += 2 * M_PI;
+                    
+                    // placeholder map scale logic (e.g. 0.05m / px, center is (0,0))
+                    double cx = videoWidget->width() / 2.0;
+                    double cy = videoWidget->height() / 2.0;
+                    double x = (overlay->startPos.x() - cx) * 0.05;
+                    double y = (cy - overlay->startPos.y()) * 0.05;
+
+                    emit reqGoalPose(x, y, theta);
+                    
+                    // 화살표를 유지하기 위해 hide()를 호출하지 않고 방향 설정 상태만 종료합니다.
+                    videoWidget->releaseMouse();
+                    isSettingDirection = false;
+                }
+                return true;
+            }
+            else if (event->type() == QEvent::MouseMove && isSettingDirection) {
+                if (controlOverlay) {
+                    ControlOverlay* overlay = static_cast<ControlOverlay*>(controlOverlay);
+                    overlay->endPos = me->pos(); // 로컬 좌표 사용
+                    overlay->update();
+                }
+                return true;
+            }
+        }
+    }
+    else if (obj == videoWidget && event->type() == QEvent::Resize) {
+        if (controlOverlay && currentMode == ControlMode && isVisible()) {
+            QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+            controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+        }
     }
     return QWidget::eventFilter(obj, event);
 }
 
+void FullScreenView::syncOverlayPosition() {
+    if (controlOverlay && currentMode == ControlMode && controlOverlay->isVisible() && this->isVisible() && videoWidget) {
+        QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+        QRect currentRect = controlOverlay->geometry();
+        QRect newRect(globalTopLeft, videoWidget->size());
+        if (currentRect != newRect) {
+            controlOverlay->setGeometry(newRect);
+        }
+    }
+}
 

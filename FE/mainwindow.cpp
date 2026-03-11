@@ -25,7 +25,7 @@ MainWindow::MainWindow(QWidget *parent)
     // [Fix] Initialize Clients BEFORE initConnections
     qDebug() << "[MainWindow] Initializing RosBridgeClient...";
     m_rosClient = new RosBridgeClient(this);
-    m_rosClient->connectToHost("ws://192.168.0.237:9090");
+    m_rosClient->connectToHost(ConfigManager::instance().getRobotIp()); // [Modified] Use config
     
     qDebug() << "[MainWindow] Initializing CameraControlClient...";
     m_cameraClient = new CameraControlClient(this);
@@ -38,6 +38,9 @@ MainWindow::MainWindow(QWidget *parent)
     
     m_inputTimer = new QTimer(this);
     connect(m_inputTimer, &QTimer::timeout, this, &MainWindow::processInput);
+    
+    // Listen to config changes
+    connect(&ConfigManager::instance(), &ConfigManager::configChanged, this, &MainWindow::onConfigChanged);
 }
 
 MainWindow::~MainWindow() { }
@@ -69,6 +72,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
 
 // [New] Shared WASD Logic
 bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress) {
+    if (!ConfigManager::instance().getManualControl()) return false;
     if (event->isAutoRepeat()) return false;
     
     int key = event->key();
@@ -156,6 +160,7 @@ void MainWindow::initUI()
     
     qDebug() << "[MainWindow] Creating Central Stack...";
     m_centralStack = new QStackedWidget(this);
+    m_centralStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
     this->setCentralWidget(m_centralStack);
 
     qDebug() << "[MainWindow] Creating LiveView...";
@@ -172,6 +177,11 @@ void MainWindow::initUI()
     
     qDebug() << "[MainWindow] Adding widgets to stack...";
 
+    m_livePage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+    m_playbackPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+    m_settingsPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+    m_fullPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
+
     m_settingsPage->setStyleSheet("color:white; font-size:20px;");
     // m_playbackPage styling removed as it is now VideoWidget
     // m_settingsPage->setAlignment(Qt::AlignCenter); // SettingsWidget is not a QLabel
@@ -186,6 +196,7 @@ void MainWindow::initUI()
 void MainWindow::initConnections()
 {
     qDebug() << "[MainWindow] initConnections Started...";
+    
     connect(m_topBar, &TopBar::sidebarToggled, [=](){ m_sidebar->setVisible(!m_sidebar->isVisible()); });
     connect(m_topBar, &TopBar::modeChanged, [=](int index){
         m_centralStack->setCurrentIndex(index);
@@ -201,6 +212,9 @@ void MainWindow::initConnections()
     });
     connect(m_topBar, &TopBar::themeToggled, this, &MainWindow::toggleTheme);
     connect(m_sidebar, &Sidebar::channelStateChanged, m_livePage, &LiveView::setChannelVisible);
+    connect(m_rosClient, &RosBridgeClient::mapReceived, m_livePage, &LiveView::updateMap);
+    connect(m_rosClient, &RosBridgeClient::odomReceived, m_livePage, &LiveView::updateOdom);
+    connect(m_rosClient, &RosBridgeClient::pathReceived, m_livePage, &LiveView::updatePath);
     
     // [New] Sidebar Category Selection -> Filter Playback List
     connect(m_sidebar, &Sidebar::categorySelected, m_playbackPage, &PlaybackView::filterRecordings);
@@ -285,7 +299,7 @@ void MainWindow::initConnections()
     connect(m_livePage, &LiveView::requestFullScreen, [=](int index, QString url){
         if (index <= 4 && !url.isEmpty()) {
             qDebug() << "Full Screen Request:" << url;
-            
+
             m_returnToWidget = m_livePage; // [Mod] Return to LiveView on close
             m_centralStack->setCurrentWidget(m_fullPage);
             m_fullPage->play(url, index);
@@ -325,6 +339,15 @@ void MainWindow::initConnections()
              else qDebug() << "[FullScreen] Recording Stopped on Channel" << actualChannelId;
         }
     });
+
+    // [New] Connect Goal Pose
+    connect(m_fullPage, &FullScreenView::reqGoalPose, [=](double x, double y, double theta){
+        if (m_rosClient) {
+            qDebug() << "[MainWindow] Sending Goal Pose -> x:" << x << "y:" << y << "theta:" << theta;
+            m_rosClient->sendGoalPose(x, y, theta);
+        }
+    });
+
     qDebug() << "[MainWindow] initConnections Completed.";
 }
 
@@ -341,4 +364,12 @@ void MainWindow::toggleTheme()
     QString qssPath = m_isDark ? "style/theme_dark.qss" : "style/theme_light.qss";
     loadTheme(qssPath);
     // [Mod] Removed manual updateTheme calls
+}
+
+void MainWindow::onConfigChanged() {
+    QString newIp = ConfigManager::instance().getRobotIp();
+    // Reconnect ROS2 Client if IP Changed
+    qDebug() << "[MainWindow] Config changed. Updating Robot IP to:" << newIp;
+    m_rosClient->disconnect();
+    m_rosClient->connectToHost(newIp);
 }

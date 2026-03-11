@@ -18,7 +18,16 @@ LiveVideoWidget::LiveVideoWidget(QWidget *parent)
     watchdogTimer->setSingleShot(true);
     connect(watchdogTimer, &QTimer::timeout, [this](){
         if(isPlaying()) return; // Base class m_isPlaying
-        stop();
+        qWarning() << "[LiveVideoWidget] Watchdog timeout. Forcing reconnect for:" << currentUrl;
+        
+        QString savedUrl = currentUrl;
+        int savedLatency = currentLatency;
+        
+        VideoWidget::stop(); // Clean up pipeline, doesn't clear currentUrl
+        
+        currentUrl = savedUrl;
+        currentLatency = savedLatency;
+        
         startRetryTimer();
     });
 }
@@ -31,6 +40,7 @@ LiveVideoWidget::~LiveVideoWidget()
 void LiveVideoWidget::playUrl(const QString &url, int latency)
 {
     // Duplicate check
+    // If playing, same URL, same latency, ignore
     if (isPlaying() && currentUrl == url && currentLatency == latency) return;
 
     VideoWidget::stop(); // Stop base pipeline if running
@@ -54,19 +64,32 @@ void LiveVideoWidget::playUrl(const QString &url, int latency)
 
     QString options = "";
     QString sinkOptions = "";
+    const bool isRtsps = url.startsWith("rtsps://", Qt::CaseInsensitive);
+    const QString transport = isRtsps ? "tcp" : "udp";
+    if (isRtsps) {
+        options = "tls-validation-flags=0";
+    }
     if (latency == 0) {
         sinkOptions = "sync=false";
     }
 
-    // RTSP Pipeline
+    // Separate receive/decode/render stages so a transient stall in one stage
+    // does not immediately back-pressure the whole live pipeline.
     QString pipelineStr = QString(
-        "rtspsrc location=%1 protocols=tcp latency=%2 %3 ! "
-        "rtph264depay ! h264parse ! avdec_h264 ! "
+        "rtspsrc name=src location=%1 protocols=%2 latency=%3 %4 ! "
+        "qualitymonitor name=qmon ! "
+        "queue ! "
+        "rtph264depay ! h264parse ! "
+        "queue ! "
+        "avdec_h264 ! "
+        "queue ! "
         "videoconvert ! videocrop name=crop ! videoconvert ! "
-        "autovideosink name=sink %4"
-    ).arg(url).arg(latency).arg(options).arg(sinkOptions);
+        "autovideosink name=sink %5"
+    ).arg(url).arg(transport).arg(latency).arg(options).arg(sinkOptions);
 
-    qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << url;
+    qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << url
+             << "| transport:" << transport
+             << "| latency:" << latency;
 
     GError *error = nullptr;
     GstElement *pipeline = gst_parse_launch(pipelineStr.toUtf8().constData(), &error);

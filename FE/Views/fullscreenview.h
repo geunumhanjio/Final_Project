@@ -27,6 +27,7 @@ public:
 signals:
     void closeRequested();
     void recordRequested(int channelId, bool start); // [New]
+    void reqGoalPose(double x, double y, double theta);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -36,6 +37,7 @@ private slots:
     void onZoomOut();
     void onRectZoomToggled(bool checked);
     void onResetZoom();
+    void onControlModeToggled(bool checked);
 
 private:
     QStackedWidget *videoStack; // [New]
@@ -49,10 +51,18 @@ private:
     QWidget *topBar;
     QLabel *titleLabel;
     QLabel *liveBadge;
+    QPushButton *btnSettings; // [New]
     QPushButton *btnClose;
 
     // [수정] QRubberBand* -> QWidget* 으로 변경
     QWidget *rubberBand;
+
+    QWidget *controlOverlay;
+    QTimer *syncTimer; // [New]
+    void syncOverlayPosition(); // [New]
+
+    bool isSettingDirection;
+    QPoint goalStartPos;
 
     QPoint originPoint;
     bool isDrawing;
@@ -61,7 +71,7 @@ private:
     bool isPanning;
 
     QStack<QRectF> zoomHistory;
-    enum Mode { Normal, Drawing, Zoomed };
+    enum Mode { Normal, Drawing, Zoomed, ControlMode };
     Mode currentMode;
 
     QString getChannelName(int index);

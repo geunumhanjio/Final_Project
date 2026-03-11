@@ -8,6 +8,9 @@
 #include <gst/video/videooverlay.h>
 #include <QMutex>
 #include <QRectF>
+#include <QElapsedTimer>
+#include "osdwidget.h"
+#include "rtsppinger.h" // [New]
 
 class VideoWidget : public QWidget
 {
@@ -37,6 +40,9 @@ public:
 
     virtual void refreshFrame() {} // [New] For forcing update when paused
 
+    // [New] OSD 위젯 접근 (메뉴 연동용)
+    OsdWidget* getOsdWidget() const { return m_osdWidget; }
+
 signals:
     void positionChanged(qint64 positionMs);
     void durationChanged(qint64 durationMs);
@@ -44,8 +50,14 @@ signals:
 
 protected:
     void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override; // [New]
+    void moveEvent(QMoveEvent *event) override; // [New]
     void resizeEvent(QResizeEvent *event) override;
     QPaintEngine *paintEngine() const override { return nullptr; }
+
+    // [New] Common stream state
+    QString currentUrl;
+    int currentLatency;
 
     // Helpers for subclasses
     bool setPipeline(GstElement *p);
@@ -69,7 +81,24 @@ private:
 
     bool m_isPlaying;
 
+    // [New] OSD Widget
+    OsdWidget *m_osdWidget;
+    RtspPinger *m_pinger; // [New]
+    void syncOverlayPosition(); // [New]
+
+    QTimer *m_statsTimer; // [New] For pulling GST stats
+    void extractGstStats(); // [New]
+
+    uint64_t m_lastBytes = 0;
+    uint64_t m_lastPackets = 0;
+    int32_t  m_lastLost = 0;
+    uint64_t m_lastFrames = 0;
+    uint64_t m_actualFrameCount = 0; // [New] Actual rendered frame count
+    guint m_lastRendered = 0;
+    QElapsedTimer m_statsClock;
+
     static GstBusSyncReply busSyncHandler(GstBus *bus, GstMessage *msg, gpointer user_data);
+    static GstPadProbeReturn sinkPadProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data); // [New]
 };
 
 #endif // VIDEOWIDGET_H

@@ -6,7 +6,9 @@
 #include <QLabel>
 #include <QEvent>
 #include <QShowEvent>
+#include <QJsonObject>
 #include "videocard.h"
+#include "slammapwidget.h"
 
 class LiveView : public QWidget
 {
@@ -26,6 +28,11 @@ protected:
     void showEvent(QShowEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override; // [Fix] Focus on click
 
+public slots:
+    void updateMap(const QJsonObject &data);
+    void updateOdom(const QJsonObject &data);
+    void updatePath(const QJsonObject &data);
+
 private:
     QGridLayout *gridLayout;
     VideoCard *cctvWidgets[4]; 
@@ -33,7 +40,7 @@ private:
     
     // Right Panel Widgets
     VideoCard *rcCarCamWidget;
-    QLabel *slamMapWidget;
+    SlamMapWidget *slamMapWidget;
 
     bool streamStarted;
 

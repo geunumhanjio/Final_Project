@@ -1,10 +1,14 @@
 #include "videocard.h"
 #include <QEvent>
 #include <QMouseEvent>
-#include <QGraphicsOpacityEffect>
+#include <QMenu>         // [New]
+#include <QAction>       // [New]
+#include <QCheckBox>     // [New]
+#include <QLabel>        // [New]
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 #include "livevideowidget.h"
+#include "osdwidget.h"   // [New]
 
 VideoCard::VideoCard(QWidget *parent) : QWidget(parent)
 {
@@ -144,6 +148,9 @@ void VideoCard::setupUi()
     
     // Connect Fullscreen Signal
     connect(m_btnFullscreen, &QPushButton::clicked, this, &VideoCard::fullScreenRequested);
+    
+    // [New] Connect Settings (OSD Menu) Signal
+    connect(m_btnSettings, &QPushButton::clicked, this, &VideoCard::showSettingsMenu);
 }
 
 void VideoCard::playUrl(const QString &url, int latency)
@@ -228,3 +235,109 @@ void VideoCard::toggleRecord()
         if (m_channelId != -1) emit recordRequested(m_channelId, false);
     }
 }
+
+// [New] Settings 메뉴 설정 함수
+void VideoCard::showSettingsMenu()
+{
+    if (!m_videoWidget || !m_videoWidget->getOsdWidget()) return;
+    
+    QWidget *popup = new QWidget(this);
+    popup->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->setStyleSheet("QWidget { background-color: #2b2b2b; color: white; border: 1px solid #555; border-radius: 4px; } "
+                         "QCheckBox { spacing: 8px; font-size: 11px; padding: 4px; border: none; } "
+                         "QCheckBox::indicator { width: 14px; height: 14px; } "
+                         "QLabel { border: none; font-weight: bold; font-size: 12px; }");
+
+    QVBoxLayout *layout = new QVBoxLayout(popup);
+    layout->setContentsMargins(8, 8, 8, 8);
+    layout->setSpacing(4);
+
+    // Header with Title and X button
+    QHBoxLayout *headerLayout = new QHBoxLayout();
+    QLabel *title = new QLabel("OSD Settings", popup);
+    QPushButton *closeBtn = new QPushButton("✕", popup);
+    closeBtn->setFixedSize(20, 20);
+    closeBtn->setStyleSheet("QPushButton { border: none; background: transparent; color: #aaa; font-weight: bold; } "
+                            "QPushButton:hover { color: white; background: rgba(255,0,0,150); border-radius: 2px; }");
+    connect(closeBtn, &QPushButton::clicked, popup, &QWidget::close);
+
+    headerLayout->addWidget(title);
+    headerLayout->addStretch();
+    headerLayout->addWidget(closeBtn);
+    layout->addLayout(headerLayout);
+
+    // Divider
+    QFrame *line = new QFrame(popup);
+    line->setFrameShape(QFrame::HLine);
+    line->setStyleSheet("border: 1px solid #555;");
+    layout->addWidget(line);
+
+    OsdWidget *osd = m_videoWidget->getOsdWidget();
+
+    // [New] All Checkbox
+    QCheckBox *cbAll = new QCheckBox("All", popup);
+    cbAll->setStyleSheet("font-weight: bold; color: #F59E0B;"); // highlight
+    layout->addWidget(cbAll);
+
+    // Divider
+    QFrame *line2 = new QFrame(popup);
+    line2->setFrameShape(QFrame::HLine);
+    line2->setStyleSheet("border: 1px solid #555;");
+    layout->addWidget(line2);
+
+    QList<QPair<OsdWidget::Metric, QCheckBox*>> metricCbs;
+    int checkedCount = 0;
+
+    for (int i = 0; i < OsdWidget::MetricCount; ++i) {
+        OsdWidget::Metric metric = static_cast<OsdWidget::Metric>(i);
+        QCheckBox *cb = new QCheckBox(OsdWidget::getMetricName(metric), popup);
+        bool isVis = osd->isMetricVisible(metric);
+        cb->setChecked(isVis);
+        if (isVis) checkedCount++;
+        
+        metricCbs.append(qMakePair(metric, cb));
+        layout->addWidget(cb);
+    }
+
+    // Now connect after all cb are populated
+    for (auto pair : metricCbs) {
+        OsdWidget::Metric metric = pair.first;
+        QCheckBox *cb = pair.second;
+        
+        connect(cb, &QCheckBox::toggled, [this, osd, metric, cbAll, metricCbs](bool checked) {
+            osd->setMetricVisible(metric, checked);
+            if (checked) osd->show();
+            
+            // Check if all are checked to update cbAll
+            bool allChecked = true;
+            bool anyChecked = false; // [New]
+            for(auto p : metricCbs) {
+                if(!p.second->isChecked()) { allChecked = false; }
+                if(p.second->isChecked()) { anyChecked = true; }
+            }
+            cbAll->blockSignals(true);
+            cbAll->setChecked(allChecked);
+            cbAll->blockSignals(false);
+            
+            Q_UNUSED(anyChecked);
+        });
+    }
+
+    // Initialize All checkbox state
+    cbAll->setChecked(checkedCount == OsdWidget::MetricCount);
+    
+    connect(cbAll, &QCheckBox::toggled, [metricCbs](bool checked) {
+        for(auto p : metricCbs) {
+            if (p.second->isChecked() != checked) {
+                p.second->setChecked(checked); // this will trigger individual toggled signals
+            }
+        }
+    });
+
+    // 톱니바퀴 버튼 아래에 메뉴 띄우기
+    QPoint globalPos = m_btnSettings->mapToGlobal(QPoint(0, m_btnSettings->height()));
+    popup->move(globalPos);
+    popup->show();
+}
+
