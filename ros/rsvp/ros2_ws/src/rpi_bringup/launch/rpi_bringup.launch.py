@@ -66,6 +66,11 @@ def generate_launch_description():
         default_value='true',
         description='Enable camera tilt servo node'
     )
+    use_ekf_arg = DeclareLaunchArgument(
+        'use_ekf',
+        default_value='true',
+        description='Enable EKF on RPi (WSL EKF must be disabled)'
+    )
 
     # ── Node: Camera ───────────────────────────────────────────────────────────
     camera_node = Node(
@@ -96,6 +101,14 @@ def generate_launch_description():
         output='screen',
     )
 
+    # ── Include: EKF ──────────────────────────────────────────────────────────
+    ekf_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([pkg_share, 'launch', 'ekf.launch.py'])
+        ]),
+        condition=IfCondition(LaunchConfiguration('use_ekf')),
+    )
+
     # ── Include: LiDAR ────────────────────────────────────────────────────────
     lidar_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -114,6 +127,7 @@ def generate_launch_description():
         use_lidar_arg,
         lidar_port_arg,
         use_servo_arg,
+        use_ekf_arg,
 
         # Log
         LogInfo(msg=['[rpi_bringup] Starting Raspberry Pi system...']),
@@ -122,6 +136,7 @@ def generate_launch_description():
         # Nodes / Includes
         camera_node,
         serial_bridge_node,
+        ekf_launch,
         lidar_launch,
         servo_node,
     ])

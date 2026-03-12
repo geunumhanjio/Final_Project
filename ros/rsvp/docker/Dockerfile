@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install -y \
     ros-humble-tf2-tools \
     ros-humble-robot-state-publisher \
     ros-humble-joint-state-publisher \
+    ros-humble-robot-localization \
     && rm -rf /var/lib/apt/lists/*
 
 # 네트워크 도구
