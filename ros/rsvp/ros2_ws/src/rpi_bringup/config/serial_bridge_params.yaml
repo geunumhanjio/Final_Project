@@ -17,3 +17,6 @@ serial_bridge_node:
 
       cmd_vel_repeat_rate: 5.0
       odom_data_type: "ticks"
+
+      # EKF(WSL)가 odom→base_footprint TF를 담당 → TF 충돌 방지
+      publish_tf: false

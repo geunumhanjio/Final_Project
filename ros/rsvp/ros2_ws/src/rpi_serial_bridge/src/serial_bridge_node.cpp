@@ -131,6 +131,9 @@ void SerialBridgeNode::declareParameters()
   // 오도메트리 타입
   this->declare_parameter("odom_data_type", "ticks");  // "ticks" or "velocity"
 
+  // TF 발행 (EKF가 있는 경우 false로 설정해 TF 충돌 방지)
+  this->declare_parameter("publish_tf", true);
+
   // CSV 로깅
   this->declare_parameter("csv_log_enabled", false);
   this->declare_parameter("csv_log_path", "/root/ros2_ws/log/serial_bridge_log.csv");
@@ -149,6 +152,7 @@ void SerialBridgeNode::declareParameters()
   imu_frame_id_ = this->get_parameter("imu_frame_id").as_string();
   cmd_vel_repeat_rate_ = this->get_parameter("cmd_vel_repeat_rate").as_double();
   odom_data_type_ = this->get_parameter("odom_data_type").as_string();
+  publish_tf_ = this->get_parameter("publish_tf").as_bool();
   csv_log_enabled_ = this->get_parameter("csv_log_enabled").as_bool();
   csv_log_path_ = this->get_parameter("csv_log_path").as_string();
 
@@ -475,9 +479,10 @@ void SerialBridgeNode::publishWheelOdom()
   );
 
   wheel_odom_pub_->publish(odom_msg);
-  
-  // TF 발행
-  publishTransform(odom_msg);
+
+  if (publish_tf_) {
+    publishTransform(odom_msg);
+  }
 }
 
 void SerialBridgeNode::publishTransform(const nav_msgs::msg::Odometry& odom)

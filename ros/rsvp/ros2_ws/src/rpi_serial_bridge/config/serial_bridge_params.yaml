@@ -27,6 +27,11 @@ serial_bridge_node:
     # STM32 타임아웃(500ms) 방지를 위해 200ms(5Hz)마다 재전송
     cmd_vel_repeat_rate: 5.0  # Hz
 
+    # === TF 발행 ===
+    # WSL에서 EKF(robot_localization)가 odom→base_footprint TF를 담당하므로
+    # serial_bridge에서 동일한 TF를 발행하면 충돌 → SLAM 방향 급변 원인
+    publish_tf: false
+
     # === 오도메트리 데이터 타입 ===
     # "ticks"    : 엔코더 틱 카운트 (STM32가 50ms 주기 delta 전송)
     # "velocity" : 바퀴 속도 (mm/s)

@@ -67,6 +67,7 @@ private:
   std::string imu_frame_id_;
   double cmd_vel_repeat_rate_;
   std::string odom_data_type_;
+  bool publish_tf_;
 
   // === State ===
   geometry_msgs::msg::Twist last_cmd_vel_;
