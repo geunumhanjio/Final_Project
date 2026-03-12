@@ -21,6 +21,7 @@ services:
       - ROS_DOMAIN_ID=0
       - ROS_LOCALHOST_ONLY=0
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=/root/cyclonedds.xml
       - PYTHONUNBUFFERED=1
       - RCUTILS_COLORIZED_OUTPUT=1
       - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:/usr/lib:${LD_LIBRARY_PATH}
@@ -28,6 +29,7 @@ services:
 
     volumes:
       - ../ros2_ws/src:/root/ros2_ws/src
+      - ./cyclonedds.xml:/root/cyclonedds.xml:ro
       - /dev/shm:/dev/shm
       - /run/udev:/run/udev:ro
       - /dev:/dev

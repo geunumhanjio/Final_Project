@@ -2,12 +2,16 @@
 <CycloneDDS xmlns="https://cdds.io/config">
     <Domain id="any">
         <General>
+            <!-- IP 주소 대신 인터페이스 이름으로 고정 (DHCP로 IP 바뀌어도 안전) -->
+            <!-- eth0 = WSL mirrored WiFi (192.168.0.x 대역, RPi와 같은 네트워크) -->
+            <!-- eth2 = LAN (172.20.x 대역, 서버용) → DDS에서 제외해 광고 주소 혼재 방지 -->
             <Interfaces>
-                <NetworkInterface address="192.168.0.237"/>
+                <NetworkInterface name="eth0" />
             </Interfaces>
             <AllowMulticast>true</AllowMulticast>
         </General>
         <Discovery>
+            <!-- 멀티캐스트 백업용 유니캐스트 피어 (RPi WiFi IP는 고정 권장) -->
             <Peers>
                 <Peer address="192.168.0.28"/>
             </Peers>
