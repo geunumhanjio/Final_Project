@@ -8,6 +8,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <std_msgs/msg/bool.hpp>
+#include <std_msgs/msg/float32.hpp>
 #include <json/json.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
@@ -37,6 +38,7 @@ private:
     void pathCallback(const nav_msgs::msg::Path::SharedPtr msg);
     void navStatusCallback(const std_msgs::msg::String::SharedPtr msg);
     void navFeedbackCallback(const std_msgs::msg::String::SharedPtr msg);
+    void trackingStatusCallback(const std_msgs::msg::String::SharedPtr msg);
 
     // 유틸리티
     double quaternionToYaw(const geometry_msgs::msg::Quaternion& quat);
@@ -47,6 +49,8 @@ private:
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_pub_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr mode_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr tracking_enable_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr tilt_pub_;
 
     // Subscribers (ROS2 → Client)
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -54,6 +58,7 @@ private:
     rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr path_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_status_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_feedback_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr tracking_status_sub_;
 
     // WebSocket 브로드캐스트 콜백
     BroadcastCallback broadcast_callback_;

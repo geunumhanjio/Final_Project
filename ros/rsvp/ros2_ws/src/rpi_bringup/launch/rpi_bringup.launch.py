@@ -61,6 +61,11 @@ def generate_launch_description():
         default_value='/dev/ttyUSB0',
         description='YDLiDAR USB port (e.g. /dev/ttyUSB0, /dev/ttyUSB1, /dev/ydlidar)'
     )
+    use_servo_arg = DeclareLaunchArgument(
+        'use_servo',
+        default_value='true',
+        description='Enable camera tilt servo node'
+    )
 
     # ── Node: Camera ───────────────────────────────────────────────────────────
     camera_node = Node(
@@ -82,6 +87,15 @@ def generate_launch_description():
         output='screen',
     )
 
+    # ── Node: Camera Tilt Servo ───────────────────────────────────────────────
+    servo_node = Node(
+        package='rpi_servo',
+        executable='servo_tilt_node',
+        name='servo_tilt_node',
+        condition=IfCondition(LaunchConfiguration('use_servo')),
+        output='screen',
+    )
+
     # ── Include: LiDAR ────────────────────────────────────────────────────────
     lidar_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -99,6 +113,7 @@ def generate_launch_description():
         use_serial_arg,
         use_lidar_arg,
         lidar_port_arg,
+        use_servo_arg,
 
         # Log
         LogInfo(msg=['[rpi_bringup] Starting Raspberry Pi system...']),
@@ -108,4 +123,5 @@ def generate_launch_description():
         camera_node,
         serial_bridge_node,
         lidar_launch,
+        servo_node,
     ])
