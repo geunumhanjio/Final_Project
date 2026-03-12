@@ -41,6 +41,17 @@ ROSBridge::ROSBridge()
         "/nav/feedback", 10,
         std::bind(&ROSBridge::navFeedbackCallback, this, std::placeholders::_1));
 
+    tracking_status_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/tracking/status", 10,
+        std::bind(&ROSBridge::trackingStatusCallback, this, std::placeholders::_1));
+
+    // Publishers 추가
+    tracking_enable_pub_ = this->create_publisher<std_msgs::msg::Bool>(
+        "/tracking/enable", 10);
+
+    tilt_pub_ = this->create_publisher<std_msgs::msg::Float32>(
+        "/camera/tilt", 10);
+
     last_odom_time_ = this->now();
     last_map_time_ = this->now();
 
@@ -65,6 +76,15 @@ void ROSBridge::processClientMessage(const Json::Value& message)
         handleModeControl(data);
     } else if (type == "emergency_stop") {
         handleEmergencyStop(data);
+    } else if (type == "tracking_enable") {
+        auto msg = std_msgs::msg::Bool();
+        msg.data = data.get("enable", false).asBool();
+        tracking_enable_pub_->publish(msg);
+        RCLCPP_INFO(this->get_logger(), "Tracking %s", msg.data ? "enabled" : "disabled");
+    } else if (type == "camera_tilt") {
+        auto msg = std_msgs::msg::Float32();
+        msg.data = static_cast<float>(data.get("angle", 0.0).asDouble());
+        tilt_pub_->publish(msg);
     } else {
         RCLCPP_WARN(this->get_logger(), "Unknown message type: %s", type.c_str());
     }
@@ -231,6 +251,24 @@ void ROSBridge::navFeedbackCallback(const std_msgs::msg::String::SharedPtr msg)
         broadcast_callback_(ws_msg);
     } else {
         RCLCPP_WARN(this->get_logger(), "nav_feedback JSON parse error: %s", errors.c_str());
+    }
+}
+
+void ROSBridge::trackingStatusCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    if (!broadcast_callback_) return;
+
+    Json::CharReaderBuilder reader;
+    Json::Value tracking_data;
+    std::string errors;
+    std::istringstream stream(msg->data);
+
+    if (Json::parseFromStream(reader, stream, &tracking_data, &errors)) {
+        Json::Value ws_msg = createTimestampedMessage("tracking_status");
+        ws_msg["data"] = tracking_data;
+        broadcast_callback_(ws_msg);
+    } else {
+        RCLCPP_WARN(this->get_logger(), "tracking_status JSON parse error: %s", errors.c_str());
     }
 }
 

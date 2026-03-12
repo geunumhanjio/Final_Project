@@ -24,8 +24,8 @@ class RTSPPublisher(Node):
         rtsp_host = self.get_parameter('rtsp_host').value
         rtsp_port = self.get_parameter('rtsp_port').value
         stream_name = self.get_parameter('stream_name').value
-        width = self.get_parameter('width').value
-        height = self.get_parameter('height').value
+        self._target_width = self.get_parameter('width').value
+        self._target_height = self.get_parameter('height').value
         fps = self.get_parameter('fps').value
         bitrate = self.get_parameter('bitrate').value
         
@@ -36,7 +36,7 @@ class RTSPPublisher(Node):
         # GStreamer 파이프라인
         gst_pipeline = (
             f'appsrc ! videoconvert ! '
-            f'video/x-raw,format=I420,width={width},height={height},framerate={fps}/1 ! '
+            f'video/x-raw,format=I420,width={self._target_width},height={self._target_height},framerate={fps}/1 ! '
             f'x264enc speed-preset=ultrafast tune=zerolatency bitrate={bitrate} key-int-max={fps} ! '
             f'rtspclientsink location={rtsp_url}'
         )
@@ -49,7 +49,7 @@ class RTSPPublisher(Node):
             cv2.CAP_GSTREAMER,
             0,
             fps,
-            (width, height),
+            (self._target_width, self._target_height),
             True
         )
         
@@ -73,7 +73,7 @@ class RTSPPublisher(Node):
         self.get_logger().info('RTSP Publisher Started! (Compressed Mode)')
         self.get_logger().info(f'  Input topic: {input_topic}')
         self.get_logger().info(f'  RTSP URL: {rtsp_url}')
-        self.get_logger().info(f'  Resolution: {width}x{height} @ {fps} fps')
+        self.get_logger().info(f'  Resolution: {self._target_width}x{self._target_height} @ {fps} fps')
         self.get_logger().info(f'  Bitrate: {bitrate} kbps')
         self.get_logger().info('='*60)
         self.get_logger().info(f'View stream at: rtsp://<your_ip>:{rtsp_port}/{stream_name}')
@@ -91,12 +91,9 @@ class RTSPPublisher(Node):
                 self.get_logger().error('Failed to decode JPEG image')
                 return
             
-            # 해상도 조정
-            target_width = self.get_parameter('width').value
-            target_height = self.get_parameter('height').value
-            
-            if cv_image.shape[1] != target_width or cv_image.shape[0] != target_height:
-                cv_image = cv2.resize(cv_image, (target_width, target_height))
+            # 해상도 조정 (파라미터 조회 오버헤드 제거 - 캐싱된 변수 사용)
+            if cv_image.shape[1] != self._target_width or cv_image.shape[0] != self._target_height:
+                cv_image = cv2.resize(cv_image, (self._target_width, self._target_height))
             
             # RTSP로 전송
             self.writer.write(cv_image)

@@ -77,6 +77,11 @@ def generate_launch_description():
             default_value='false',
             description='Launch rqt for debugging'
         ),
+        DeclareLaunchArgument(
+            'use_tracker',
+            default_value='false',
+            description='Enable YOLO person tracker node'
+        ),
     ]
 
     # ── Helper: include from wsl_bringup/launch/ ───────────────────────────────
@@ -178,4 +183,15 @@ def generate_launch_description():
         ),
     ]
 
-    return LaunchDescription(args + [scan_relay_node] + includes)
+    tracker_node = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('person_tracker'),
+                'launch',
+                'person_tracker.launch.py',
+            ])
+        ]),
+        condition=IfCondition(LaunchConfiguration('use_tracker')),
+    )
+
+    return LaunchDescription(args + [scan_relay_node] + includes + [tracker_node])
