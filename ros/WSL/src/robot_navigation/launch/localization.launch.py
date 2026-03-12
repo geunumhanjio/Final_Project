@@ -50,6 +50,25 @@ def generate_launch_description():
                 'mode': 'localization',
                 'map_file_name': LaunchConfiguration('map'),
                 'map_start_at_dock': True,
+
+                # ── localization 전용 보수적 설정 ──────────────────────────
+                # mapping 모드 값을 오버라이드해서 false positive 점프 방지
+
+                # loop closure 비활성화: localization에서 loop closure는
+                # 잘못된 위치로 갑자기 점프하는 주요 원인
+                'do_loop_closing': False,
+
+                # scan match 수락 기준 강화: 낮으면 엉뚱한 위치도 수락
+                'link_match_minimum_response_fine': 0.50,   # 0.35 → 0.50
+
+                # response expansion 비활성화: 약한 매칭시 검색 범위 확장하다
+                # 전혀 다른 위치를 찾아버리는 현상 방지
+                'use_response_expansion': False,
+
+                # 오도메트리와 크게 다른 pose에 패널티 강화
+                # EKF가 완벽하지 않아도 갑작스러운 대각도/대거리 점프를 억제
+                'distance_variance_penalty': 1.0,   # 0.5 → 1.0
+                'angle_variance_penalty': 1.5,      # 1.0 → 1.5
             }
         ],
     )

@@ -85,15 +85,15 @@ controller_server:
     # Regulated Pure Pursuit (RPP)
     FollowPath:
       plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
-      desired_linear_vel: 0.18          # 목표 속도 18cm/s
+      desired_linear_vel: 0.15          # 목표 속도 15cm/s
       lookahead_dist: 0.4               # 전방 추적 거리
       min_lookahead_dist: 0.25
       max_lookahead_dist: 0.7
       lookahead_time: 1.5
-      rotate_to_heading_angular_vel: 0.22
+      rotate_to_heading_angular_vel: 0.07
       transform_tolerance: 0.2
       use_velocity_scaled_lookahead_dist: false
-      min_approach_linear_velocity: 0.14
+      min_approach_linear_velocity: 0.07
       approach_velocity_scaling_dist: 0.5
       use_collision_detection: true
       max_allowed_time_to_collision_up_to_carrot: 1.0
@@ -102,11 +102,11 @@ controller_server:
       curvature_feedforward_gain: 1.0
       use_cost_regulated_linear_velocity_scaling: false
       regulated_linear_scaling_min_radius: 0.9
-      regulated_linear_scaling_min_speed: 0.1
+      regulated_linear_scaling_min_speed: 0.05
       use_rotate_to_heading: true       # 경로 방향으로 먼저 회전
       allow_reversing: false
       rotate_to_heading_min_angle: 0.785  # 45도 이상이면 제자리 회전
-      max_angular_accel: 2.0
+      max_angular_accel: 0.2
       max_robot_pose_search_dist: 10.0
 
 # ── Planner (Global Planner) ────────────────────────────────
@@ -155,9 +155,9 @@ behavior_server:
     robot_base_frame: base_footprint
     transform_tolerance: 0.2
     simulate_ahead_time: 2.0
-    max_rotational_vel: 0.4
-    min_rotational_vel: 0.22
-    rotational_acc_lim: 2.0
+    max_rotational_vel: 0.07
+    min_rotational_vel: 0.04
+    rotational_acc_lim: 0.15
 
 # ── Waypoint Follower ──────────────────────────────────────
 waypoint_follower:
@@ -178,10 +178,10 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: false
     feedback: "OPEN_LOOP"
-    max_velocity: [0.20, 0.0, 0.5]     # [vx, vy, vyaw] 최대값
-    min_velocity: [-0.20, 0.0, -0.5]
-    max_accel: [0.25, 0.0, 1.25]
-    max_decel: [-0.25, 0.0, -1.25]
+    max_velocity: [0.15, 0.0, 0.07]    # [vx, vy, vyaw] 최대값
+    min_velocity: [-0.15, 0.0, -0.07]
+    max_accel: [0.08, 0.0, 0.15]
+    max_decel: [-0.08, 0.0, -0.15]
     odom_topic: "odom"
     odom_duration: 0.1
     deadband_velocity: [0.0, 0.0, 0.0]

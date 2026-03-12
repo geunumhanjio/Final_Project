@@ -12,6 +12,10 @@ RPi ↔ WSL 시계 불일치 해결용 릴레이 노드.
   /wheel_odom (50Hz) 수신 시각과 RPi 스탬프의 차이로
   scan(10Hz)보다 5배 빠르게 clock_offset + transmission_delay를 EMA 추적.
   → scan 타임스탬프 = rpi_scan_stamp + offset_ema - 전송지연 - TF안전마진
+
+주의: odom/IMU는 보정하지 않음.
+  EKF가 odom(RPi 시각) + IMU(RPi 시각)를 동일한 시간 기준으로 융합하므로
+  내부 dt 계산이 정확함. odom만 보정하면 IMU와 시간 도메인이 달라져 오히려 오작동.
 """
 
 import rclpy
@@ -47,7 +51,7 @@ class ScanRelayNode(Node):
         self.sub = self.create_subscription(
             LaserScan, '/scan_raw', self._scan_callback, sub_qos)
 
-        # wheel_odom 구독: 50Hz로 클럭 오프셋 빠르게 추적
+        # wheel_odom 구독: 50Hz로 클럭 오프셋 빠르게 추적 (재발행은 하지 않음)
         self.odom_sub = self.create_subscription(
             Odometry, '/wheel_odom', self._odom_callback, 10)
 
@@ -77,7 +81,7 @@ class ScanRelayNode(Node):
                 _EMA_ALPHA * raw + (1.0 - _EMA_ALPHA) * self._offset_ema_ns
             )
 
-        # 100샘플마다 현재 추정값 로그
+        # 500샘플마다 현재 추정값 로그
         if self._sample_count % 500 == 0:
             self.get_logger().info(
                 f'Clock offset EMA: {self._offset_ema_ns / 1e9:.4f}s '
@@ -85,7 +89,7 @@ class ScanRelayNode(Node):
             )
 
     def _odom_callback(self, msg: Odometry) -> None:
-        """50Hz odom → 빠른 클럭 오프셋 수렴"""
+        """50Hz odom → 클럭 오프셋 EMA 추적 전용 (재발행 없음)"""
         self._update_offset(msg.header.stamp)
 
     def _scan_callback(self, msg: LaserScan) -> None:
