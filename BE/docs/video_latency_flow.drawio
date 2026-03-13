@@ -1,0 +1,363 @@
+<mxfile host="65bd71144e">
+    <diagram id="video-latency-flow" name="Video Latency Flow">
+        <mxGraphModel dx="606" dy="547" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="750" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a2e;strokeColor=#1a1a2e;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="15" width="1340" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="&lt;b&gt;&lt;font style=&#39;font-size:20px;&#39; color=&#39;#ffffff&#39;&gt;How to Manage Video Latency – &lt;/font&gt;&lt;font style=&#39;font-size:20px;&#39; color=&#39;#f0c040&#39;&gt;End-to-End Flow&lt;/font&gt;&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="15" width="1340" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="&lt;font color=&#39;#2d8a2d&#39;&gt;• Reduce Delay • Optimize Streaming • Improve User Experience •&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="72" width="1340" height="25" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="&lt;b&gt;Video Source&lt;/b&gt;&lt;br&gt;(Camera)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="115" width="130" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="11" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#00aa00;strokeWidth=2;" parent="1" source="10" target="12" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="12" value="&lt;b&gt;Encoder&lt;/b&gt;&lt;br&gt;(H.264/H.265)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="210" width="130" height="55" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="&lt;b&gt;Low Latency&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ff0000;strokeColor=#cc0000;fontColor=#ffffff;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="273" width="90" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="16a" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#555555;strokeWidth=2;" parent="1" source="12" target="14" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="&lt;b&gt;RTMP / WebRTC&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="320" width="130" height="45" as="geometry"/>
+                </mxCell>
+                <mxCell id="15" value="&lt;b&gt;Fast Transfer&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=#006600;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="373" width="90" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="20" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="198" y="100" width="390" height="315" as="geometry"/>
+                </mxCell>
+                <mxCell id="21" value="&lt;b&gt;Streaming Server&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a2e;strokeColor=#1a1a2e;fontColor=#ffffff;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="273" y="100" width="240" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="22" value="&lt;b&gt;Transcoding&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="213" y="152" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="&lt;b&gt;Compression&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="338" y="152" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="24" value="&lt;b&gt;Low Buffer&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="463" y="152" width="100" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#00aa00;strokeWidth=2;" parent="1" source="22" target="23" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="26" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#00aa00;strokeWidth=2;" parent="1" source="23" target="24" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="27" value="&lt;b&gt;Optimizations&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="273" y="215" width="240" height="24" as="geometry"/>
+                </mxCell>
+                <mxCell id="28" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#d6b656;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="206" y="242" width="372" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="29" value="&lt;b&gt;Bitrate&lt;br&gt;Control&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1a1a2e;strokeColor=#1a1a2e;fontColor=#ffffff;fontSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="214" y="250" width="75" height="58" as="geometry"/>
+                </mxCell>
+                <mxCell id="30" value="&lt;b&gt;GOP ↓&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="304" y="250" width="65" height="58" as="geometry"/>
+                </mxCell>
+                <mxCell id="31" value="&lt;b&gt;Cache&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="384" y="250" width="65" height="58" as="geometry"/>
+                </mxCell>
+                <mxCell id="32" value="&lt;b&gt;CDN&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="464" y="250" width="65" height="58" as="geometry"/>
+                </mxCell>
+                <mxCell id="33" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="29" target="30" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="34" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="30" target="31" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="35" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="31" target="32" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="36" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.3;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#00aa00;strokeWidth=2;" parent="1" source="14" target="22" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="37" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.7;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="14" target="29" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="40" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#d6b656;strokeWidth=2;" parent="1" vertex="1">
+                    <mxGeometry x="608" y="100" width="230" height="315" as="geometry"/>
+                </mxCell>
+                <mxCell id="41" value="&lt;b&gt;CDN&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:11px&#39;&gt;(Edge Servers)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f0c040;strokeColor=#d6b656;fontSize=14;fontStyle=1;" parent="1" vertex="1">
+                    <mxGeometry x="648" y="108" width="150" height="46" as="geometry"/>
+                </mxCell>
+                <mxCell id="42" value="🌐 &lt;b&gt;USA&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="625" y="168" width="110" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="43" value="📍 &lt;b&gt;Europe&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="625" y="205" width="110" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="44" value="🌐 &lt;b&gt;India&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="625" y="242" width="110" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="45" value="👥 &lt;b&gt;Asia&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="625" y="279" width="110" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="46" value="&lt;font color=&#39;#00aa00&#39;&gt;&lt;b&gt;▶ Low Latency&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="612" y="330" width="220" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="47" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;strokeColor=#ff0000;strokeWidth=2;" parent="1" source="24" target="40" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="48" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;strokeColor=#ff0000;strokeWidth=2;" parent="1" source="32" target="40" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="50" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#aaaaaa;strokeWidth=1;" parent="1" vertex="1">
+                    <mxGeometry x="858" y="100" width="160" height="315" as="geometry"/>
+                </mxCell>
+                <mxCell id="51" value="&lt;b&gt;User Devices&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="858" y="108" width="160" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="52" value="📱 Mobile" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="878" y="148" width="120" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="53" value="💻 Laptop" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="878" y="200" width="120" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="54" value="📺 TV" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="878" y="252" width="120" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="55" value="&lt;b&gt;Playback&lt;/b&gt;&lt;br&gt;Buffer: 1-2 sec" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff9c4;strokeColor=#d6b656;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="878" y="308" width="120" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="56" value="&lt;font color=&#39;#ff8800&#39;&gt;&lt;b&gt;▶ Adaptive Stream&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="858" y="358" width="160" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="57" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.2;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#000000;strokeWidth=2;" parent="1" source="40" target="52" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="58" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#00aa00;strokeWidth=2;" parent="1" source="40" target="53" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="59" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="40" target="54" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="60" style="edgeStyle=orthogonalEdgeStyle;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="54" target="55" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="70" value="&lt;b&gt;Latency Reduction Techniques&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=16;" parent="1" vertex="1">
+                    <mxGeometry x="150" y="440" width="800" height="32" as="geometry"/>
+                </mxCell>
+                <mxCell id="71" value="&lt;b&gt;WebRTC&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:17px;&#39; color=&#39;#0055cc&#39;&gt;&lt; 1 sec&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="483" width="130" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="72" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="71" target="73" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="73" value="&lt;b&gt;Low-Latency HLS&lt;/b&gt;&lt;br&gt;&lt;font style=&#39;font-size:15px;&#39; color=&#39;#ff8800&#39;&gt;2-5 sec&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="483" width="150" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="74" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ff8800;strokeWidth=2;" parent="1" source="73" target="75" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="75" value="&lt;b&gt;CDN Edge&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="483" width="130" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="76" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#99cc00;strokeWidth=2;" parent="1" source="75" target="77" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="77" value="&lt;b&gt;Optimized&lt;br&gt;Encoding&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="483" width="130" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="78" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#ff0000;strokeWidth=2;" parent="1" source="77" target="79" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="79" value="&lt;b&gt;Small Buffer&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="760" y="483" width="130" height="65" as="geometry"/>
+                </mxCell>
+                <mxCell id="80" value="&lt;font color=&#39;#cc0000&#39;&gt;&lt;b&gt;High Latency&lt;/b&gt;&lt;/font&gt; ◄" style="text;html=1;align=right;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="568" width="190" height="26" as="geometry"/>
+                </mxCell>
+                <mxCell id="81" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#cc0000;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="220" y="573" width="132" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="82" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#cc6600;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="352" y="573" width="132" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="83" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#cccc00;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="484" y="573" width="132" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="84" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#88cc00;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="616" y="573" width="132" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="85" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#00aa00;strokeColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="748" y="573" width="132" height="16" as="geometry"/>
+                </mxCell>
+                <mxCell id="86" value="► &lt;font color=&#39;#007700&#39;&gt;&lt;b&gt;Low&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;" parent="1" vertex="1">
+                    <mxGeometry x="882" y="568" width="80" height="26" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="DoY5gB5PUiE1Utx2YIya" name="diagram_refactoring">
+        <mxGraphModel dx="606" dy="-553" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFB866;strokeColor=#aaaaaa;strokeWidth=1;" parent="1" vertex="1">
+                    <mxGeometry x="825" y="1500" width="1115" height="2010" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFB866;strokeColor=#aaaaaa;strokeWidth=1;" parent="1" vertex="1">
+                    <mxGeometry x="265" y="1580" width="395" height="890" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-3" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-5" target="djloTv2OwbFXEbQ8ZcZW-9" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-4" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-5" target="djloTv2OwbFXEbQ8ZcZW-15" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-5" value="&lt;b&gt;Video Source&lt;/b&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;-카메라, 영상이 최초로 생성되는 지점&amp;nbsp;&lt;/div&gt;&lt;div&gt;- 웹캠, 스마트폰 카메라, CCTV 등&lt;span style=&quot;color: rgb(63, 63, 63); background-color: transparent;&quot;&gt;&amp;nbsp;&amp;nbsp;&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="307" y="1750" width="306" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-6" value="&lt;span style=&quot;font-size: 24px;&quot;&gt;물리적인 데이터 흐름&lt;/span&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="338" y="1620" width="240" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-7" value="- 비디오 소스(카메라)에서 생성된 영상이 사용자에게 &lt;br&gt;전달되기까지 데이터가 거쳐가는 물리적인 장치들" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="318" y="1680" width="280" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-8" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-9" target="djloTv2OwbFXEbQ8ZcZW-10" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-9" value="&lt;b&gt;Streaming Server&amp;nbsp;&lt;/b&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 비디오 소스에서 영상을 수신&amp;nbsp;&lt;br&gt;- 시청자들의 다양한 네트워크 환경에 대응하기 위해 수신한 영상을 가공하는 중앙 관리 서버&lt;br&gt;- 고화질의 원본 영상을 여러가지 화질 버전으로 가공&amp;nbsp;&lt;br&gt;- 가공 데이터를 CDN으로 전송&amp;nbsp;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="306" y="1900" width="306" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-10" value="&lt;b&gt;CDN&amp;nbsp;&lt;/b&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- CDN = Content Deliver Network&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 모든 사용자가 하나의 메인 서버에 접속하는 것은 네트워크 트래픽과 물리적 거리에 대한 한계가 있음&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 지리적으로 분산된 Edge Server를 두고, 영상을 캐싱하여 중앙 서버를 거치지 않고 곧바로 사용자에게 제공&lt;br&gt;- Edge Server는 미국, 유럽 아시아 등 전세계에 거점을 둠&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="306" y="2110" width="304" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-11" value="&lt;b&gt;User Devices&amp;nbsp;&lt;/b&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 미디어 데이터를 최종적으로 수신하고 사용자에게 제공&lt;br&gt;- CDN으로부터 영상을 수신&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="312" y="2320" width="306" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-12" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.479;entryY=-0.015;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-10" target="djloTv2OwbFXEbQ8ZcZW-11" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-13" value="&lt;font style=&quot;font-size: 24px;&quot;&gt;스트리밍을 위한 여러가지 기술&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="910" y="1530" width="330" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-14" value="- 저지연, 효율적인 스트리밍을 위한 여러가지 기법과 프로토콜" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="910" y="1590" width="330" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-15" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="896" y="1680" width="424" height="440" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-16" value="&lt;b&gt;Video Source&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="1040" y="1700" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-17" style="edgeStyle=none;html=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-18" target="djloTv2OwbFXEbQ8ZcZW-20" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-18" value="&lt;b&gt;Encoder&lt;/b&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 원본 미디어 데이터를 네트워크로 전송하기 적합하게 압축&lt;/div&gt;&lt;div&gt;-&amp;nbsp; 압축 알고리즘을 코덱이라고 부르며, 가장 보편적인 표준 기술로는 H.264, H.265가 있음&amp;nbsp;&lt;/div&gt;&lt;div&gt;- 데이터의 압축률과 지연 시간 사이의 트레이드 오프에서 Low Latency 설정 적용 가능&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="940" y="1750" width="312" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-19" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-20" target="djloTv2OwbFXEbQ8ZcZW-22" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-20" value="&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;b&gt;Ingest 프로토콜&lt;/b&gt;&amp;nbsp;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;div&gt;- 인코딩된 데이터를 빠르게 서버로 업스트림 전송하기 위한 프로토콜&amp;nbsp;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- RTMP, WebRTC 두 개의 프로토콜이 있음&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="940" y="1940" width="312" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-21" value="&lt;div&gt;&lt;font&gt;&lt;b&gt;RTMP&lt;/b&gt;&lt;/font&gt;&lt;font color=&quot;#000000&quot;&gt;&amp;nbsp;&lt;/font&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;div&gt;- RTMP = Real-Time Messaging Protocol&lt;/div&gt;&lt;/div&gt;&lt;div&gt;- 기존 인프라에서 가장 널리 쓰이는 빠르고 안정적인 단방향 업스트림 전송 방식&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1380" y="1890" width="240" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-22" value="&lt;div&gt;&lt;b&gt;WebRTC&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;div&gt;- WebRTC = Web Real-Time Communication&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 브라우저 기반의 양방향 초저지연 통신에 특화&lt;/div&gt;&lt;/div&gt;&lt;div&gt;- P2P 또는 SFU 구성에서 1초 미만의 실시간성이 필요할 때 사용&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1380" y="2050" width="240" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-23" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.385;entryDx=0;entryDy=0;entryPerimeter=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-20" target="djloTv2OwbFXEbQ8ZcZW-21" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-24" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="890" y="2240" width="558" height="630" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-25" value="&lt;b&gt;Streaming Server&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="1155" y="2260" width="120" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-26" style="edgeStyle=none;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-15" target="djloTv2OwbFXEbQ8ZcZW-24" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-27" value="&lt;strong style=&quot;color: rgb(52, 59, 89); font-family: -apple-system, BlinkMacSystemFont, &amp;quot;Segoe WPC&amp;quot;, &amp;quot;Segoe UI&amp;quot;, system-ui, Ubuntu, &amp;quot;Droid Sans&amp;quot;, sans-serif; font-size: 14px; text-align: start;&quot;&gt;Transcoding&lt;/strong&gt;&lt;div&gt;&lt;strong style=&quot;color: rgb(52, 59, 89); font-family: -apple-system, BlinkMacSystemFont, &amp;quot;Segoe WPC&amp;quot;, &amp;quot;Segoe UI&amp;quot;, system-ui, Ubuntu, &amp;quot;Droid Sans&amp;quot;, sans-serif; font-size: 14px; text-align: start;&quot;&gt;&lt;br&gt;&lt;/strong&gt;&lt;/div&gt;&lt;div&gt;- 원본 미디어 데이터를 다양한 해상도(1080p, 720p, 480p)로 변환&lt;/div&gt;&lt;div&gt;- 지연에 대비하여 클라이언트 환경에 맞게 화질 옵션을 선택&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1016" y="2310" width="372" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-28" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-29" target="djloTv2OwbFXEbQ8ZcZW-30" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-29" value="&lt;strong style=&quot;color: rgb(52, 59, 89); font-family: -apple-system, BlinkMacSystemFont, &amp;quot;Segoe WPC&amp;quot;, &amp;quot;Segoe UI&amp;quot;, system-ui, Ubuntu, &amp;quot;Droid Sans&amp;quot;, sans-serif; font-size: 14px; text-align: start;&quot;&gt;Compression&lt;/strong&gt;&lt;div&gt;&lt;strong style=&quot;color: rgb(52, 59, 89); font-family: -apple-system, BlinkMacSystemFont, &amp;quot;Segoe WPC&amp;quot;, &amp;quot;Segoe UI&amp;quot;, system-ui, Ubuntu, &amp;quot;Droid Sans&amp;quot;, sans-serif; font-size: 14px; text-align: start;&quot;&gt;&lt;br&gt;&lt;/strong&gt;&lt;/div&gt;&lt;div&gt;- 네트워크 대역폭을 부담을 줄이기 위해 압축&lt;br&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1046" y="2450" width="332" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-30" value="&lt;div&gt;&lt;b&gt;Low Buffer&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;font color=&quot;#000000&quot;&gt;&lt;br&gt;&lt;/font&gt;&lt;div&gt;- 지연 시간을 감소하기 위해 서버에서 데이터를 모으는 단위를 최소화하여 CDN으로 전송&lt;br&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1035" y="2565" width="360" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-31" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-33" target="djloTv2OwbFXEbQ8ZcZW-36" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-32" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-33" target="djloTv2OwbFXEbQ8ZcZW-37" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-33" value="&lt;div&gt;&lt;b&gt;Optimization&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;-&lt;/b&gt;&amp;nbsp;지연 시간을 줄이기 위한 모든 계산&lt;/div&gt;&lt;div&gt;- 영상을 작은 단위로 쪼개고 사용자의 네트워크 상태에 적합한 화질의 데이터를 전송하는 등의 작업을 수행&lt;/div&gt;&lt;div&gt;- Bitrate Control,&amp;nbsp;&lt;span style=&quot;color: rgb(63, 63, 63); background-color: transparent;&quot;&gt;GOP,&amp;nbsp;&lt;/span&gt;&lt;span style=&quot;color: rgb(63, 63, 63); background-color: transparent;&quot;&gt;Cashe &amp;amp; CDN 연동&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1016" y="2690" width="360" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-34" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-27" target="djloTv2OwbFXEbQ8ZcZW-29" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-35" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.516;entryY=-0.008;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-30" target="djloTv2OwbFXEbQ8ZcZW-33" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-36" value="&lt;div&gt;&lt;b&gt;Dynamic Bite Rate Control&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;-&lt;/b&gt;&amp;nbsp;클라이언트의 네트워크 환경에 따라 고화질 대용량 / 저화질 저용량 데이터를 선택적으로 전송&lt;span style=&quot;color: rgb(63, 63, 63); font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap; background-color: transparent;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3BOptimization%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B-%26lt%3B%2Fb%26gt%3B%20Bitrate%20Control%26amp%3Bnbsp%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20GOP%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20Cashe%20%26amp%3Bamp%3B%20CDN%20%EC%97%B0%EB%8F%99%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221008%22%20y%3D%222750%22%20width%3D%22360%22%20height%3D%2295%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1518" y="2590" width="360" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-37" value="&lt;div&gt;&lt;b&gt;Gop&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- GOP: Group of Pictures&lt;/div&gt;&lt;div style=&quot;text-align: center;&quot;&gt;&lt;span style=&quot;color: rgb(63, 63, 63); font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap; background-color: transparent;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3BDynamic%20Bite%20Rate%20Control%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B-%26lt%3B%2Fb%26gt%3B%26amp%3Bnbsp%3B%ED%81%B4%EB%9D%BC%EC%9D%B4%EC%96%B8%ED%8A%B8%EC%9D%98%20%EB%84%A4%ED%8A%B8%EC%9B%8C%ED%81%AC%20%ED%99%98%EA%B2%BD%EC%97%90%20%EB%94%B0%EB%9D%BC%20%EA%B3%A0%ED%99%94%EC%A7%88%20%EB%8C%80%EC%9A%A9%EB%9F%89%20%2F%20%EC%A0%80%ED%99%94%EC%A7%88%20%EC%A0%80%EC%9A%A9%EB%9F%89%20%EB%8D%B0%EC%9D%B4%ED%84%B0%EB%A5%BC%20%EC%84%A0%ED%83%9D%EC%A0%81%EC%9C%BC%EB%A1%9C%20%EC%A0%84%EC%86%A1%26lt%3Bspan%20style%3D%26quot%3Bcolor%3A%20rgb(63%2C%2063%2C%2063)%3B%20font-family%3A%20monospace%3B%20font-size%3A%200px%3B%20text-align%3A%20start%3B%20text-wrap-mode%3A%20nowrap%3B%20background-color%3A%20transparent%3B%26quot%3B%26gt%3B%253CmxGraphModel%253E%253Croot%253E%253CmxCell%2520id%253D%25220%2522%252F%253E%253CmxCell%2520id%253D%25221%2522%2520parent%253D%25220%2522%252F%253E%253CmxCell%2520id%253D%25222%2522%2520value%253D%2522%2526lt%253Bdiv%2526gt%253B%2526lt%253Bb%2526gt%253BOptimization%2526lt%253B%252Fb%2526gt%253B%2526lt%253B%252Fdiv%2526gt%253B%2526lt%253Bdiv%2526gt%253B%2526lt%253Bb%2526gt%253B%2526lt%253Bbr%2526gt%253B%2526lt%253B%252Fb%2526gt%253B%2526lt%253B%252Fdiv%2526gt%253B%2526lt%253Bdiv%2526gt%253B%2526lt%253Bb%2526gt%253B-%2526lt%253B%252Fb%2526gt%253B%2520Bitrate%2520Control%2526amp%253Bnbsp%253B%2526lt%253B%252Fdiv%2526gt%253B%2526lt%253Bdiv%2526gt%253B-%2520GOP%2526lt%253B%252Fdiv%2526gt%253B%2526lt%253Bdiv%2526gt%253B-%2520Cashe%2520%2526amp%253Bamp%253B%2520CDN%2520%25EC%2597%25B0%25EB%258F%2599%2526lt%253B%252Fdiv%2526gt%253B%2522%2520style%253D%2522rounded%253D1%253BwhiteSpace%253Dwrap%253Bhtml%253D1%253B%2522%2520vertex%253D%25221%2522%2520parent%253D%25221%2522%253E%253CmxGeometry%2520x%253D%25221008%2522%2520y%253D%25222750%2522%2520width%253D%2522360%2522%2520height%253D%252295%2522%2520as%253D%2522geometry%2522%252F%253E%253C%252FmxCell%253E%253C%252Froot%253E%253C%252FmxGraphModel%253E%26lt%3B%2Fspan%26gt%3B%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221510%22%20y%3D%222750%22%20width%3D%22360%22%20height%3D%2295%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;span style=&quot;background-color: transparent; text-align: start;&quot;&gt;- GOP란 영상 프레임의 묶음 단위를 의미함&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: center;&quot;&gt;&lt;span style=&quot;background-color: transparent; text-align: start;&quot;&gt;- GOP가 작을수록 서버에서 데이터가 빠르게 Push됨&lt;/span&gt;&lt;span style=&quot;background-color: transparent; font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3BOptimization%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B-%26lt%3B%2Fb%26gt%3B%20Bitrate%20Control%26amp%3Bnbsp%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20GOP%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20Cashe%20%26amp%3Bamp%3B%20CDN%20%EC%97%B0%EB%8F%99%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221008%22%20y%3D%222750%22%20width%3D%22360%22%20height%3D%2295%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1518" y="2700" width="360" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-38" value="&lt;div&gt;&lt;b&gt;Cashe &amp;amp; CDN 연동&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 해당 지역의 CDN에서 자주 접근되는 세그먼트를 빠르게 Push하고 CDN에 캐싱해두어 응답 시간을 단축&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3BOptimization%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B-%26lt%3B%2Fb%26gt%3B%20Bitrate%20Control%26amp%3Bnbsp%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20GOP%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20Cashe%20%26amp%3Bamp%3B%20CDN%20%EC%97%B0%EB%8F%99%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221008%22%20y%3D%222750%22%20width%3D%22360%22%20height%3D%2295%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1518" y="2820" width="360" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-39" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.005;entryY=0.448;entryDx=0;entryDy=0;entryPerimeter=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-33" target="djloTv2OwbFXEbQ8ZcZW-38" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-40" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="1030" y="2960" width="308" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-41" value="&lt;b&gt;CDN&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="1163" y="2980" width="50" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-42" style="edgeStyle=none;html=1;entryX=0.642;entryY=-0.011;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-24" target="djloTv2OwbFXEbQ8ZcZW-40" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-43" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6D3;" parent="1" vertex="1">
+                    <mxGeometry x="965" y="3130" width="430" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-44" value="&lt;b&gt;User Devices&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="1134" y="3150" width="100" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-45" value="&lt;div&gt;&lt;b&gt;Playback&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 전달받은 미디어 데이터를 최종적으로 화면에 출력하는 것&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3BOptimization%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B-%26lt%3B%2Fb%26gt%3B%20Bitrate%20Control%26amp%3Bnbsp%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20GOP%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20Cashe%20%26amp%3Bamp%3B%20CDN%20%EC%97%B0%EB%8F%99%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221008%22%20y%3D%222750%22%20width%3D%22360%22%20height%3D%2295%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1010" y="3200" width="360" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-46" style="edgeStyle=none;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.49;entryY=0.007;entryDx=0;entryDy=0;entryPerimeter=0;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-40" target="djloTv2OwbFXEbQ8ZcZW-43" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-47" value="&lt;div&gt;&lt;b&gt;Small Buffer&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;&lt;br&gt;&lt;/b&gt;&lt;/div&gt;&lt;div&gt;- 영상 재생에 있어 실시간성을 최대한 확보하기 위해 최소한의 분량만 버퍼에 저장하고 화면에 출력&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;%3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3BOptimization%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B-%26lt%3B%2Fb%26gt%3B%20Bitrate%20Control%26amp%3Bnbsp%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20GOP%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20Cashe%20%26amp%3Bamp%3B%20CDN%20%EC%97%B0%EB%8F%99%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221008%22%20y%3D%222750%22%20width%3D%22360%22%20height%3D%2295%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1480" y="3160" width="360" height="95" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-48" value="&lt;div&gt;&lt;b&gt;Adaptive Stream&lt;/b&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;- 사용자의 물리적 거리 이동 시 네트워크가 끊기거나 느려질 수 있음&lt;/div&gt;&lt;div&gt;- 끊김 없이 재생을 유지할 수 있도록 네트워크 상황에 따라 화질을 변경하여 스트리밍&lt;/div&gt;&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: rgb(63, 63, 63); font-family: monospace; font-size: 0px; text-align: start; text-wrap-mode: nowrap;&quot;&gt;0 %3CmxGraphModel%3E%3Croot%3E%3CmxCell%20id%3D%220%22%2F%3E%3CmxCell%20id%3D%221%22%20parent%3D%220%22%2F%3E%3CmxCell%20id%3D%222%22%20value%3D%22%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3BOptimization%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B%26lt%3Bbr%26gt%3B%26lt%3B%2Fb%26gt%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B%26lt%3Bb%26gt%3B-%26lt%3B%2Fb%26gt%3B%20Bitrate%20Control%26amp%3Bnbsp%3B%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20GOP%26lt%3B%2Fdiv%26gt%3B%26lt%3Bdiv%26gt%3B-%20Cashe%20%26amp%3Bamp%3B%20CDN%20%EC%97%B0%EB%8F%99%26lt%3B%2Fdiv%26gt%3B%22%20style%3D%22rounded%3D1%3BwhiteSpace%3Dwrap%3Bhtml%3D1%3B%22%20vertex%3D%221%22%20parent%3D%221%22%3E%3CmxGeometry%20x%3D%221008%22%20y%3D%222750%22%20width%3D%22360%22%20height%3D%2295%22%20as%3D%22geometry%22%2F%3E%3C%2FmxCell%3E%3C%2Froot%3E%3C%2FmxGraphModel%3E&lt;/span&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="1480" y="3295" width="360" height="115" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-49" style="edgeStyle=none;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.005;entryY=0.452;entryDx=0;entryDy=0;entryPerimeter=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-45" target="djloTv2OwbFXEbQ8ZcZW-47" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="djloTv2OwbFXEbQ8ZcZW-50" style="edgeStyle=none;html=1;entryX=0.007;entryY=0.574;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.993;exitY=0.666;exitDx=0;exitDy=0;exitPerimeter=0;dashed=1;" parent="1" source="djloTv2OwbFXEbQ8ZcZW-45" target="djloTv2OwbFXEbQ8ZcZW-48" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
