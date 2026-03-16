@@ -31,17 +31,19 @@ def generate_launch_description():
         'smoother_server',
         'planner_server',
         'behavior_server',
+        'velocity_smoother',
         'bt_navigator',
-        'waypoint_follower',
     ]
 
     # 로컬 플래너 + 로컬 costmap
+    # cmd_vel → /cmd_vel_raw : velocity_smoother가 받아서 /cmd_vel로 내보냄
     controller_server = Node(
         package='nav2_controller',
         executable='controller_server',
         name='controller_server',
         output='screen',
         parameters=[nav2_params],
+        remappings=[('cmd_vel', '/cmd_vel_raw')],
     )
 
     # 경로 스무딩
@@ -63,31 +65,38 @@ def generate_launch_description():
     )
 
     # Recovery behavior (spin, backup, wait)
+    # cmd_vel → /cmd_vel_raw : velocity_smoother 경유
     behavior_server = Node(
         package='nav2_behaviors',
         executable='behavior_server',
         name='behavior_server',
         output='screen',
         parameters=[nav2_params],
-        remappings=[('cmd_vel', '/cmd_vel')],
+        remappings=[('cmd_vel', '/cmd_vel_raw')],
+    )
+
+    # cmd_vel 가속도 제한 (급격한 회전 방지 → HectorSLAM 맵 보호)
+    # /cmd_vel_raw (controller/behavior) → smooth → /cmd_vel (로봇)
+    velocity_smoother = Node(
+        package='nav2_velocity_smoother',
+        executable='velocity_smoother',
+        name='velocity_smoother',
+        output='screen',
+        parameters=[nav2_params],
+        remappings=[('cmd_vel', '/cmd_vel_raw'),
+                    ('cmd_vel_smoothed', '/cmd_vel')],
     )
 
     # 고수준 네비게이션 BT 실행기
+    # goal_pose 토픽 remap: RViz2 /goal_pose는 navigation_manager가 처리
+    # bt_navigator가 직접 /goal_pose를 처리하면 navigation_manager와 충돌
     bt_navigator = Node(
         package='nav2_bt_navigator',
         executable='bt_navigator',
         name='bt_navigator',
         output='screen',
         parameters=[nav2_params],
-    )
-
-    # 다중 웨이포인트 순차 실행
-    waypoint_follower = Node(
-        package='nav2_waypoint_follower',
-        executable='waypoint_follower',
-        name='waypoint_follower',
-        output='screen',
-        parameters=[nav2_params],
+        remappings=[('goal_pose', '/bt_nav_goal_pose')],
     )
 
     # Lifecycle 관리 (모든 Nav2 노드 autostart)
@@ -108,7 +117,7 @@ def generate_launch_description():
         smoother_server,
         planner_server,
         behavior_server,
+        velocity_smoother,
         bt_navigator,
-        waypoint_follower,
         lifecycle_manager,
     ])
