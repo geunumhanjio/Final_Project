@@ -110,6 +110,7 @@ def generate_launch_description():
         executable='scan_relay',
         name='scan_relay',
         output='screen',
+        parameters=[{'use_ekf_relay': True}],
     )
 
     # ── Includes ───────────────────────────────────────────────────────────────
@@ -134,11 +135,12 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_websocket')),
         ),
 
-        # Robot Description + EKF
+        # Robot Description (WSL EKF 비활성화: RPi EKF 사용)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([pkg_share, 'launch', 'robot_core.launch.py'])
             ]),
+            launch_arguments={'use_ekf': 'false'}.items(),
             condition=IfCondition(LaunchConfiguration('use_robot_core')),
         ),
 

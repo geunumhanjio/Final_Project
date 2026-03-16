@@ -174,13 +174,14 @@ nav_msgs::msg::Odometry OdometryCalculator::createOdometryMsg(
   // Twist
   odom.twist.twist = getTwist();
   
-  // Covariance (임시 값, 나중에 튜닝 필요)
-  odom.pose.covariance[0] = 0.001;   // x
-  odom.pose.covariance[7] = 0.001;   // y
-  odom.pose.covariance[35] = 0.01;   // yaw
-  
-  odom.twist.covariance[0] = 0.001;  // vx
-  odom.twist.covariance[35] = 0.01;  // vyaw
+  // Covariance: 실제 휠 오도메트리 정확도 반영
+  // 너무 작으면 EKF가 오도메트리를 과신해 IMU 보정을 무시함
+  odom.pose.covariance[0] = 0.05;    // x      (~22cm 1σ)
+  odom.pose.covariance[7] = 0.05;    // y
+  odom.pose.covariance[35] = 0.1;    // yaw    (~18° 1σ)
+
+  odom.twist.covariance[0] = 0.01;   // vx
+  odom.twist.covariance[35] = 0.05;  // vyaw
   
   return odom;
 }
