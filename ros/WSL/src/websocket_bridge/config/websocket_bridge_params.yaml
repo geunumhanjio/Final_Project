@@ -1,0 +1,17 @@
+websocket_bridge_node:
+  ros__parameters:
+
+    # ── odom 위치 소스 ──────────────────────────────────────────────────────
+    # "slam" : map → base_footprint TF 사용 (SLAM 추정 위치, 권장)
+    # "odom" : /odom 토픽 사용 (EKF 오도메트리 위치)
+    odom_source: "slam"
+
+    # ── odom 전송 모드 ──────────────────────────────────────────────────────
+    # "timer" : odom_publish_interval 주기마다 고정 전송 (권장)
+    # "topic" : /odom 메시지 도착 시 전송 (odom_publish_interval로 다운샘플)
+    odom_publish_mode: "timer"
+
+    # ── 전송 주기 (초) ──────────────────────────────────────────────────────
+    # timer 모드: 이 주기마다 정확히 전송
+    # topic 모드: 이 간격보다 짧으면 무시 (다운샘플링)
+    odom_publish_interval: 0.1   # 0.1초 = 10Hz
