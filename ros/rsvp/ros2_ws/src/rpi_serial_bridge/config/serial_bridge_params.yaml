@@ -6,7 +6,7 @@ serial_bridge_node:
 
     # === 로봇 물리 파라미터 (실측값) ===
     wheel_base: 0.100             # m (유효 kinematic wheel_base 실측 보정값)
-    wheel_radius: 0.0325          # m (65mm 지름 → 반경 32.5mm)
+    wheel_radius: 0.0333          # m (65mm 지름 → 반경 32.5mm)
     encoder_ticks_per_rev: 3840   # 480 CPR × 4체배 × 기어비 2 (실측 보정)
 
     # === IMU 스케일 팩터 ===

@@ -4,7 +4,7 @@ serial_bridge_node:
       baud_rate: 115200
 
       wheel_base: 0.125
-      wheel_radius: 0.0325
+      wheel_radius: 0.0329
       encoder_ticks_per_rev: 3840
 
       imu_accel_scale: 0.000598
