@@ -27,8 +27,15 @@ def generate_launch_description():
         description='Enable WSL-side EKF. Set false when EKF runs on RPi.'
     )
 
+    use_relay_ekf_arg = DeclareLaunchArgument(
+        'use_relay_ekf',
+        default_value='false',
+        description='Enable WSL relay EKF: /odom_relay → continuous TF during WiFi gaps.'
+    )
+
     return LaunchDescription([
         use_ekf_arg,
+        use_relay_ekf_arg,
 
         # robot_state_publisher (URDF → TF)
         IncludeLaunchDescription(
@@ -51,5 +58,17 @@ def generate_launch_description():
                 ])
             ]),
             condition=IfCondition(LaunchConfiguration('use_ekf')),
+        ),
+
+        # Relay EKF: /odom_relay → TF 연속 발행 (WiFi 갭 구간 예측 보완)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare('robot_localization_config'),
+                    'launch',
+                    'relay_ekf.launch.py',
+                ])
+            ]),
+            condition=IfCondition(LaunchConfiguration('use_relay_ekf')),
         ),
     ])

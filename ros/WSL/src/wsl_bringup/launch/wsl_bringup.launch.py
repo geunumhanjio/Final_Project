@@ -8,6 +8,12 @@ WSL 전체 시스템 메인 런처
   # SLAM 모드 (기본 - 새 맵 생성)
   ros2 launch wsl_bringup wsl_bringup.launch.py
 
+  # HectorSLAM 모드 (scan-only, odom/imu 불필요)
+  ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=hector
+
+  # HectorSLAM + odom 연동 (map→odom TF 발행)
+  ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=hector hector_odom_frame:=odom
+
   # Localization 모드 (기존 맵 사용)
   ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=localization
 
@@ -82,6 +88,15 @@ def generate_launch_description():
             default_value='false',
             description='Enable YOLO person tracker node'
         ),
+        DeclareLaunchArgument(
+            'hector_odom_frame',
+            default_value='odom',
+            description=(
+                'HectorSLAM odom_frame: '
+                '"odom" = map→odom TF 발행 (navigation 기본), '
+                '"base_footprint" = scan-only 순수 테스트'
+            ),
+        ),
     ]
 
     # ── Helper: include from wsl_bringup/launch/ ───────────────────────────────
@@ -105,12 +120,40 @@ def generate_launch_description():
         return inc
 
     # ── Nodes ──────────────────────────────────────────────────────────────────
-    scan_relay_node = Node(
+    # hector 모드: scan_relay가 직접 odom→base_footprint TF 발행 (keepalive 50Hz)
+    #   /odom은 이미 RPi EKF 출력 → WSL relay_ekf 중복 계산 불필요
+    # 그 외 모드: relay_ekf가 TF 담당, scan_relay는 TF 발행 안 함
+    scan_relay_hector = Node(
         package='scan_relay',
         executable='scan_relay',
         name='scan_relay',
         output='screen',
-        parameters=[{'use_ekf_relay': True}],
+        parameters=[{'use_ekf_relay': True, 'publish_tf': True}],
+        condition=LaunchConfigurationEquals('nav_mode', 'hector'),
+    )
+    scan_relay_other = Node(
+        package='scan_relay',
+        executable='scan_relay',
+        name='scan_relay',
+        output='screen',
+        parameters=[{'use_ekf_relay': True, 'publish_tf': False}],
+        condition=LaunchConfigurationEquals('nav_mode', 'slam'),
+    )
+    scan_relay_localization = Node(
+        package='scan_relay',
+        executable='scan_relay',
+        name='scan_relay',
+        output='screen',
+        parameters=[{'use_ekf_relay': True, 'publish_tf': False}],
+        condition=LaunchConfigurationEquals('nav_mode', 'localization'),
+    )
+    scan_relay_none = Node(
+        package='scan_relay',
+        executable='scan_relay',
+        name='scan_relay',
+        output='screen',
+        parameters=[{'use_ekf_relay': True, 'publish_tf': False}],
+        condition=LaunchConfigurationEquals('nav_mode', 'none'),
     )
 
     # ── Includes ───────────────────────────────────────────────────────────────
@@ -135,21 +178,62 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration('use_websocket')),
         ),
 
-        # Robot Description (WSL EKF 비활성화: RPi EKF 사용)
+        # Robot Description - SLAM/Localization/none 모드: relay_ekf 활성화
+        # relay_ekf가 odom→base_footprint TF를 WiFi 갭 구간에도 유지
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([pkg_share, 'launch', 'robot_core.launch.py'])
             ]),
-            launch_arguments={'use_ekf': 'false'}.items(),
-            condition=IfCondition(LaunchConfiguration('use_robot_core')),
+            launch_arguments={'use_ekf': 'false', 'use_relay_ekf': 'true'}.items(),
+            condition=LaunchConfigurationEquals('nav_mode', 'slam'),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'robot_core.launch.py'])
+            ]),
+            launch_arguments={'use_ekf': 'false', 'use_relay_ekf': 'true'}.items(),
+            condition=LaunchConfigurationEquals('nav_mode', 'localization'),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'robot_core.launch.py'])
+            ]),
+            launch_arguments={'use_ekf': 'false', 'use_relay_ekf': 'true'}.items(),
+            condition=LaunchConfigurationEquals('nav_mode', 'none'),
         ),
 
-        # SLAM (새 맵 생성)
+        # Robot Description - HectorSLAM 모드
+        # relay_ekf 비활성화: scan_relay가 직접 TF 발행 (50Hz keepalive)
+        # /odom = RPi EKF 출력(이미 필터됨) → WSL에서 추가 EKF 불필요
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'robot_core.launch.py'])
+            ]),
+            launch_arguments={'use_ekf': 'false', 'use_relay_ekf': 'false'}.items(),
+            condition=LaunchConfigurationEquals('nav_mode', 'hector'),
+        ),
+
+        # SLAM (새 맵 생성 - SLAM Toolbox)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([pkg_share, 'launch', 'slam_mapping.launch.py'])
             ]),
             condition=LaunchConfigurationEquals('nav_mode', 'slam'),
+        ),
+
+        # HectorSLAM (scan-only 또는 odom 연동)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare('hector_mapping'),
+                    'launch',
+                    'hector_mapping.launch.py',
+                ])
+            ]),
+            launch_arguments={
+                'odom_frame': LaunchConfiguration('hector_odom_frame'),
+            }.items(),
+            condition=LaunchConfigurationEquals('nav_mode', 'hector'),
         ),
 
         # Localization (기존 맵 사용)
@@ -160,7 +244,19 @@ def generate_launch_description():
             condition=LaunchConfigurationEquals('nav_mode', 'localization'),
         ),
 
-        # Navigation Manager (localization 모드일 때만 실행)
+        # Nav2 (HectorSLAM 모드 - HectorSLAM이 map→odom TF 발행)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare('robot_navigation'),
+                    'launch',
+                    'nav2.launch.py',
+                ])
+            ]),
+            condition=LaunchConfigurationEquals('nav_mode', 'hector'),
+        ),
+
+        # Navigation Manager (localization / hector 모드)
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource([
                 PathJoinSubstitution([
@@ -170,6 +266,17 @@ def generate_launch_description():
                 ])
             ]),
             condition=LaunchConfigurationEquals('nav_mode', 'localization'),
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([
+                    FindPackageShare('navigation_manager'),
+                    'launch',
+                    'navigation_manager.launch.py',
+                ])
+            ]),
+            launch_arguments={'replan_on_map_update': 'false'}.items(),
+            condition=LaunchConfigurationEquals('nav_mode', 'hector'),
         ),
 
         # RViz2 / rqt
@@ -196,4 +303,10 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_tracker')),
     )
 
-    return LaunchDescription(args + [scan_relay_node] + includes + [tracker_node])
+    scan_relay_nodes = [
+        scan_relay_hector,
+        scan_relay_other,
+        scan_relay_localization,
+        scan_relay_none,
+    ]
+    return LaunchDescription(args + scan_relay_nodes + includes + [tracker_node])
