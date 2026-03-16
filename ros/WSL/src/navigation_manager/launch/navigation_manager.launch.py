@@ -41,6 +41,11 @@ def generate_launch_description():
             default_value='2.0',
             description='재시도 전 대기 시간 (초)'
         ),
+        DeclareLaunchArgument(
+            'replan_on_map_update',
+            default_value='true',
+            description='맵 업데이트 시 자동 재계획 여부 (HectorSLAM 모드에서는 false 권장)'
+        ),
 
         Node(
             package='navigation_manager',
@@ -48,10 +53,11 @@ def generate_launch_description():
             name='navigation_manager',
             output='screen',
             parameters=[{
-                'waypoints_file':  LaunchConfiguration('waypoints_file'),
-                'max_retries':     LaunchConfiguration('max_retries'),
-                'retry_delay_sec': LaunchConfiguration('retry_delay_sec'),
-                'linear_speed':    0.12,
+                'waypoints_file':       LaunchConfiguration('waypoints_file'),
+                'max_retries':          LaunchConfiguration('max_retries'),
+                'retry_delay_sec':      LaunchConfiguration('retry_delay_sec'),
+                'linear_speed':         0.12,
+                'replan_on_map_update': LaunchConfiguration('replan_on_map_update'),
             }],
         ),
     ])
