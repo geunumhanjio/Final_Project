@@ -37,10 +37,27 @@ source install/setup.bash
 
 ## 사용법
 
-### SLAM 모드 — 새 맵 생성 (기본)
+### SLAM 모드 — 새 맵 생성 (기본, SLAM Toolbox)
 ```bash
 ros2 launch wsl_bringup wsl_bringup.launch.py
 ```
+
+### HectorSLAM 모드 — scan-only 맵 생성 (odom/IMU 불필요)
+```bash
+# scan-only (odom 없이 순수 라이다만으로 SLAM + Nav2)
+ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=hector use_rviz:=true
+
+# odom 연동 (map→odom TF 발행, 네비게이션 권장)
+ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=hector hector_odom_frame:=odom use_rviz:=true
+```
+
+`nav_mode:=hector` 시 다음이 자동으로 함께 실행된다.
+- `hector_mapping`: HectorSLAM (scan-only SLAM)
+- `robot_navigation/nav2`: Nav2 스택 (HectorSLAM이 map→odom TF 발행)
+- `navigation_manager`: 웨이포인트 / 순찰 미션 컨트롤러 (`replan_on_map_update=false`)
+- `scan_relay`: `publish_tf:=true` 모드 (odom→base_footprint TF 직접 발행)
+
+> `hector_odom_frame` 기본값은 `odom`. `base_footprint`로 설정하면 map→odom TF 없이 순수 scan-only 테스트 가능.
 
 ### Localization 모드 — 기존 맵 사용
 ```bash
@@ -55,6 +72,9 @@ ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=localization
 ```bash
 # SLAM + RViz2
 ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=slam use_rviz:=true
+
+# HectorSLAM + RViz2
+ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=hector use_rviz:=true
 
 # Localization + RViz2
 ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=localization use_rviz:=true
@@ -93,9 +113,11 @@ ros2 launch wsl_bringup rviz2.launch.py use_rviz:=true rviz_mode:=slam
 | `use_rtsp` | `true` | RTSP 브릿지 활성화 |
 | `use_websocket` | `true` | WebSocket 브릿지 활성화 |
 | `use_robot_core` | `true` | robot_description + EKF 활성화 |
-| `nav_mode` | `slam` | `slam` / `localization` / `none` |
+| `nav_mode` | `slam` | `slam` / `hector` / `localization` / `none` |
 | `use_rviz` | `false` | RViz2 실행 |
 | `use_rqt` | `false` | rqt 실행 |
+| `use_tracker` | `false` | YOLO 사람 추적 노드 활성화 |
+| `hector_odom_frame` | `odom` | HectorSLAM odom 프레임 (`odom` = map→odom TF 발행, `base_footprint` = scan-only) |
 
 ---
 
@@ -106,6 +128,7 @@ ros2 launch wsl_bringup rviz2.launch.py use_rviz:=true rviz_mode:=slam
 | nav_mode | 사용되는 설정 파일 | 표시 항목 |
 |----------|------------------|-----------|
 | `slam` | `config/rviz/slam.rviz` | Grid, RobotModel, LaserScan, Map, Odometry |
+| `hector` | `config/rviz/slam.rviz` | Grid, RobotModel, LaserScan, Map, Odometry |
 | `localization` | `config/rviz/navigation.rviz` | 위 항목 + Costmap (Local/Global), Global/Local Plan |
 
 설정 파일을 수정하려면 `config/rviz/` 안의 `.rviz` 파일을 직접 편집하거나, RViz2에서 수정 후 `File > Save Config As`로 덮어씁니다.

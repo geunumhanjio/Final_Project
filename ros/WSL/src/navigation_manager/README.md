@@ -73,6 +73,21 @@ ros2 topic pub --once /nav/command std_msgs/String \
   '{"data": "{\"cmd\": \"patrol\", \"route\": \"default\"}"}'
 ```
 
+### 큐(ping-pong) 반복 주행
+좌표 목록을 순서대로 이동하고, 끝에 도달하면 역순으로 되돌아오는 방식으로 무한 반복한다.
+```bash
+ros2 topic pub --once /nav/command std_msgs/String \
+  '{"data": "{\"cmd\": \"queue\", \"waypoints\": [{\"x\": 1.0, \"y\": 0.0, \"yaw\": 0.0}, {\"x\": 2.0, \"y\": 1.0, \"yaw\": 0.0}]}"}'
+```
+
+### 런타임 속도 변경
+주행 중에도 즉시 적용된다. `controller_server`와 `velocity_smoother`의 파라미터를 동시에 변경한다.
+```bash
+ros2 topic pub --once /nav/command std_msgs/String \
+  '{"data": "{\"cmd\": \"set_speed\", \"speed\": 0.20}"}'
+```
+- 속도 범위: `0.05 ~ 0.30 m/s` (범위 밖은 클램핑)
+
 ### 취소
 ```bash
 ros2 topic pub --once /nav/command std_msgs/String \
@@ -94,8 +109,8 @@ navigation_manager가 이를 구독해 `_navigate_to()`로 처리한다.
 
 | 토픽 | 타입 | 주기 | 설명 |
 |------|------|------|------|
-| `/nav/status` | `std_msgs/String` (JSON) | 1 Hz | 현재 상태 + 로봇 현재 위치 |
-| `/nav/feedback` | `std_msgs/String` (JSON) | Nav2 feedback 주기 | 남은 거리, ETA, 순찰 진행도 |
+| `/nav/status` | `std_msgs/String` (JSON) | 1 Hz | 현재 상태 + 로봇 현재 위치 + 속도 |
+| `/nav/feedback` | `std_msgs/String` (JSON) | Nav2 feedback 주기 | 남은 거리, ETA, 순찰/큐 진행도 |
 
 ### 서브스크라이브
 
@@ -118,13 +133,20 @@ navigation_manager가 이를 구독해 `_navigate_to()`로 처리한다.
   "goal_y": 1.5,
   "goal_yaw": 0.0,
   "dist_remaining": 1.23,
+  "linear_speed": 0.12,
   "patrol_active": true,
   "patrol_index": 0,
-  "patrol_total": 4
+  "patrol_total": 4,
+  "queue_active": false,
+  "queue_index": null,
+  "queue_total": null,
+  "queue_direction": null
 }
 ```
 
 > `robot_x/y/yaw`: `map → base_footprint` TF 조회 결과. RViz에 표시되는 robot model 위치와 동일한 좌표계. (이전에는 `/odom_relay` 기반이었으나, odom 프레임과 map 프레임이 달라 불일치가 발생해 TF 기반으로 변경)
+>
+> `linear_speed`: 현재 설정된 주행 속도 (ETA 추정 및 `set_speed` 명령으로 변경 가능)
 
 ### `/nav/feedback` 예시
 
@@ -172,10 +194,12 @@ RViz에서 원하는 위치를 확인한 뒤 입력한다.
 | `waypoints_file` | `config/waypoints.yaml` | 웨이포인트 파일 경로 |
 | `max_retries` | `2` | 목표 실패 시 최대 재시도 횟수 |
 | `retry_delay_sec` | `2.0` | 재시도 전 대기 시간 (초) |
-| `linear_speed` | `0.12` | ETA 추정용 평균 선속도 (m/s) |
+| `linear_speed` | `0.12` | 초기 선속도 (m/s). `set_speed` 명령으로 런타임 변경 가능 |
 | `replan_on_map_update` | `true` | 맵 업데이트 시 자동 재계획 |
 | `replan_min_interval` | `5.0` | 최소 재계획 간격 (초) |
 
+> `linear_speed` 속도 범위: 최소 `0.05 m/s`, 최대 `0.30 m/s`. 범위 밖 값은 자동으로 클램핑된다.
+>
 > `replan_on_map_update` 주의: `nav_mode:=hector` 에서는 HectorSLAM이 매 scan마다 맵을 업데이트하므로 `true`로 두면 5초마다 goal이 cancel→replan 반복된다. wsl_bringup에서 hector 모드로 실행 시 자동으로 `false`로 설정된다.
 
 ---
@@ -184,8 +208,20 @@ RViz에서 원하는 위치를 확인한 뒤 입력한다.
 
 ```
 IDLE → (명령 수신) → NAVIGATING → (도착) → IDLE
+                               → (patrol 도착) → NAVIGATING (다음 웨이포인트)
+                               → (queue 도착) → NAVIGATING (다음 큐 포인트, ping-pong)
                                → (실패) → RECOVERING → (재시도) → NAVIGATING
-                                                      → (횟수 초과) → FAILED
+                                                      → (횟수 초과, queue) → 해당 포인트 스킵 → 계속
+                                                      → (횟수 초과, 그 외) → FAILED
 NAVIGATING → (cancel 명령) → IDLE
 NAVIGATING → (맵 업데이트, replan_on_map_update=true) → cancel → NAVIGATING (동일 목표 재전송)
 ```
+
+### 큐(queue) ping-pong 동작
+
+```
+waypoints: [A, B, C]
+A → B → C → B → A → B → C → ...  (무한 반복)
+```
+
+방향이 끝에 도달하면 자동으로 역전된다. `/nav/status`의 `queue_direction` 필드에서 현재 방향 확인 가능 (`1` = 순방향, `-1` = 역방향).

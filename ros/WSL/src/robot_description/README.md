@@ -93,8 +93,8 @@ ros2 launch wsl_bringup robot_core.launch.py
 ```xml
 <xacro:property name="base_length"      value="0.220"/>  <!-- 앞뒤 220mm -->
 <xacro:property name="base_width"       value="0.140"/>  <!-- 좌우 140mm -->
-<xacro:property name="wheel_radius"     value="0.033"/>  <!-- 바퀴 반지름 33mm -->
-<xacro:property name="wheel_separation" value="0.100"/>  <!-- 바퀴 중심 간격 -->
+<xacro:property name="wheel_radius"     value="0.0329"/> <!-- 바퀴 반지름 32.9mm (serial_bridge 캘리브레이션 값과 통일) -->
+<xacro:property name="wheel_separation" value="0.100"/>  <!-- 좌우 바퀴 중심 간격 100mm (실측) -->
 ```
 
 수정 후 재빌드 없이 `--symlink-install`로 빌드했다면 런처 재시작만으로 반영된다.

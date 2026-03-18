@@ -137,6 +137,18 @@ WebSocket 서버는 기본적으로 **포트 9090**에서 대기한다.
 
 ---
 
+## 파라미터 (`config/websocket_bridge_params.yaml`)
+
+| 파라미터 | 기본값 | 설명 |
+|----------|--------|------|
+| `odom_source` | `"slam"` | odom 위치 소스: `"slam"` = map→base_footprint TF 사용 (권장), `"odom"` = `/odom` 토픽 사용 |
+| `odom_publish_mode` | `"timer"` | 전송 방식: `"timer"` = 고정 주기 전송 (권장), `"topic"` = /odom 메시지 도착 시 전송 |
+| `odom_publish_interval` | `0.1` | 전송 주기 (초). `timer` 모드에서는 정확히 이 주기로 전송, `topic` 모드에서는 다운샘플링 간격 |
+
+> `odom_source: "slam"` 권장: SLAM 좌표계(map 프레임)와 동일한 위치를 클라이언트에 전달한다. `"odom"`으로 설정하면 EKF 오도메트리 기준 위치가 전달되어 map과 오차가 발생할 수 있다.
+
+---
+
 ## 트러블슈팅
 
 ### 클라이언트에서 연결 불가
@@ -151,4 +163,4 @@ sudo ufw allow 9090/tcp
 
 ### 오도메트리가 너무 빠르거나 느림
 
-`ros_bridge.cpp`의 `odomCallback` 내 다운샘플링 주기(`0.1`초 = 10Hz)를 수정한다.
+`config/websocket_bridge_params.yaml`의 `odom_publish_interval` 값을 수정한다 (초 단위, 기본 `0.1` = 10 Hz).

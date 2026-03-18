@@ -34,7 +34,9 @@ ros/
         ├── websocket_bridge/   ← ROS2 ↔ WebSocket (Qt 클라이언트용)
         ├── robot_description/  ← URDF 로봇 모델
         ├── robot_localization_config/ ← EKF 센서 융합 설정
-        └── robot_navigation/   ← SLAM / Navigation2 설정
+        ├── robot_navigation/   ← SLAM / Navigation2 설정
+        ├── hector_mapping/     ← HectorSLAM (scan-only SLAM)
+        └── navigation_manager/ ← 자율주행 미션 컨트롤러 (웨이포인트 / 순찰 / 큐)
 ```
 
 ---
@@ -200,7 +202,15 @@ docker exec -it wsl_ros2 bash
 cd /root/ros2_ws
 colcon build --symlink-install
 source install/setup.bash
+
+# SLAM Toolbox 모드 (기본)
 ros2 launch wsl_bringup wsl_bringup.launch.py
+
+# HectorSLAM 모드 (odom/IMU 없이 라이다만으로 SLAM + Nav2)
+ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=hector use_rviz:=true
+
+# Localization 모드 (기존 맵 사용)
+ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=localization use_rviz:=true
 ```
 
 ### 3. 연결 확인
@@ -215,6 +225,8 @@ ros2 topic list
 
 ## 전체 시스템 토픽 흐름
 
+### SLAM Toolbox / Localization 모드
+
 ```
 [STM32] ──UART──► [rpi_serial_bridge] ──► /wheel_odom, /imu/data
 [YDLiDAR X4] ────► [ydlidar_ros2_driver] ──► /scan
@@ -226,10 +238,23 @@ ros2 topic list
 [/wheel_odom + /imu/data] ──► [robot_localization] ──► /odom
 [/scan + /odom] ─────────────► [slam_toolbox] ──────► /map
 [/map + /odom] ──────────────► [nav2] ─────────────► /cmd_vel
+[/nav/command] ──────────────► [navigation_manager] ──► /navigate_to_pose (Nav2 Action)
 [/cmd_vel] ───────────────────────────────────────► [rpi_serial_bridge] ──UART──► [STM32]
 [/camera/image_raw/compressed] ──► [rtsp_bridge] ──► RTSP stream
-[/odom, /map, /cmd_vel] ─────────► [websocket_bridge] ──► WebSocket (Qt 클라이언트)
+[map→base_footprint TF] ─────────► [websocket_bridge] ──► WebSocket (Qt 클라이언트)
 ```
+
+### HectorSLAM 모드 (`nav_mode:=hector`)
+
+```
+[YDLiDAR X4] ──► /scan ──► [hector_mapping] ──► /map, map→odom TF
+[scan_relay] ──► odom→base_footprint TF (50 Hz keepalive)
+[/scan + map→odom TF] ──► [nav2] ──► /cmd_vel
+[/nav/command] ──► [navigation_manager] ──► /navigate_to_pose (Nav2 Action)
+                   (replan_on_map_update=false: HectorSLAM 고빈도 맵 업데이트 무시)
+```
+
+> HectorSLAM 모드는 odom/IMU 없이 라이다 scan만으로 SLAM을 수행한다. `/wheel_odom`, `/imu/data`가 없어도 동작하나, 긴 직선 구간이나 특징이 없는 환경에서 드리프트가 발생할 수 있다.
 
 ---
 
@@ -239,10 +264,12 @@ ros2 topic list
 |--------|------|------|
 | `rpi_bringup` | `rsvp/ros2_ws/src/rpi_bringup/README.md` | RPi 전체 런처 |
 | `rpi_serial_bridge` | `rsvp/ros2_ws/src/rpi_serial_bridge/README.md` | STM32 시리얼 통신 |
-| `wsl_bringup` | `WSL/src/wsl_bringup/README.md` | WSL 전체 런처 |
+| `wsl_bringup` | `WSL/src/wsl_bringup/README.md` | WSL 전체 런처 (hector 모드 포함) |
 | `camera_bridge` | `WSL/src/camera_bridge/README.md` | MJPEG 브릿지 |
 | `rtsp_bridge` | `WSL/src/rtsp_bridge/README.md` | RTSP 스트리밍 |
 | `websocket_bridge` | `WSL/src/websocket_bridge/README.md` | WebSocket 브릿지 |
 | `robot_description` | `WSL/src/robot_description/README.md` | 로봇 URDF 모델 |
 | `robot_localization_config` | `WSL/src/robot_localization_config/README.md` | EKF 센서 융합 |
 | `robot_navigation` | `WSL/src/robot_navigation/README.md` | SLAM / Nav2 |
+| `hector_mapping` | `WSL/src/hector_mapping/README.md` | HectorSLAM (scan-only SLAM) |
+| `navigation_manager` | `WSL/src/navigation_manager/README.md` | 자율주행 미션 컨트롤러 |
