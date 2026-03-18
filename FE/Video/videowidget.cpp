@@ -60,6 +60,8 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     m_isPlaying = false;
     sourceWidth = 0; // [Mod] Init to 0 to detect valid resolution
     sourceHeight = 0;
+    sourcePixelAspectNum = 1;
+    sourcePixelAspectDen = 1;
     currentCropRect = QRectF(0.0, 0.0, 1.0, 1.0); 
 
     busTimer = new QTimer(this);
@@ -139,6 +141,8 @@ void VideoWidget::stop()
     // Reset Resolution
     sourceWidth = 0; 
     sourceHeight = 0;
+    sourcePixelAspectNum = 1;
+    sourcePixelAspectDen = 1;
 }
 
 void VideoWidget::updateSourceResolution() {
@@ -153,6 +157,17 @@ void VideoWidget::updateSourceResolution() {
             if (gst_structure_get_int(str, "width", &w) && gst_structure_get_int(str, "height", &h)) {
                 sourceWidth = w;
                 sourceHeight = h;
+                int parNum = 1;
+                int parDen = 1;
+                if (gst_structure_has_field(str, "pixel-aspect-ratio")) {
+                    gst_structure_get_fraction(str, "pixel-aspect-ratio", &parNum, &parDen);
+                }
+                if (parNum <= 0 || parDen <= 0) {
+                    parNum = 1;
+                    parDen = 1;
+                }
+                sourcePixelAspectNum = parNum;
+                sourcePixelAspectDen = parDen;
                 qDebug() << "[VideoWidget] Source resolution updated:" << w << "x" << h;
                 
                 // Re-apply current crop if valid
@@ -176,7 +191,12 @@ void VideoWidget::showPlaceholder(const QString &text) {
 void VideoWidget::applyCrop(const QRectF &rect)
 {
     QMutexLocker locker(&cropMutex);
-    currentCropRect = rect; 
+    const double requestedWidth = qBound(0.0, rect.width(), 1.0);
+    const double requestedHeight = qBound(0.0, rect.height(), 1.0);
+    const double requestedX = qBound(0.0, rect.x(), qMax(0.0, 1.0 - requestedWidth));
+    const double requestedY = qBound(0.0, rect.y(), qMax(0.0, 1.0 - requestedHeight));
+    const QRectF requestedRect(requestedX, requestedY, requestedWidth, requestedHeight);
+    currentCropRect = requestedRect;
 
     // Allow crop adjustment even if paused, as long as pipeline exists
     if (!cropper) {
@@ -193,13 +213,22 @@ void VideoWidget::applyCrop(const QRectF &rect)
         }
     }
 
-    int left = static_cast<int>(rect.left() * sourceWidth);
-    int right = static_cast<int>((1.0 - rect.right()) * sourceWidth);
-    int top = static_cast<int>(rect.top() * sourceHeight);
-    int bottom = static_cast<int>((1.0 - rect.bottom()) * sourceHeight);
+    int left = static_cast<int>(requestedRect.left() * sourceWidth);
+    int right = static_cast<int>((1.0 - requestedRect.right()) * sourceWidth);
+    int top = static_cast<int>(requestedRect.top() * sourceHeight);
+    int bottom = static_cast<int>((1.0 - requestedRect.bottom()) * sourceHeight);
 
-    left = qMax(0, left); right = qMax(0, right);
-    top = qMax(0, top); bottom = qMax(0, bottom);
+    left = qBound(0, left, qMax(0, sourceWidth - 1));
+    top = qBound(0, top, qMax(0, sourceHeight - 1));
+    right = qBound(0, right, qMax(0, sourceWidth - left - 1));
+    bottom = qBound(0, bottom, qMax(0, sourceHeight - top - 1));
+
+    const int visibleWidth = qMax(1, sourceWidth - left - right);
+    const int visibleHeight = qMax(1, sourceHeight - top - bottom);
+    currentCropRect = QRectF(static_cast<double>(left) / static_cast<double>(sourceWidth),
+                             static_cast<double>(top) / static_cast<double>(sourceHeight),
+                             static_cast<double>(visibleWidth) / static_cast<double>(sourceWidth),
+                             static_cast<double>(visibleHeight) / static_cast<double>(sourceHeight));
 
     // Debug
     // qDebug() << "Crop:" << left << right << top << bottom;
@@ -215,8 +244,13 @@ void VideoWidget::applyCrop(const QRectF &rect)
 void VideoWidget::panView(qreal dx, qreal dy) {
     if (currentCropRect.width() >= 1.0 && currentCropRect.height() >= 1.0) return;
 
-    qreal percentX = dx / (qreal)this->width();
-    qreal percentY = dy / (qreal)this->height();
+    const QRectF displayRect = getVideoDisplayRect();
+    if (displayRect.width() <= 0.0 || displayRect.height() <= 0.0) {
+        return;
+    }
+
+    qreal percentX = dx / static_cast<qreal>(displayRect.width());
+    qreal percentY = dy / static_cast<qreal>(displayRect.height());
 
     qreal newX = currentCropRect.x() - percentX;
     qreal newY = currentCropRect.y() - percentY;
@@ -229,6 +263,86 @@ void VideoWidget::panView(qreal dx, qreal dy) {
 
 void VideoWidget::resetCrop() {
     applyCrop(QRectF(0, 0, 1, 1));
+}
+
+QRectF VideoWidget::getVideoDisplayRect() const
+{
+    const QRectF widgetRect = rect();
+    if (widgetRect.isEmpty()) {
+        return widgetRect;
+    }
+
+    QRectF cropRect;
+    {
+        QMutexLocker locker(&cropMutex);
+        cropRect = currentCropRect;
+    }
+
+    const double cropWidth = cropRect.width() > 0.0 ? cropRect.width() : 1.0;
+    const double cropHeight = cropRect.height() > 0.0 ? cropRect.height() : 1.0;
+    const double pixelAspect = (sourcePixelAspectDen > 0)
+                                   ? (static_cast<double>(sourcePixelAspectNum) / static_cast<double>(sourcePixelAspectDen))
+                                   : 1.0;
+    const double contentWidth = static_cast<double>(sourceWidth > 0 ? sourceWidth : widgetRect.width()) * cropWidth * pixelAspect;
+    const double contentHeight = static_cast<double>(sourceHeight > 0 ? sourceHeight : widgetRect.height()) * cropHeight;
+
+    QSizeF contentSize(contentWidth, contentHeight);
+    contentSize.scale(widgetRect.size(), Qt::KeepAspectRatio);
+
+    const QPointF topLeft((widgetRect.width() - contentSize.width()) * 0.5,
+                          (widgetRect.height() - contentSize.height()) * 0.5);
+    return QRectF(topLeft, contentSize);
+}
+
+QPointF VideoWidget::widgetPointToVideoNormalized(const QPointF &widgetPoint, bool *ok) const
+{
+    if (ok) {
+        *ok = false;
+    }
+
+    const QRectF displayRect = getVideoDisplayRect();
+    if (displayRect.isEmpty() || !displayRect.contains(widgetPoint)) {
+        return QPointF();
+    }
+
+    QRectF cropRect;
+    {
+        QMutexLocker locker(&cropMutex);
+        cropRect = currentCropRect;
+    }
+
+    const double localX = (widgetPoint.x() - displayRect.left()) / displayRect.width();
+    const double localY = (widgetPoint.y() - displayRect.top()) / displayRect.height();
+    const QPointF normalized(cropRect.x() + (localX * cropRect.width()),
+                             cropRect.y() + (localY * cropRect.height()));
+
+    if (ok) {
+        *ok = true;
+    }
+    return normalized;
+}
+
+QPointF VideoWidget::videoNormalizedToWidgetPoint(const QPointF &normalizedPoint) const
+{
+    const QRectF displayRect = getVideoDisplayRect();
+    if (displayRect.isEmpty()) {
+        return QPointF();
+    }
+
+    QRectF cropRect;
+    {
+        QMutexLocker locker(&cropMutex);
+        cropRect = currentCropRect;
+    }
+
+    if (cropRect.width() <= 0.0 || cropRect.height() <= 0.0) {
+        return QPointF();
+    }
+
+    const double localX = (normalizedPoint.x() - cropRect.x()) / cropRect.width();
+    const double localY = (normalizedPoint.y() - cropRect.y()) / cropRect.height();
+    return QPointF(displayRect.left() + (localX * displayRect.width()),
+                   displayRect.top() + (localY * displayRect.height()));
 }
 
 void VideoWidget::pollGstBus()
@@ -257,6 +371,13 @@ void VideoWidget::pollGstBus()
         }
         gst_message_unref(msg);
     }
+
+    // Keep trying until caps are ready so overlay coordinate mapping can use
+    // the real video aspect ratio instead of the widget rect fallback.
+    if (m_isPlaying && (sourceWidth <= 0 || sourceHeight <= 0)) {
+        updateSourceResolution();
+    }
+
     gst_object_unref(bus);
 }
 
@@ -404,7 +525,6 @@ void VideoWidget::extractGstStats() {
 
 void VideoWidget::resizeEvent(QResizeEvent *e) { 
     QWidget::resizeEvent(e); 
-    if (pipeline) { /* overlay expose */ } 
     // [New] OSD 위젯의 크기를 부모(비디오)에 맞춤 - 탑레벨이므로 Global 좌표 사용
     if (m_osdWidget) {
         QPoint globalPos = mapToGlobal(QPoint(0, 0));

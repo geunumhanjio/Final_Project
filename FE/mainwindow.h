@@ -13,6 +13,8 @@
 #include <QSet>
 #include <QTimer>
 #include <QKeyEvent>
+#include <QPointF>
+#include <QString>
 
 QT_BEGIN_NAMESPACE
 QT_END_NAMESPACE
@@ -39,6 +41,21 @@ protected:
 
 private:
     bool handleWasdKey(QKeyEvent *event, bool isPress); // [New] Shared logic
+    void applyRobotMode(Sidebar::RobotMode mode);
+    void syncRobotModeToBackend(bool sendIdleMotion = false);
+    void stopManualMotion();
+    void requestEmergencyStop();
+    void clearAllGoalOverlays();
+    void armGoalTracking(const QPointF &goalPosition, double goalYaw);
+    void clearGoalTracking();
+    void handleGoalOdomUpdate(const QJsonObject &data);
+    void handleGoalNavStatus(const QJsonObject &data);
+    void handleGoalNavFeedback(const QJsonObject &data);
+    void deactivateControlSession();
+    void updateSidebarForCurrentPage();
+    void applySharedVideoGoalOverlay();
+    void setSharedVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd);
+    void clearSharedVideoGoalOverlay();
 
 private slots:
     void processInput();
@@ -68,6 +85,19 @@ private:
     
     QTimer *m_inputTimer;
     QSet<int> m_pressedKeys;
+    QString m_currentRobotWsUrl;
+    Sidebar::RobotMode m_robotMode = Sidebar::ManualMode;
+    bool m_sidebarVisibleBeforeFullScreen = true;
+    bool m_sidebarForcedHiddenForFullScreen = false;
+    bool m_hasSharedVideoGoalOverlay = false;
+    int m_sharedVideoGoalChannelIndex = -1;
+    QPointF m_sharedVideoGoalStartNormalized;
+    QPointF m_sharedVideoGoalEndNormalized;
+    bool m_isClosingFullScreen = false;
+    bool m_hasActiveGoal = false;
+    QPointF m_activeGoalPosition;
+    double m_activeGoalYaw = 0.0;
+    int m_goalArrivalStableCount = 0;
     
     // [New] Widget to return to after closing FullScreenView
     QWidget* m_returnToWidget = nullptr; 

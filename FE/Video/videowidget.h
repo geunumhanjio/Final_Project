@@ -37,6 +37,9 @@ public:
     void resetCrop();
     void panView(qreal dx, qreal dy);
     QRectF getCurrentCrop() const { return currentCropRect; }
+    QRectF getVideoDisplayRect() const;
+    QPointF widgetPointToVideoNormalized(const QPointF &widgetPoint, bool *ok = nullptr) const;
+    QPointF videoNormalizedToWidgetPoint(const QPointF &normalizedPoint) const;
 
     virtual void refreshFrame() {} // [New] For forcing update when paused
 
@@ -73,7 +76,9 @@ private:
     GstElement *pipeline;
     GstElement *cropper;
     int sourceWidth, sourceHeight;
-    QMutex cropMutex;
+    int sourcePixelAspectNum = 1;
+    int sourcePixelAspectDen = 1;
+    mutable QMutex cropMutex;
     QRectF currentCropRect;
 
     QLabel *placeholderLabel;

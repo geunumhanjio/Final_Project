@@ -6,11 +6,14 @@
 #define SIDEBAR_H
 
 #include <QDockWidget>
-#include <QListWidget>
 #include <QLineEdit>
+#include <QListWidget>
 #include <QVBoxLayout>
 
-class QStackedLayout; // [Fixed] 전방 선언
+class QButtonGroup;
+class QPushButton;
+class QRadioButton;
+class QStackedLayout;
 
 class Sidebar : public QDockWidget
 {
@@ -20,42 +23,56 @@ public:
     enum SidebarMode { Live, Playback };
     Q_ENUM(SidebarMode)
 
-    explicit Sidebar(const QString &title, QWidget *parent = nullptr); // [Fixed] 생성자 복구
+    enum RobotMode { ManualMode, AutoMode, ControlMode };
+    Q_ENUM(RobotMode)
+
+    explicit Sidebar(const QString &title, QWidget *parent = nullptr);
+    RobotMode currentRobotMode() const;
+    bool isControlButtonActive() const;
+    void setControlButtonActive(bool active);
+    void setRobotMode(RobotMode mode);
 
 public slots:
-    void setMode(SidebarMode mode); // [New] 모드 설정 슬롯
+    void setMode(SidebarMode mode);
 
 signals:
     void channelStateChanged(int channelIndex, bool isVisible);
-    void categorySelected(int categoryId); // [New] 카테고리 선택 시그널
+    void categorySelected(int categoryId);
+    void robotModeChanged(Sidebar::RobotMode mode);
+    void controlButtonToggled(bool enabled);
+    void emergencyStopRequested();
 
 private:
     QWidget *container;
-    // Layouts & Widgets for switching
-    QStackedLayout *mainStack; // [New]
-    QWidget *liveWidget;       // [New] 기존 채널 목록 컨테이너
-    QWidget *playbackWidget;   // [New] 재생 카테고리 목록 컨테이너
+    QStackedLayout *mainStack;
+    QWidget *liveWidget;
+    QWidget *playbackWidget;
 
-    // Live Mode Components
     QLineEdit *searchBar;
     QListWidget *channelList;
+    QButtonGroup *modeButtonGroup;
+    QRadioButton *manualModeButton;
+    QRadioButton *autoModeButton;
+    QRadioButton *controlModeButton;
+    QPushButton *activateControlButton;
+    QPushButton *emergencyStopButton;
 
-    // Playback Mode Components
-    QListWidget *categoryList; // [New]
+    QListWidget *categoryList;
 
     void setupUi();
-    void setupLiveUI();       // [New] 기존 setupUi 로직 이동
-    void setupPlaybackUI();   // [New] 재생 모드 UI 초기화
-    
-    void setupList(); 
-    void addHeaderItem(QString title, QString count); 
+    void setupLiveUI();
+    void setupPlaybackUI();
+    void applyRobotModeSelection(RobotMode mode, bool emitModeSignal);
+
+    void setupList();
+    void addHeaderItem(QString title, QString count);
     void addChannelItem(int index, QString name, bool isLidar = false, bool useTextStatus = true);
-    QString getChannelName(int index); 
+    QString getChannelName(int index);
     void filterChannels(const QString &text);
 
 private slots:
     void onItemClicked(QListWidgetItem *item);
-    void onCategoryClicked(QListWidgetItem *item); // [New]
+    void onCategoryClicked(QListWidgetItem *item);
 };
 
 #endif // SIDEBAR_H

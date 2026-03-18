@@ -1,4 +1,6 @@
 #include "videocard.h"
+#include <cmath>
+#include <functional>
 #include <QEvent>
 #include <QMouseEvent>
 #include <QMenu>         // [New]
@@ -6,9 +8,198 @@
 #include <QCheckBox>     // [New]
 #include <QLabel>        // [New]
 #include <QGraphicsOpacityEffect>
+#include <QPainter>
 #include <QPropertyAnimation>
 #include "livevideowidget.h"
 #include "osdwidget.h"   // [New]
+
+namespace {
+
+bool nearlyEqual(qreal a, qreal b, qreal epsilon = 0.01)
+{
+    return std::abs(a - b) <= epsilon;
+}
+
+bool samePoint(const QPointF &lhs, const QPointF &rhs, qreal epsilon = 0.01)
+{
+    return nearlyEqual(lhs.x(), rhs.x(), epsilon) && nearlyEqual(lhs.y(), rhs.y(), epsilon);
+}
+
+bool sameRect(const QRectF &lhs, const QRectF &rhs, qreal epsilon = 0.01)
+{
+    return samePoint(lhs.topLeft(), rhs.topLeft(), epsilon)
+           && nearlyEqual(lhs.width(), rhs.width(), epsilon)
+           && nearlyEqual(lhs.height(), rhs.height(), epsilon);
+}
+
+class GoalOverlayWidget : public QWidget
+{
+public:
+    explicit GoalOverlayWidget(QWidget *parent = nullptr) : QWidget(parent)
+    {
+        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowDoesNotAcceptFocus);
+        setAttribute(Qt::WA_NoSystemBackground, true);
+        setAttribute(Qt::WA_TranslucentBackground, true);
+        setAttribute(Qt::WA_StyledBackground, false);
+        setAttribute(Qt::WA_TransparentForMouseEvents, true);
+        setAttribute(Qt::WA_ShowWithoutActivating, true);
+        setAutoFillBackground(false);
+        hide();
+    }
+
+    void syncToWidget(QWidget *target)
+    {
+        if (!target) {
+            return;
+        }
+
+        QWidget *ownerWindow = target->window();
+        if (ownerWindow && parentWidget() != ownerWindow) {
+            setParent(ownerWindow, windowFlags());
+        }
+
+        const QRect targetGeometry(target->mapToGlobal(QPoint(0, 0)), target->size());
+        if (geometry() != targetGeometry) {
+            setGeometry(targetGeometry);
+        }
+    }
+
+    void setClipRect(const QRectF &clipRect)
+    {
+        m_clipRect = clipRect;
+        update();
+    }
+
+    void setActive(bool active)
+    {
+        m_active = active;
+        if (!m_active) {
+            m_isSettingDirection = false;
+            m_startPos = QPointF();
+            m_endPos = QPointF();
+        }
+        setMouseTracking(active);
+        setCursor(active ? Qt::CrossCursor : Qt::ArrowCursor);
+        updateVisibility();
+        update();
+    }
+
+    bool isActive() const
+    {
+        return m_active;
+    }
+
+    std::function<void(QPointF, double)> onGoalRequested;
+
+    void setGoalState(const QPointF &startPos, const QPointF &endPos, bool isDrawingArrow)
+    {
+        m_startPos = startPos;
+        m_endPos = endPos;
+        m_isSettingDirection = isDrawingArrow;
+        updateVisibility();
+        update();
+    }
+
+    void clearGoalState()
+    {
+        m_startPos = QPointF();
+        m_endPos = QPointF();
+        m_isSettingDirection = false;
+        updateVisibility();
+        update();
+    }
+
+    void clearAllGoalState()
+    {
+        clearGoalState();
+        setCommittedGoalState(QPointF(), QPointF(), false);
+    }
+
+    void setCommittedGoalState(const QPointF &startPos, const QPointF &endPos, bool hasCommitted)
+    {
+        const bool changed = (m_hasCommittedArrow != hasCommitted)
+                             || (m_committedStartPos != startPos)
+                             || (m_committedEndPos != endPos);
+        m_hasCommittedArrow = hasCommitted;
+        m_committedStartPos = hasCommitted ? startPos : QPointF();
+        m_committedEndPos = hasCommitted ? endPos : QPointF();
+        updateVisibility();
+        if (changed) {
+            update();
+        }
+    }
+
+    void commitGoalState(const QPointF &startPos, const QPointF &endPos)
+    {
+        m_startPos = QPointF();
+        m_endPos = QPointF();
+        m_isSettingDirection = false;
+        setCommittedGoalState(startPos, endPos, true);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        Q_UNUSED(event);
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setClipRect(m_clipRect.isValid() ? m_clipRect : QRectF(rect()));
+        auto drawArrow = [&painter](const QPointF &startPos, const QPointF &endPos) {
+            if (startPos.isNull()) {
+                return;
+            }
+
+            painter.setPen(QPen(Qt::red, 3.0));
+            painter.setBrush(Qt::red);
+            painter.drawEllipse(startPos, 5.0, 5.0);
+
+            if (endPos.isNull() || endPos == startPos) {
+                return;
+            }
+
+            painter.drawLine(startPos, endPos);
+
+            const double angle = std::atan2(endPos.y() - startPos.y(), endPos.x() - startPos.x());
+            const double arrowSize = 12.0;
+            const QPointF p1 = endPos - QPointF(arrowSize * std::cos(angle - (M_PI / 6.0)),
+                                                arrowSize * std::sin(angle - (M_PI / 6.0)));
+            const QPointF p2 = endPos - QPointF(arrowSize * std::cos(angle + (M_PI / 6.0)),
+                                                arrowSize * std::sin(angle + (M_PI / 6.0)));
+            QPolygonF arrowHead;
+            arrowHead << endPos << p1 << p2;
+            painter.drawPolygon(arrowHead);
+        };
+
+        if (m_hasCommittedArrow) {
+            drawArrow(m_committedStartPos, m_committedEndPos);
+        }
+        if (m_active && !m_startPos.isNull()) {
+            drawArrow(m_startPos, m_endPos);
+        }
+    }
+private:
+    void updateVisibility()
+    {
+        if (m_hasCommittedArrow || (m_active && !m_startPos.isNull())) {
+            if (!isVisible()) {
+                show();
+            }
+        } else if (isVisible()) {
+            hide();
+        }
+    }
+
+    bool m_active = false;
+    bool m_isSettingDirection = false;
+    QPointF m_startPos;
+    QPointF m_endPos;
+    bool m_hasCommittedArrow = false;
+    QPointF m_committedStartPos;
+    QPointF m_committedEndPos;
+    QRectF m_clipRect;
+};
+
+} // namespace
 
 VideoCard::VideoCard(QWidget *parent) : QWidget(parent)
 {
@@ -16,11 +207,16 @@ VideoCard::VideoCard(QWidget *parent) : QWidget(parent)
     m_isHovered = false;
     m_isRecording = false;
     m_channelId = -1;
+    m_goalOverlaySyncTimer = new QTimer(this);
+    m_goalOverlaySyncTimer->setInterval(16);
+    connect(m_goalOverlaySyncTimer, &QTimer::timeout, this, &VideoCard::syncGoalOverlayPosition);
+    m_goalOverlaySyncTimer->start();
     showRecIndicator(false); // Default hidden until recording start
 }
 
 VideoCard::~VideoCard()
 {
+    delete m_goalOverlay;
 }
 
 void VideoCard::setupUi()
@@ -42,7 +238,10 @@ void VideoCard::setupUi()
     // 2-1. The Video Widget
     m_videoWidget = new LiveVideoWidget(videoContainer);
     m_videoWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_videoWidget->installEventFilter(this);
     videoLayout->addWidget(m_videoWidget, 0, 0);
+
+    m_goalOverlay = new GoalOverlayWidget(window());
 
     // 2-2. Top Overlay (REC badge, Buttons)
     m_topOverlay = new QWidget(videoContainer);
@@ -183,6 +382,67 @@ void VideoCard::showRecIndicator(bool show)
     m_recBadge->setVisible(show);
 }
 
+void VideoCard::setGoalTargetingEnabled(bool enabled)
+{
+    m_goalTargetingEnabled = enabled;
+    if (!m_goalOverlay) {
+        return;
+    }
+
+    m_isSettingGoalDirection = false;
+    m_goalStartPos = QPointF();
+    m_goalEndPos = QPointF();
+    m_videoWidget->setMouseTracking(enabled);
+    static_cast<GoalOverlayWidget *>(m_goalOverlay)->syncToWidget(m_videoWidget);
+    static_cast<GoalOverlayWidget *>(m_goalOverlay)->setClipRect(m_videoWidget->getVideoDisplayRect());
+    static_cast<GoalOverlayWidget *>(m_goalOverlay)->clearGoalState();
+    static_cast<GoalOverlayWidget *>(m_goalOverlay)->setActive(enabled);
+    updateCommittedGoalOverlay();
+    m_topOverlay->setVisible(m_isHovered && !enabled);
+}
+
+bool VideoCard::isGoalTargetingEnabled() const
+{
+    return m_goalTargetingEnabled;
+}
+
+void VideoCard::clearGoalOverlay()
+{
+    m_isSettingGoalDirection = false;
+    m_goalStartPos = QPointF();
+    m_goalEndPos = QPointF();
+    m_hasCommittedGoalOverlay = false;
+    m_committedGoalStartNormalized = QPointF();
+    m_committedGoalEndNormalized = QPointF();
+    m_hasCommittedGoalLocalCache = false;
+    m_committedGoalStartLocal = QPointF();
+    m_committedGoalEndLocal = QPointF();
+    m_committedGoalDisplayRect = QRectF();
+    m_preserveLocalCommittedGoalOnNextSet = false;
+    if (m_goalOverlay) {
+        static_cast<GoalOverlayWidget *>(m_goalOverlay)->clearAllGoalState();
+    }
+}
+
+void VideoCard::setCommittedGoalOverlay(const QPointF &normalizedStart, const QPointF &normalizedEnd)
+{
+    const bool preserveLocalCache = m_preserveLocalCommittedGoalOnNextSet
+                                    && m_hasCommittedGoalOverlay
+                                    && samePoint(m_committedGoalStartNormalized, normalizedStart)
+                                    && samePoint(m_committedGoalEndNormalized, normalizedEnd);
+    m_preserveLocalCommittedGoalOnNextSet = false;
+    m_hasCommittedGoalOverlay = true;
+    m_committedGoalStartNormalized = normalizedStart;
+    m_committedGoalEndNormalized = normalizedEnd;
+    if (!preserveLocalCache) {
+        m_hasCommittedGoalLocalCache = false;
+        m_committedGoalStartLocal = QPointF();
+        m_committedGoalEndLocal = QPointF();
+        m_committedGoalDisplayRect = QRectF();
+    }
+    updateCommittedGoalOverlay();
+}
+
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 void VideoCard::enterEvent(QEnterEvent *event)
 #else
@@ -190,8 +450,93 @@ void VideoCard::enterEvent(QEvent *event)
 #endif
 {
     m_isHovered = true;
-    m_topOverlay->setVisible(true);
+    m_topOverlay->setVisible(!m_goalTargetingEnabled);
     QWidget::enterEvent(event);
+}
+
+bool VideoCard::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_videoWidget && m_goalTargetingEnabled && m_goalOverlay) {
+        GoalOverlayWidget *overlay = static_cast<GoalOverlayWidget *>(m_goalOverlay);
+
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton && m_videoWidget->width() > 0 && m_videoWidget->height() > 0) {
+                overlay->syncToWidget(m_videoWidget);
+                overlay->setClipRect(m_videoWidget->getVideoDisplayRect());
+                if (!m_isSettingGoalDirection) {
+                    bool ok = false;
+                    const QPointF normalizedStart = m_videoWidget->widgetPointToVideoNormalized(mouseEvent->position(), &ok);
+                    if (!ok) {
+                        return true;
+                    }
+                    emit goalInteractionStarted();
+                    m_goalStartPos = mouseEvent->position();
+                    m_goalEndPos = m_goalStartPos;
+                    m_isSettingGoalDirection = true;
+                    m_hasCommittedGoalOverlay = false;
+                    overlay->setGoalState(m_goalStartPos, m_goalEndPos, true);
+                } else {
+                    const QRectF displayRect = m_videoWidget->getVideoDisplayRect();
+                    const QPointF clampedEnd(qBound(displayRect.left(), mouseEvent->position().x(), displayRect.right()),
+                                             qBound(displayRect.top(), mouseEvent->position().y(), displayRect.bottom()));
+                    m_goalEndPos = clampedEnd;
+                    bool ok = false;
+                    const QPointF normalizedStart = m_videoWidget->widgetPointToVideoNormalized(m_goalStartPos, &ok);
+                    if (!ok) {
+                        m_isSettingGoalDirection = false;
+                        m_goalStartPos = QPointF();
+                        m_goalEndPos = QPointF();
+                        overlay->clearGoalState();
+                        return true;
+                    }
+                    const QPointF normalizedEnd = m_videoWidget->widgetPointToVideoNormalized(m_goalEndPos, &ok);
+                    if (!ok) {
+                        m_isSettingGoalDirection = false;
+                        m_goalStartPos = QPointF();
+                        m_goalEndPos = QPointF();
+                        overlay->clearGoalState();
+                        return true;
+                    }
+                    m_hasCommittedGoalOverlay = true;
+                    m_committedGoalStartNormalized = normalizedStart;
+                    m_committedGoalEndNormalized = normalizedEnd;
+                    m_hasCommittedGoalLocalCache = true;
+                    m_committedGoalStartLocal = m_goalStartPos;
+                    m_committedGoalEndLocal = m_goalEndPos;
+                    m_committedGoalDisplayRect = displayRect;
+                    m_preserveLocalCommittedGoalOnNextSet = true;
+                    overlay->commitGoalState(m_goalStartPos, m_goalEndPos);
+                    emit goalOverlayCommitted(normalizedStart, normalizedEnd);
+                    emit goalCommitted();
+                    const double yaw = std::atan2(m_goalStartPos.y() - m_goalEndPos.y(),
+                                                  m_goalEndPos.x() - m_goalStartPos.x());
+                    emit goalRequested(normalizedStart, yaw);
+
+                    m_isSettingGoalDirection = false;
+                    m_goalStartPos = QPointF();
+                    m_goalEndPos = QPointF();
+                    overlay->clearGoalState();
+                }
+                return true;
+            }
+        } else if (event->type() == QEvent::MouseMove && m_isSettingGoalDirection) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            m_goalEndPos = mouseEvent->position();
+            overlay->setGoalState(m_goalStartPos, m_goalEndPos, true);
+            return true;
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::LeftButton) {
+                return true;
+            }
+        } else if (event->type() == QEvent::Leave && m_isSettingGoalDirection) {
+            overlay->setGoalState(m_goalStartPos, m_goalStartPos, true);
+            return true;
+        }
+    }
+
+    return QWidget::eventFilter(watched, event);
 }
 
 void VideoCard::leaveEvent(QEvent *event)
@@ -204,6 +549,7 @@ void VideoCard::leaveEvent(QEvent *event)
 void VideoCard::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
+    syncGoalOverlayPosition();
 }
 
 void VideoCard::mouseDoubleClickEvent(QMouseEvent *event)
@@ -215,6 +561,63 @@ void VideoCard::mouseDoubleClickEvent(QMouseEvent *event)
 void VideoCard::updateOverlayLayout()
 {
     // If we wanted to do manual positioning instead of Grid, we would do it here.
+}
+
+void VideoCard::syncGoalOverlayPosition()
+{
+    if (!m_goalOverlay || !m_videoWidget) {
+        return;
+    }
+
+    updateCommittedGoalOverlay();
+
+    if (!isVisible()) {
+        if (m_goalOverlay->isVisible()) {
+            m_goalOverlay->hide();
+        }
+        return;
+    }
+
+    if (!m_goalOverlay->isVisible()) {
+        return;
+    }
+
+    static_cast<GoalOverlayWidget *>(m_goalOverlay)->syncToWidget(m_videoWidget);
+    static_cast<GoalOverlayWidget *>(m_goalOverlay)->setClipRect(m_videoWidget->getVideoDisplayRect());
+}
+
+void VideoCard::updateCommittedGoalOverlay()
+{
+    if (!m_goalOverlay || !m_videoWidget || m_isSettingGoalDirection) {
+        return;
+    }
+
+    GoalOverlayWidget *overlay = static_cast<GoalOverlayWidget *>(m_goalOverlay);
+    if (!isVisible()) {
+        overlay->hide();
+        return;
+    }
+
+    overlay->syncToWidget(m_videoWidget);
+    const QRectF displayRect = m_videoWidget->getVideoDisplayRect();
+    overlay->setClipRect(displayRect);
+    if (!m_hasCommittedGoalOverlay || m_videoWidget->width() <= 0 || m_videoWidget->height() <= 0) {
+        overlay->setCommittedGoalState(QPointF(), QPointF(), false);
+        return;
+    }
+
+    if (m_hasCommittedGoalLocalCache && sameRect(displayRect, m_committedGoalDisplayRect)) {
+        overlay->setCommittedGoalState(m_committedGoalStartLocal, m_committedGoalEndLocal, true);
+        return;
+    }
+
+    const QPointF startPos = m_videoWidget->videoNormalizedToWidgetPoint(m_committedGoalStartNormalized);
+    const QPointF endPos = m_videoWidget->videoNormalizedToWidgetPoint(m_committedGoalEndNormalized);
+    m_hasCommittedGoalLocalCache = true;
+    m_committedGoalStartLocal = startPos;
+    m_committedGoalEndLocal = endPos;
+    m_committedGoalDisplayRect = displayRect;
+    overlay->setCommittedGoalState(startPos, endPos, true);
 }
 
 void VideoCard::toggleRecord()

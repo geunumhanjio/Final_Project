@@ -1,4 +1,5 @@
 #include "fullscreenview.h"
+#include <algorithm>
 #include <QDebug>
 #include <QCursor>
 #include <QPainter>
@@ -11,6 +12,67 @@
 #include <QGuiApplication>
 #include <QApplication>
 
+namespace {
+
+bool nearlyEqual(qreal a, qreal b, qreal epsilon = 0.01)
+{
+    return std::abs(a - b) <= epsilon;
+}
+
+bool samePoint(const QPointF &lhs, const QPointF &rhs, qreal epsilon = 0.01)
+{
+    return nearlyEqual(lhs.x(), rhs.x(), epsilon) && nearlyEqual(lhs.y(), rhs.y(), epsilon);
+}
+
+bool sameRect(const QRectF &lhs, const QRectF &rhs, qreal epsilon = 0.01)
+{
+    return samePoint(lhs.topLeft(), rhs.topLeft(), epsilon)
+           && nearlyEqual(lhs.width(), rhs.width(), epsilon)
+           && nearlyEqual(lhs.height(), rhs.height(), epsilon);
+}
+
+QRectF selectionRectToCropRect(VideoWidget *videoWidget, const QRect &selectionRect)
+{
+    if (!videoWidget || selectionRect.width() < 2 || selectionRect.height() < 2) {
+        return QRectF();
+    }
+
+    const QRectF displayRect = videoWidget->getVideoDisplayRect();
+    const QRectF currentCrop = videoWidget->getCurrentCrop();
+    if (displayRect.isEmpty() || currentCrop.width() <= 0.0 || currentCrop.height() <= 0.0) {
+        return QRectF();
+    }
+
+    const QRectF widgetSelectionRect(QPointF(selectionRect.x(), selectionRect.y()),
+                                     QPointF(selectionRect.x() + selectionRect.width(),
+                                             selectionRect.y() + selectionRect.height()));
+    const QRectF clippedSelectionRect = widgetSelectionRect.normalized().intersected(displayRect);
+    if (clippedSelectionRect.width() <= 1.0 || clippedSelectionRect.height() <= 1.0) {
+        return QRectF();
+    }
+
+    const double leftRatio = qBound(0.0,
+                                    (clippedSelectionRect.left() - displayRect.left()) / displayRect.width(),
+                                    1.0);
+    const double topRatio = qBound(0.0,
+                                   (clippedSelectionRect.top() - displayRect.top()) / displayRect.height(),
+                                   1.0);
+    const double rightRatio = qBound(0.0,
+                                     (clippedSelectionRect.right() - displayRect.left()) / displayRect.width(),
+                                     1.0);
+    const double bottomRatio = qBound(0.0,
+                                      (clippedSelectionRect.bottom() - displayRect.top()) / displayRect.height(),
+                                      1.0);
+
+    const double targetX = currentCrop.x() + (leftRatio * currentCrop.width());
+    const double targetY = currentCrop.y() + (topRatio * currentCrop.height());
+    const double targetW = qMax(0.0, rightRatio - leftRatio) * currentCrop.width();
+    const double targetH = qMax(0.0, bottomRatio - topRatio) * currentCrop.height();
+    return QRectF(targetX, targetY, targetW, targetH);
+}
+
+} // namespace
+
 // =============================================================
 // [내부 클래스] 직접 그려지는 네모 박스
 // =============================================================
@@ -18,7 +80,7 @@ class SimpleRubberBand : public QWidget {
 public:
     SimpleRubberBand(QWidget* parent = nullptr) : QWidget(parent) {
         // 1. 테두리 없는 탑레벨 투명 윈도우 설정
-        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
+        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowDoesNotAcceptFocus);
 
         // 2. 배경 투명화 (중요)
         setAttribute(Qt::WA_TranslucentBackground);
@@ -53,26 +115,104 @@ protected:
 // =============================================================
 class ControlOverlay : public QWidget {
 public:
-    QPoint startPos;
-    QPoint endPos;
+    QPointF startPos;
+    QPointF endPos;
     bool isDrawingArrow;
+    QPointF committedStartPos;
+    QPointF committedEndPos;
+    bool hasCommittedArrow;
 
     ControlOverlay(QWidget* parent = nullptr) : QWidget(parent) {
         // [수정] SimpleRubberBand처럼 비디오 위젯 위에 확실히 그려지도록 탑레벨 윈도우 속성 부여
-        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowStaysOnTopHint);
+        setWindowFlags(Qt::FramelessWindowHint | Qt::Tool | Qt::WindowDoesNotAcceptFocus);
         setAttribute(Qt::WA_TranslucentBackground);
         setAttribute(Qt::WA_TransparentForMouseEvents);
         setAttribute(Qt::WA_NoSystemBackground, true);
+        setAttribute(Qt::WA_ShowWithoutActivating, true);
         
         isDrawingArrow = false;
+        hasCommittedArrow = false;
+    }
+
+    void setCommittedArrow(const QPointF &start, const QPointF &end, bool hasArrow) {
+        const bool changed = (hasCommittedArrow != hasArrow)
+                             || (committedStartPos != start)
+                             || (committedEndPos != end);
+        hasCommittedArrow = hasArrow;
+        committedStartPos = hasArrow ? start : QPointF();
+        committedEndPos = hasArrow ? end : QPointF();
+        updateVisibility();
+        if (changed) {
+            update();
+        }
+    }
+
+    void setClipRect(const QRectF &clipRect) {
+        m_clipRect = clipRect;
+        update();
+    }
+
+    void commitArrow(const QPointF &start, const QPointF &end) {
+        startPos = QPointF();
+        endPos = QPointF();
+        isDrawingArrow = false;
+        setCommittedArrow(start, end, true);
+    }
+
+    void clearPreview() {
+        startPos = QPointF();
+        endPos = QPointF();
+        isDrawingArrow = false;
+        updateVisibility();
+        update();
+    }
+
+    void clearAll() {
+        clearPreview();
+        setCommittedArrow(QPointF(), QPointF(), false);
     }
 
 protected:
     void paintEvent(QPaintEvent*) override {
-        if (startPos.isNull()) return;
-
         QPainter p(this);
         p.setRenderHint(QPainter::Antialiasing);
+        p.setClipRect(m_clipRect.isValid() ? m_clipRect : QRectF(rect()));
+
+        const auto drawArrow = [&p](const QPointF &start, const QPointF &end) {
+            if (start.isNull()) {
+                return;
+            }
+
+            QPen pen(Qt::red);
+            pen.setWidth(4);
+            p.setPen(pen);
+            p.setBrush(Qt::red);
+            p.drawEllipse(start, 5.0, 5.0);
+
+            if (end.isNull() || end == start) {
+                return;
+            }
+
+            p.drawLine(start, end);
+
+            const double angle = std::atan2(end.y() - start.y(), end.x() - start.x());
+            const double arrowSize = 15.0;
+            const QPointF p1 = end - QPointF(arrowSize * std::cos(angle - (M_PI / 6.0)),
+                                             arrowSize * std::sin(angle - (M_PI / 6.0)));
+            const QPointF p2 = end - QPointF(arrowSize * std::cos(angle + (M_PI / 6.0)),
+                                             arrowSize * std::sin(angle + (M_PI / 6.0)));
+            QPolygonF arrowHead;
+            arrowHead << end << p1 << p2;
+            p.drawPolygon(arrowHead);
+        };
+
+        if (hasCommittedArrow) {
+            drawArrow(committedStartPos, committedEndPos);
+        }
+        if (isDrawingArrow) {
+            drawArrow(startPos, endPos);
+        }
+        return;
 
         QPen pen(Qt::red);
         pen.setWidth(4);
@@ -97,6 +237,19 @@ protected:
             p.drawPolygon(arrowHead);
         }
     }
+
+private:
+    void updateVisibility() {
+        if (hasCommittedArrow || isDrawingArrow) {
+            if (!isVisible()) {
+                show();
+            }
+        } else if (isVisible()) {
+            hide();
+        }
+    }
+
+    QRectF m_clipRect;
 };
 // =============================================================
 
@@ -247,7 +400,9 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
         popup->show();
     });
 
-    connect(btnClose, &QPushButton::clicked, this, &FullScreenView::closeRequested);
+    connect(btnClose, &QPushButton::clicked, this, [this]() {
+        requestCloseView();
+    });
 
     topLayout->addWidget(titleLabel);
     topLayout->addSpacing(10);
@@ -362,7 +517,8 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
         if (state != Qt::ApplicationActive) {
             if (controlOverlay) controlOverlay->hide();
         } else {
-            if (currentMode == ControlMode && controlOverlay && this->isVisible()) {
+            if (controlOverlay && this->isVisible() &&
+                (currentMode == ControlMode || static_cast<ControlOverlay *>(controlOverlay)->hasCommittedArrow)) {
                 controlOverlay->show();
             }
         }
@@ -379,10 +535,119 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     currentMode = Normal;
 }
 
+void FullScreenView::setControlModeAvailable(bool available)
+{
+    m_controlModeAvailable = available;
+    const bool canControlVideo = canControlCurrentVideo();
+    underBar->setControlModeAvailable(canControlVideo);
+    if ((!m_controlModeAvailable || !canControlVideo) && currentMode == ControlMode) {
+        setMode(Normal);
+    }
+}
+
+void FullScreenView::setControlModeChecked(bool checked)
+{
+    if (underBar) {
+        underBar->setControlModeChecked(checked && canControlCurrentVideo());
+    }
+
+    if (checked) {
+        if (m_controlModeAvailable && canControlCurrentVideo()) {
+            setMode(ControlMode);
+        }
+        return;
+    }
+
+    if (currentMode == ControlMode) {
+        if (zoomHistory.isEmpty()) {
+            setMode(Normal);
+        } else {
+            setMode(Zoomed);
+        }
+    }
+}
+
+void FullScreenView::setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd)
+{
+    const bool preserveLocalCache = m_preserveVideoGoalLocalCacheOnNextSet
+                                    && m_hasVideoGoalOverlay
+                                    && m_videoGoalOverlayChannelIndex == channelIndex
+                                    && samePoint(m_videoGoalStartNormalized, normalizedStart)
+                                    && samePoint(m_videoGoalEndNormalized, normalizedEnd);
+    m_preserveVideoGoalLocalCacheOnNextSet = false;
+    m_hasVideoGoalOverlay = true;
+    m_videoGoalOverlayChannelIndex = channelIndex;
+    m_videoGoalStartNormalized = normalizedStart;
+    m_videoGoalEndNormalized = normalizedEnd;
+    if (!preserveLocalCache) {
+        m_hasVideoGoalLocalCache = false;
+        m_videoGoalStartLocal = QPointF();
+        m_videoGoalEndLocal = QPointF();
+        m_videoGoalDisplayRect = QRectF();
+        m_videoGoalCropRect = QRectF();
+    }
+    updateCommittedGoalOverlay();
+}
+
+void FullScreenView::clearVideoGoalOverlay()
+{
+    m_hasVideoGoalOverlay = false;
+    m_videoGoalOverlayChannelIndex = -1;
+    m_videoGoalStartNormalized = QPointF();
+    m_videoGoalEndNormalized = QPointF();
+    m_hasVideoGoalLocalCache = false;
+    m_videoGoalStartLocal = QPointF();
+    m_videoGoalEndLocal = QPointF();
+    m_videoGoalDisplayRect = QRectF();
+    m_videoGoalCropRect = QRectF();
+    m_preserveVideoGoalLocalCacheOnNextSet = false;
+    updateCommittedGoalOverlay();
+}
+
+void FullScreenView::setMapGeometry(const QPointF &origin, int widthCells, int heightCells, double resolution)
+{
+    m_mapOrigin = origin;
+    m_mapWidthCells = widthCells;
+    m_mapHeightCells = heightCells;
+    m_mapResolution = resolution;
+}
+
+void FullScreenView::clearGoalOverlay()
+{
+    isSettingDirection = false;
+    goalStartPos = QPointF();
+    m_hasVideoGoalOverlay = false;
+    m_videoGoalOverlayChannelIndex = -1;
+    m_videoGoalStartNormalized = QPointF();
+    m_videoGoalEndNormalized = QPointF();
+    m_hasVideoGoalLocalCache = false;
+    m_videoGoalStartLocal = QPointF();
+    m_videoGoalEndLocal = QPointF();
+    m_videoGoalDisplayRect = QRectF();
+    m_videoGoalCropRect = QRectF();
+    m_preserveVideoGoalLocalCacheOnNextSet = false;
+    if (controlOverlay) {
+        static_cast<ControlOverlay *>(controlOverlay)->clearAll();
+    }
+}
+
+void FullScreenView::requestCloseView()
+{
+    QTimer::singleShot(0, this, [this]() {
+        emit closeRequested();
+    });
+}
+
 void FullScreenView::play(const QString &url, int index)
 {
+    if (syncTimer && !syncTimer->isActive()) {
+        syncTimer->start(16);
+    }
+
     zoomHistory.clear();
     setMode(Normal);
+    clearGoalOverlay();
+    setControlModeChecked(false);
     
     currentChannelId = index; // [New] Store index
 
@@ -415,15 +680,39 @@ void FullScreenView::play(const QString &url, int index)
          videoStack->setCurrentWidget(liveWidget);
     }
 
-    videoWidget->playUrl(url, 0);
+    setControlModeAvailable(m_controlModeAvailable);
+
+    const int playbackLatency = isFile ? 0 : 200;
+    videoWidget->playUrl(url, playbackLatency);
 }
 
 void FullScreenView::stop()
 {
-    videoWidget->stop();
+    if (syncTimer && syncTimer->isActive()) {
+        syncTimer->stop();
+    }
+    if (rubberBand) {
+        rubberBand->hide();
+    }
+    if (controlOverlay) {
+        static_cast<ControlOverlay *>(controlOverlay)->clearAll();
+        controlOverlay->hide();
+    }
+
+    if (liveWidget) {
+        liveWidget->stop();
+    }
+    if (recordedWidget) {
+        recordedWidget->stop();
+    }
+    currentChannelId = -1;
+    videoWidget = liveWidget;
     // titleLabel->hide(); // Preserved part of layout
     zoomHistory.clear();
     setMode(Normal);
+    underBar->setControlModeAvailable(false);
+    setControlModeChecked(false);
+    clearGoalOverlay();
 }
 
 void FullScreenView::setMode(Mode mode)
@@ -434,7 +723,10 @@ void FullScreenView::setMode(Mode mode)
     isSettingDirection = false;
     if(rubberBand) rubberBand->hide();
     if(controlOverlay) {
-        controlOverlay->hide();
+        ControlOverlay *overlay = static_cast<ControlOverlay *>(controlOverlay);
+        if (!overlay->hasCommittedArrow) {
+            controlOverlay->hide();
+        }
     }
 
     switch(mode) {
@@ -468,6 +760,8 @@ void FullScreenView::setMode(Mode mode)
 }
 
 void FullScreenView::onResetZoom() {
+    clearGoalOverlay();
+    emit videoGoalOverlayClearRequested();
     zoomHistory.clear();
     setMode(Normal);
 }
@@ -495,7 +789,8 @@ void FullScreenView::onZoomOut() {
 
     // 이미 전체화면이거나 거의 전체화면이면 리셋
     if (current.width() >= 0.99 || current.height() >= 0.99) {
-        onResetZoom();
+        zoomHistory.clear();
+        setMode(Normal);
         return;
     }
 
@@ -505,7 +800,8 @@ void FullScreenView::onZoomOut() {
 
     // 줌 아웃 결과가 전체화면보다 크거나 같으면 전체화면으로 복귀
     if (newW >= 0.99 || newH >= 0.99) {
-        onResetZoom();
+        zoomHistory.clear();
+        setMode(Normal);
         return;
     }
 
@@ -548,10 +844,21 @@ void FullScreenView::onRectZoomToggled(bool checked) {
 }
 
 void FullScreenView::onControlModeToggled(bool checked) {
+    if (!canControlCurrentVideo()) {
+        underBar->setControlModeAvailable(false);
+        underBar->setControlModeChecked(false);
+        return;
+    }
+
+    emit controlModeRequested(checked);
+
     if (checked) {
-        setMode(ControlMode);
+        if (m_controlModeAvailable) {
+            setMode(ControlMode);
+        } else {
+            underBar->setControlModeChecked(false);
+        }
     } else {
-        if (controlOverlay) controlOverlay->hide();
         if (zoomHistory.isEmpty()) setMode(Normal);
         else setMode(Zoomed);
     }
@@ -562,8 +869,262 @@ QString FullScreenView::getChannelName(int index) {
     return "Robot Camera";
 }
 
+bool FullScreenView::canControlCurrentVideo() const
+{
+    return (videoWidget == liveWidget) && currentChannelId >= 0 && currentChannelId < 4;
+}
+
 bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
 {
+    if (obj != liveWidget && obj != recordedWidget) {
+        return QWidget::eventFilter(obj, event);
+    }
+
+    if (obj != videoWidget) {
+        return QWidget::eventFilter(obj, event);
+    }
+
+    if (event->type() == QEvent::Resize) {
+        if (controlOverlay && controlOverlay->isVisible() && isVisible()) {
+            const QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+            controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+            static_cast<ControlOverlay *>(controlOverlay)->setClipRect(videoWidget->getVideoDisplayRect());
+        }
+        updateCommittedGoalOverlay();
+        return QWidget::eventFilter(obj, event);
+    }
+
+    if (event->type() == QEvent::MouseButtonDblClick) {
+        if (currentMode != Normal) {
+            return true;
+        }
+        requestCloseView();
+        return true;
+    }
+
+    if (currentMode == Drawing) {
+        if (event->type() != QEvent::MouseButtonPress
+            && event->type() != QEvent::MouseMove
+            && event->type() != QEvent::MouseButtonRelease) {
+            return QWidget::eventFilter(obj, event);
+        }
+
+        QMouseEvent *me = static_cast<QMouseEvent *>(event);
+        if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
+            if (!rubberBand) {
+                rubberBand = new SimpleRubberBand(nullptr);
+            }
+            originPoint = me->globalPos();
+            rubberBand->setGeometry(QRect(originPoint, QSize()));
+            rubberBand->show();
+            isDrawing = true;
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove && isDrawing) {
+            if (rubberBand) {
+                rubberBand->setGeometry(QRect(originPoint, me->globalPos()).normalized());
+            }
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && isDrawing) {
+            isDrawing = false;
+            if (!rubberBand) {
+                return true;
+            }
+
+            const QRect globalRect = rubberBand->geometry();
+            rubberBand->hide();
+            if (globalRect.width() < 10 || globalRect.height() < 10) {
+                return true;
+            }
+
+            const QPoint localTopLeft = videoWidget->mapFromGlobal(globalRect.topLeft());
+            const QPoint localBottomRight = videoWidget->mapFromGlobal(globalRect.bottomRight());
+            const QRect rect(localTopLeft, localBottomRight);
+            const QRectF currentCrop = videoWidget->getCurrentCrop();
+            const QRectF targetCrop = selectionRectToCropRect(videoWidget, rect);
+            if (!targetCrop.isValid() || targetCrop.width() <= 0.0 || targetCrop.height() <= 0.0) {
+                return true;
+            }
+
+            zoomHistory.push(currentCrop);
+            videoWidget->applyCrop(targetCrop);
+            currentMode = Zoomed;
+            videoWidget->setCursor(Qt::OpenHandCursor);
+            underBar->setRectButtonMode(2);
+            return true;
+        }
+
+        return QWidget::eventFilter(obj, event);
+    }
+
+    if (currentMode == Zoomed) {
+        if (event->type() == QEvent::Leave && isPanning) {
+            isPanning = false;
+            videoWidget->setCursor(Qt::OpenHandCursor);
+            return true;
+        }
+
+        if (event->type() != QEvent::MouseButtonPress
+            && event->type() != QEvent::MouseMove
+            && event->type() != QEvent::MouseButtonRelease) {
+            return QWidget::eventFilter(obj, event);
+        }
+
+        QMouseEvent *me = static_cast<QMouseEvent *>(event);
+        if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
+            isPanning = true;
+            lastDragPos = me->pos();
+            videoWidget->setCursor(Qt::ClosedHandCursor);
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove && isPanning) {
+            const QPoint delta = me->pos() - lastDragPos;
+            lastDragPos = me->pos();
+            videoWidget->panView(delta.x(), delta.y());
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && isPanning) {
+            isPanning = false;
+            videoWidget->setCursor(Qt::OpenHandCursor);
+            return true;
+        }
+
+        return QWidget::eventFilter(obj, event);
+    }
+
+    if (currentMode == ControlMode) {
+        if (!m_controlModeAvailable || currentChannelId < 0 || currentChannelId >= 4 || videoWidget != liveWidget) {
+            return true;
+        }
+
+        ControlOverlay *overlay = static_cast<ControlOverlay *>(controlOverlay);
+        if (event->type() == QEvent::Leave && isSettingDirection) {
+            if (overlay) {
+                overlay->endPos = goalStartPos;
+                overlay->update();
+            }
+            return true;
+        }
+
+        if (event->type() != QEvent::MouseButtonPress
+            && event->type() != QEvent::MouseMove
+            && event->type() != QEvent::MouseButtonRelease) {
+            return QWidget::eventFilter(obj, event);
+        }
+
+        QMouseEvent *me = static_cast<QMouseEvent *>(event);
+        const QPointF mousePos = me->position();
+
+        if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
+            if (!overlay) {
+                controlOverlay = new ControlOverlay(this);
+                overlay = static_cast<ControlOverlay *>(controlOverlay);
+            }
+
+            const QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+            controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+            overlay->setClipRect(videoWidget->getVideoDisplayRect());
+
+            if (!isSettingDirection) {
+                bool ok = false;
+                videoWidget->widgetPointToVideoNormalized(mousePos, &ok);
+                if (!ok) {
+                    return true;
+                }
+
+                emit goalInteractionStarted();
+                goalStartPos = mousePos;
+                overlay->startPos = goalStartPos;
+                overlay->endPos = goalStartPos;
+                overlay->isDrawingArrow = true;
+                overlay->show();
+                overlay->raise();
+                isSettingDirection = true;
+                return true;
+            }
+
+            if (videoWidget->width() <= 0 || videoWidget->height() <= 0) {
+                return true;
+            }
+
+            const QRectF displayRect = videoWidget->getVideoDisplayRect();
+            const qreal clampedX = std::clamp(static_cast<qreal>(mousePos.x()),
+                                              static_cast<qreal>(displayRect.left()),
+                                              static_cast<qreal>(displayRect.right()));
+            const qreal clampedY = std::clamp(static_cast<qreal>(mousePos.y()),
+                                              static_cast<qreal>(displayRect.top()),
+                                              static_cast<qreal>(displayRect.bottom()));
+            const QPointF clampedEnd(clampedX, clampedY);
+
+            bool ok = false;
+            const QPointF normalizedStart = videoWidget->widgetPointToVideoNormalized(goalStartPos, &ok);
+            if (!ok) {
+                isSettingDirection = false;
+                overlay->clearPreview();
+                return true;
+            }
+
+            const QPointF normalizedEnd = videoWidget->widgetPointToVideoNormalized(clampedEnd, &ok);
+            if (!ok) {
+                isSettingDirection = false;
+                overlay->clearPreview();
+                return true;
+            }
+
+            m_hasVideoGoalOverlay = true;
+            m_videoGoalOverlayChannelIndex = currentChannelId;
+            m_videoGoalStartNormalized = normalizedStart;
+            m_videoGoalEndNormalized = normalizedEnd;
+            m_hasVideoGoalLocalCache = true;
+            m_videoGoalStartLocal = goalStartPos;
+            m_videoGoalEndLocal = clampedEnd;
+            m_videoGoalDisplayRect = displayRect;
+            m_videoGoalCropRect = videoWidget->getCurrentCrop();
+            m_preserveVideoGoalLocalCacheOnNextSet = true;
+
+            overlay->commitArrow(goalStartPos, clampedEnd);
+            emit videoGoalOverlayCommitted(currentChannelId, normalizedStart, normalizedEnd);
+            emit goalCommitted();
+
+            bool worldOk = false;
+            const QPointF worldPoint = quadrantToWorld(normalizedStart, &worldOk);
+            if (worldOk) {
+                const double theta = std::atan2(goalStartPos.y() - clampedEnd.y(),
+                                                clampedEnd.x() - goalStartPos.x());
+                qDebug().noquote() << QStringLiteral("x: %1  y: %2  angle: %3")
+                                          .arg(worldPoint.x(), 0, 'f', 3)
+                                          .arg(worldPoint.y(), 0, 'f', 3)
+                                          .arg(theta, 0, 'f', 3);
+                emit reqGoalPose(worldPoint.x(), worldPoint.y(), theta);
+            }
+
+            isSettingDirection = false;
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove && isSettingDirection) {
+            if (overlay) {
+                overlay->endPos = mousePos;
+                overlay->setClipRect(videoWidget->getVideoDisplayRect());
+                overlay->update();
+            }
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && me->button() == Qt::LeftButton) {
+            return true;
+        }
+
+        return QWidget::eventFilter(obj, event);
+    }
+
+    return QWidget::eventFilter(obj, event);
+
     if (obj == videoWidget) {
         if (event->type() == QEvent::MouseButtonDblClick) {
             if (currentMode != Normal) return true;
@@ -572,6 +1133,11 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
         }
 
         if (currentMode == Drawing) {
+            if (event->type() != QEvent::MouseButtonPress
+                && event->type() != QEvent::MouseMove
+                && event->type() != QEvent::MouseButtonRelease) {
+                return QWidget::eventFilter(obj, event);
+            }
             QMouseEvent *me = static_cast<QMouseEvent*>(event);
             if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
                 if (!rubberBand) {
@@ -627,7 +1193,11 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
             }
         }
         else if (currentMode == Zoomed) {
-            QMouseEvent *me = static_cast<QMouseEvent*>(event);
+            QMouseEvent *me = (event->type() == QEvent::MouseButtonPress
+                                || event->type() == QEvent::MouseMove
+                                || event->type() == QEvent::MouseButtonRelease)
+                                   ? static_cast<QMouseEvent*>(event)
+                                   : nullptr;
             if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
                 isPanning = true;
                 lastDragPos = me->pos();
@@ -647,16 +1217,136 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
             }
         }
         else if (currentMode == ControlMode) {
-            QMouseEvent *me = static_cast<QMouseEvent*>(event);
+            if (!m_controlModeAvailable || currentChannelId < 0 || currentChannelId >= 4 || videoWidget != liveWidget) {
+                return true;
+            }
+            ControlOverlay *overlay = static_cast<ControlOverlay*>(controlOverlay);
+
+            if (event->type() == QEvent::Leave && isSettingDirection) {
+                if (overlay) {
+                    overlay->endPos = goalStartPos;
+                    overlay->update();
+                }
+                return true;
+            }
+
+            if (event->type() != QEvent::MouseButtonPress
+                && event->type() != QEvent::MouseMove
+                && event->type() != QEvent::MouseButtonRelease) {
+                return true;
+            }
+
+            QMouseEvent *me = (event->type() == QEvent::MouseButtonPress
+                                || event->type() == QEvent::MouseMove
+                                || event->type() == QEvent::MouseButtonRelease)
+                                   ? static_cast<QMouseEvent*>(event)
+                                   : nullptr;
+            if (!me) {
+                return true;
+            }
+            const QPointF mousePos = me->position();
+
+            if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
+                if (!overlay) {
+                    controlOverlay = new ControlOverlay(this);
+                    overlay = static_cast<ControlOverlay*>(controlOverlay);
+                }
+
+                const QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+                controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+                overlay->setClipRect(videoWidget->getVideoDisplayRect());
+                if (!isSettingDirection) {
+                    bool ok = false;
+                    const QPointF normalizedStart = videoWidget->widgetPointToVideoNormalized(mousePos, &ok);
+                    if (!ok) {
+                        return true;
+                    }
+                    emit goalInteractionStarted();
+                    goalStartPos = mousePos;
+                    overlay->startPos = goalStartPos;
+                    overlay->endPos = goalStartPos;
+                    overlay->isDrawingArrow = true;
+                    overlay->show();
+                    overlay->raise();
+                    isSettingDirection = true;
+                } else if (videoWidget->width() > 0 && videoWidget->height() > 0) {
+                    const QRectF displayRect = videoWidget->getVideoDisplayRect();
+                    const qreal clampedX = std::clamp(static_cast<qreal>(mousePos.x()),
+                                                      static_cast<qreal>(displayRect.left()),
+                                                      static_cast<qreal>(displayRect.right()));
+                    const qreal clampedY = std::clamp(static_cast<qreal>(mousePos.y()),
+                                                      static_cast<qreal>(displayRect.top()),
+                                                      static_cast<qreal>(displayRect.bottom()));
+                    const QPointF clampedEnd(clampedX, clampedY);
+                    bool ok = false;
+                    const QPointF normalizedStart = videoWidget->widgetPointToVideoNormalized(goalStartPos, &ok);
+                    if (!ok) {
+                        isSettingDirection = false;
+                        overlay->clearPreview();
+                        return true;
+                    }
+                    const QPointF normalizedEnd = videoWidget->widgetPointToVideoNormalized(clampedEnd, &ok);
+                    if (!ok) {
+                        isSettingDirection = false;
+                        overlay->clearPreview();
+                        return true;
+                    }
+                    m_hasVideoGoalOverlay = true;
+                    m_videoGoalOverlayChannelIndex = currentChannelId;
+                    m_videoGoalStartNormalized = normalizedStart;
+                    m_videoGoalEndNormalized = normalizedEnd;
+                    m_hasVideoGoalLocalCache = true;
+                    m_videoGoalStartLocal = goalStartPos;
+                    m_videoGoalEndLocal = clampedEnd;
+                    m_videoGoalDisplayRect = displayRect;
+                    m_videoGoalCropRect = videoWidget->getCurrentCrop();
+                    m_preserveVideoGoalLocalCacheOnNextSet = true;
+                    overlay->commitArrow(goalStartPos, clampedEnd);
+                    emit videoGoalOverlayCommitted(currentChannelId, normalizedStart, normalizedEnd);
+                    emit goalCommitted();
+
+                    bool worldOk = false;
+                    const QPointF worldPoint = quadrantToWorld(normalizedStart, &worldOk);
+                    if (worldOk) {
+                        const double theta = std::atan2(goalStartPos.y() - clampedEnd.y(),
+                                                        clampedEnd.x() - goalStartPos.x());
+                        qDebug().noquote() << QStringLiteral("x: %1  y: %2  angle: %3")
+                                                  .arg(worldPoint.x(), 0, 'f', 3)
+                                                  .arg(worldPoint.y(), 0, 'f', 3)
+                                                  .arg(theta, 0, 'f', 3);
+                        emit reqGoalPose(worldPoint.x(), worldPoint.y(), theta);
+                    }
+
+                    isSettingDirection = false;
+                }
+                return true;
+            }
+
+            if (event->type() == QEvent::MouseMove && isSettingDirection) {
+                if (overlay) {
+                    overlay->endPos = mousePos;
+                    overlay->setClipRect(videoWidget->getVideoDisplayRect());
+                    overlay->update();
+                }
+                return true;
+            }
+
+            if (event->type() == QEvent::MouseButtonRelease && me->button() == Qt::LeftButton) {
+                return true;
+            }
+            return true;
             if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
                 if (!controlOverlay) {
-                    controlOverlay = new ControlOverlay(nullptr); // 독립된 윈도우
+                    controlOverlay = new ControlOverlay(this); // 독립된 윈도우
                 }
                 
                 // [수정] 탑레벨 윈도우이므로 global 좌표 기준으로 Geometry 설정
                 QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
                 controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
-                
+                if (isSettingDirection) {
+                    return true;
+                }
+
                 if (!isSettingDirection) {
                     // First click: origin
                     // 탑레벨 화면의 좌상단 기준 로컬 좌표계와 일치하므로 me->pos()를 그대로 사용해도 무방합니다.
@@ -687,13 +1377,17 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
                     double theta = std::atan2(dy, dx);
                     if (theta < 0) theta += 2 * M_PI;
                     
-                    // placeholder map scale logic (e.g. 0.05m / px, center is (0,0))
-                    double cx = videoWidget->width() / 2.0;
-                    double cy = videoWidget->height() / 2.0;
-                    double x = (overlay->startPos.x() - cx) * 0.05;
-                    double y = (cy - overlay->startPos.y()) * 0.05;
-
-                    emit reqGoalPose(x, y, theta);
+                    bool ok = false;
+                    const QPointF normalizedStart = videoWidget->widgetPointToVideoNormalized(overlay->startPos, &ok);
+                    const QPointF worldPoint = ok ? quadrantToWorld(normalizedStart, &ok) : QPointF();
+                    if (ok) {
+                        overlay->hasCommittedArrow = true;
+                        qDebug().noquote() << QStringLiteral("x: %1  y: %2  angle: %3")
+                                                  .arg(worldPoint.x(), 0, 'f', 3)
+                                                  .arg(worldPoint.y(), 0, 'f', 3)
+                                                  .arg(theta, 0, 'f', 3);
+                        emit reqGoalPose(worldPoint.x(), worldPoint.y(), theta);
+                    }
                     
                     // 화살표를 유지하기 위해 hide()를 호출하지 않고 방향 설정 상태만 종료합니다.
                     videoWidget->releaseMouse();
@@ -712,16 +1406,19 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
         }
     }
     else if (obj == videoWidget && event->type() == QEvent::Resize) {
-        if (controlOverlay && currentMode == ControlMode && isVisible()) {
+        if (controlOverlay && controlOverlay->isVisible() && isVisible()) {
             QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
             controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+            static_cast<ControlOverlay *>(controlOverlay)->setClipRect(videoWidget->getVideoDisplayRect());
         }
+        updateCommittedGoalOverlay();
     }
     return QWidget::eventFilter(obj, event);
 }
 
 void FullScreenView::syncOverlayPosition() {
-    if (controlOverlay && currentMode == ControlMode && controlOverlay->isVisible() && this->isVisible() && videoWidget) {
+    updateCommittedGoalOverlay();
+    if (controlOverlay && controlOverlay->isVisible() && this->isVisible() && videoWidget) {
         QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
         QRect currentRect = controlOverlay->geometry();
         QRect newRect(globalTopLeft, videoWidget->size());
@@ -729,5 +1426,94 @@ void FullScreenView::syncOverlayPosition() {
             controlOverlay->setGeometry(newRect);
         }
     }
+}
+
+void FullScreenView::updateCommittedGoalOverlay()
+{
+    if (!controlOverlay || !videoWidget || isSettingDirection) {
+        return;
+    }
+
+    ControlOverlay *overlay = static_cast<ControlOverlay *>(controlOverlay);
+    const bool canShowSharedOverlay = this->isVisible()
+                                      && (videoWidget == liveWidget)
+                                      && currentChannelId >= 0
+                                      && currentChannelId < 4
+                                      && m_hasVideoGoalOverlay
+                                      && m_videoGoalOverlayChannelIndex == currentChannelId
+                                      && videoWidget->width() > 0
+                                      && videoWidget->height() > 0;
+
+    if (!canShowSharedOverlay) {
+        overlay->setCommittedArrow(QPointF(), QPointF(), false);
+        return;
+    }
+
+    const QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
+    controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
+    const QRectF displayRect = videoWidget->getVideoDisplayRect();
+    const QRectF cropRect = videoWidget->getCurrentCrop();
+    overlay->setClipRect(displayRect);
+    if (m_hasVideoGoalLocalCache
+        && sameRect(cropRect, m_videoGoalCropRect)
+        && sameRect(displayRect, m_videoGoalDisplayRect)) {
+        overlay->setCommittedArrow(m_videoGoalStartLocal, m_videoGoalEndLocal, true);
+        return;
+    }
+
+    const QPointF startPoint = videoWidget->videoNormalizedToWidgetPoint(m_videoGoalStartNormalized);
+    const QPointF endPoint = videoWidget->videoNormalizedToWidgetPoint(m_videoGoalEndNormalized);
+    m_hasVideoGoalLocalCache = true;
+    m_videoGoalStartLocal = startPoint;
+    m_videoGoalEndLocal = endPoint;
+    m_videoGoalDisplayRect = displayRect;
+    m_videoGoalCropRect = cropRect;
+    overlay->setCommittedArrow(startPoint, endPoint, true);
+}
+
+QPointF FullScreenView::widgetPointToVideoNormalized(const QPointF &widgetPoint) const
+{
+    if (!videoWidget) {
+        return QPointF();
+    }
+
+    bool ok = false;
+    const QPointF normalized = videoWidget->widgetPointToVideoNormalized(widgetPoint, &ok);
+    return ok ? normalized : QPointF();
+}
+
+QPointF FullScreenView::videoNormalizedToWidgetPoint(const QPointF &normalizedPoint) const
+{
+    return videoWidget ? videoWidget->videoNormalizedToWidgetPoint(normalizedPoint) : QPointF();
+}
+
+QPointF FullScreenView::quadrantToWorld(const QPointF &normalizedPoint, bool *ok) const
+{
+    if (ok) {
+        *ok = false;
+    }
+
+    if (currentChannelId < 0 || currentChannelId >= 4 || m_mapWidthCells <= 0 || m_mapHeightCells <= 0 || m_mapResolution <= 0.0) {
+        return QPointF();
+    }
+
+    const double fullWidth = m_mapWidthCells * m_mapResolution;
+    const double fullHeight = m_mapHeightCells * m_mapResolution;
+    const double halfWidth = fullWidth * 0.5;
+    const double halfHeight = fullHeight * 0.5;
+    const double clampedX = qBound(0.0, normalizedPoint.x(), 1.0);
+    const double clampedY = qBound(0.0, normalizedPoint.y(), 1.0);
+    const bool isRight = (currentChannelId == 1 || currentChannelId == 3);
+    const bool isBottom = (currentChannelId == 2 || currentChannelId == 3);
+
+    const double quadrantMinX = m_mapOrigin.x() + (isRight ? halfWidth : 0.0);
+    const double quadrantMinY = m_mapOrigin.y() + (isBottom ? 0.0 : halfHeight);
+    const double worldX = quadrantMinX + (clampedX * halfWidth);
+    const double worldY = quadrantMinY + ((1.0 - clampedY) * halfHeight);
+
+    if (ok) {
+        *ok = true;
+    }
+    return QPointF(worldX, worldY);
 }
 

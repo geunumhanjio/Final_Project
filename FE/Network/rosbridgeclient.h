@@ -16,6 +16,11 @@ public:
     void connectToHost(const QString &url);
     void disconnect();
     void sendCmdVel(double linear, double angular);
+    void sendModeControl(const QString &mode);
+    void sendNavGoto(double x, double y, double yaw);
+    void sendNavGotoWaypoint(const QString &name);
+    void sendNavPatrol(const QString &route);
+    void sendNavCancel();
     void sendGoalPose(double x, double y, double theta, const QString &frame_id = "map");
     void emergencyStop();
 
@@ -26,6 +31,8 @@ signals:
     void mapReceived(const QJsonObject &data);
     void odomReceived(const QJsonObject &data);
     void pathReceived(const QJsonObject &data);
+    void navStatusReceived(const QJsonObject &data);
+    void navFeedbackReceived(const QJsonObject &data);
 
 private slots:
     void onConnected();

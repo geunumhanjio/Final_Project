@@ -4,6 +4,7 @@
  */
 #include "topbar.h"
 #include <QStyle>
+#include <QAbstractButton>
 
 // Helper to update style
 void updateStyle(QWidget* w) {
@@ -34,7 +35,7 @@ void TopBar::setupUi()
     layout->setContentsMargins(16, 0, 16, 0);
     layout->setSpacing(12);
 
-    // 1. Sidebar Toggle & Logo
+    // 1. Sidebar Toggle & Title
     btnToggle = new QPushButton(this);
     btnToggle->setText("☰");
     btnToggle->setFixedSize(32, 32);
@@ -43,11 +44,6 @@ void TopBar::setupUi()
     btnToggle->setStyleSheet("QPushButton { color: #94a3b8; font-size: 20px; border: none; background: transparent; } QPushButton:hover { color: white; background: rgba(255,255,255,0.05); border-radius: 4px; }");
     // Note: btnToggle icon color might need manual update or QIcon theme, keeping simple for now.
 
-    QLabel *logoIcon = new QLabel("📹", this);
-    logoIcon->setFixedSize(32, 32);
-    logoIcon->setAlignment(Qt::AlignCenter);
-    logoIcon->setStyleSheet("background-color: transparent; font-size: 24px; border: none;"); 
-    
     titleLabel = new QLabel("Monitoring System", this);
     titleLabel->setObjectName("TopBarTitle");
     // Initial Style set in updateTheme 
@@ -98,12 +94,24 @@ void TopBar::setupUi()
     timeLayout->addWidget(dateLabel);
     timeLayout->addWidget(timeLabel);
 
+    btnClose = new QPushButton("X", this);
+    btnClose->setFixedSize(36, 36);
+    btnClose->setCursor(Qt::PointingHandCursor);
+    btnClose->setObjectName("TopBarCloseBtn");
+    btnClose->setStyleSheet(
+        "QPushButton { color: #f8fafc; font-size: 14px; font-weight: bold; border: none; "
+        "background: rgba(239, 68, 68, 0.88); border-radius: 10px; padding-bottom: 1px; }"
+        "QPushButton:hover { background: rgba(220, 38, 38, 0.96); }"
+        "QPushButton:pressed { background: rgba(185, 28, 28, 1.0); }");
+
     btnTheme = new QPushButton("☀", this); 
     btnTheme->setFixedSize(32, 32);
     btnTheme->setObjectName("ThemeBtn");
     btnTheme->setStyleSheet("color: #94a3b8; font-size: 18px; border:none; background:transparent;");
     
     userIcon = new QLabel("👤", this);
+    btnEmergencyStop = new QPushButton(QStringLiteral("즉시 정지"), this);
+    btnEmergencyStop->hide();
     userIcon->setFixedSize(32, 32);
     userIcon->setAlignment(Qt::AlignCenter);
     userIcon->setStyleSheet("background-color: rgba(19, 91, 236, 0.2); color: #135bec; border: 1px solid rgba(19, 91, 236, 0.3); border-radius: 16px; font-size: 16px;");
@@ -111,7 +119,6 @@ void TopBar::setupUi()
     // Add to Main Layout
     layout->addWidget(btnToggle);
     layout->addSpacing(8);
-    layout->addWidget(logoIcon);
     layout->addWidget(titleLabel);
     layout->addStretch(); 
     layout->addWidget(navContainer);
@@ -120,9 +127,11 @@ void TopBar::setupUi()
     layout->addSpacing(10);
     layout->addWidget(btnTheme);
     layout->addWidget(userIcon);
+    layout->addWidget(btnClose);
 
     // Connections
     connect(btnToggle, &QPushButton::clicked, this, &TopBar::sidebarToggled);
+    connect(btnClose, &QPushButton::clicked, this, &TopBar::closeRequested);
     
     // Theme Toggle
     connect(btnTheme, &QPushButton::clicked, [=](){
@@ -165,4 +174,46 @@ void TopBar::updateTime()
     timeLabel->setText(now.toString("HH:mm:ss"));
 }
 
+void TopBar::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        QWidget *pressedChild = childAt(event->pos());
+        if (!qobject_cast<QAbstractButton *>(pressedChild) && window()) {
+            m_isDraggingWindow = true;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+            m_windowDragOffset = event->globalPosition().toPoint() - window()->frameGeometry().topLeft();
+#else
+            m_windowDragOffset = event->globalPos() - window()->frameGeometry().topLeft();
+#endif
+            event->accept();
+            return;
+        }
+    }
 
+    QWidget::mousePressEvent(event);
+}
+
+void TopBar::mouseMoveEvent(QMouseEvent *event)
+{
+    if (m_isDraggingWindow && (event->buttons() & Qt::LeftButton) && window()) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+        const QPoint globalPos = event->globalPosition().toPoint();
+#else
+        const QPoint globalPos = event->globalPos();
+#endif
+        window()->move(globalPos - m_windowDragOffset);
+        event->accept();
+        return;
+    }
+
+    QWidget::mouseMoveEvent(event);
+}
+
+void TopBar::mouseReleaseEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        m_isDraggingWindow = false;
+    }
+
+    QWidget::mouseReleaseEvent(event);
+}

@@ -17,10 +17,17 @@ public:
     explicit LiveView(QWidget *parent = nullptr);
     void setChannelVisible(int index, bool visible);
     void stopAll();
+    void clearGoalOverlays();
+    void setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd);
+    void clearVideoGoalOverlay();
 
 signals:
     void requestFullScreen(int index, QString url);
     void recordCommandRequested(int channelId, bool start);
+    void goalPoseRequested(double x, double y, double yaw);
+    void goalInteractionStarted();
+    void goalCommitted();
+    void videoGoalOverlayCommitted(int channelIndex, QPointF normalizedStart, QPointF normalizedEnd);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -32,6 +39,7 @@ public slots:
     void updateMap(const QJsonObject &data);
     void updateOdom(const QJsonObject &data);
     void updatePath(const QJsonObject &data);
+    void setGoalTargetingEnabled(bool enabled);
 
 private:
     QGridLayout *gridLayout;
@@ -46,9 +54,15 @@ private:
 
     QStringList lowQualityUrls;
     QStringList highQualityUrls;
+    QPointF m_mapOrigin;
+    double m_mapResolution = 0.0;
+    int m_mapWidthCells = 0;
+    int m_mapHeightCells = 0;
+    bool m_goalTargetingEnabled = false;
 
     void initCCTVStreams();
     void updateCCTVLayout(); // Dynamic layout update
+    QPointF quadrantToWorld(int index, const QPointF &normalizedPoint, bool *ok = nullptr) const;
 
 private slots:
     void refreshStreams();

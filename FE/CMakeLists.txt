@@ -106,6 +106,7 @@ endif()
 # 5. 라이브러리 연결
 target_link_libraries(VEDA_QT_1 PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::WebSockets)
 
+
 # -------------------------------------------------------------------------
 # [수동 연결] 라이브러리 파일 직접 링크 (MSVC vs MinGW)
 # -------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 QMainWindow, QWidget {
     background-color: #f8fafc; /* Slate 50 */
     color: #0f172a;        /* Slate 900 */
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Pretendard';
 }
 
 /* Scrollbar */
@@ -213,6 +213,92 @@ QLineEdit:focus {
     border: 1px solid #ff6b00;
 }
 
+#SidebarModePanel {
+    background-color: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+#SidebarModeTitle {
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+}
+
+QRadioButton#SidebarModeOption {
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 600;
+    spacing: 10px;
+    padding: 6px 2px;
+}
+
+QRadioButton#SidebarModeOption::indicator {
+    width: 16px;
+    height: 16px;
+}
+
+QRadioButton#SidebarModeOption::indicator:unchecked {
+    border: 2px solid #94a3b8;
+    border-radius: 8px;
+    background: transparent;
+}
+
+QRadioButton#SidebarModeOption::indicator:checked {
+    border: 2px solid #ff6b00;
+    border-radius: 8px;
+    background: #ff6b00;
+}
+
+#SidebarControlButton {
+    background-color: #ff6b00;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 12px;
+}
+
+#SidebarControlButton:hover {
+    background-color: #fb923c;
+}
+
+#SidebarControlButton:checked {
+    background-color: #dc2626;
+    color: white;
+}
+
+#SidebarControlButton:disabled {
+    background-color: #cbd5e1;
+    color: #64748b;
+}
+
+#SidebarEmergencyStopButton {
+    background-color: #c2410c;
+    color: #fff7ed;
+    border: 1px solid rgba(251, 146, 60, 0.55);
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 12px;
+}
+
+#SidebarEmergencyStopButton:hover {
+    background-color: #9a3412;
+}
+
+#SidebarEmergencyStopButton:pressed {
+    background-color: #7c2d12;
+}
+
+#SidebarEmergencyStopButton:disabled {
+    background-color: #cbd5e1;
+    color: #64748b;
+    border-color: transparent;
+}
+
 /* Sidebar Headers */
 #SidebarHeaderTitle {
     color: black; 
@@ -280,6 +366,133 @@ QLineEdit:focus {
     background-color: #334155;
 }
 
+/* Settings View (Light) */
+#SettingsPage {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #fffdf8, stop:1 #eef6ff);
+}
+
+#SettingsTitle {
+    background: transparent;
+    color: #0f172a;
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+#SettingsFormContainer {
+    background-color: rgba(255, 255, 255, 0.96);
+    border: 1px solid #d9e5f5;
+    border-radius: 18px;
+}
+
+#SettingsPage QLabel {
+    background: transparent;
+}
+
+#SettingsPage QLabel[settingsRole="label"] {
+    color: #1e293b;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+#SettingsPage QLabel[settingsRole="section"] {
+    color: #ea580c;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+#SettingsPage QLabel[settingsRole="hint"] {
+    color: #64748b;
+    font-size: 11px;
+    padding: 2px 0 4px 0;
+}
+
+#SettingsPage QLineEdit[settingsRole="input"],
+#SettingsPage QDoubleSpinBox[settingsRole="input"] {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid #d7e2ee;
+    border-radius: 10px;
+    padding: 10px 12px;
+    min-height: 20px;
+    selection-background-color: #ffb37d;
+}
+
+#SettingsPage QLineEdit[settingsRole="input"]:focus,
+#SettingsPage QDoubleSpinBox[settingsRole="input"]:focus {
+    background-color: #ffffff;
+    border: 1px solid #ff6b00;
+}
+
+#SettingsPage QDoubleSpinBox::up-button,
+#SettingsPage QDoubleSpinBox::down-button {
+    width: 24px;
+    border-left: 1px solid #d7e2ee;
+    background-color: #f8fafc;
+}
+
+#SettingsPage QDoubleSpinBox::up-button:hover,
+#SettingsPage QDoubleSpinBox::down-button:hover {
+    background-color: #eef2f7;
+}
+
+#SettingsPage QDoubleSpinBox::up-arrow {
+    image: url(:/icons/style/icons/spin-up-dark.svg);
+    width: 12px;
+    height: 8px;
+}
+
+#SettingsPage QDoubleSpinBox::down-arrow {
+    image: url(:/icons/style/icons/spin-down-dark.svg);
+    width: 12px;
+    height: 8px;
+}
+
+#SettingsPage QCheckBox[settingsRole="check"] {
+    background: transparent;
+    color: #1f2937;
+    font-size: 14px;
+    font-weight: 600;
+    spacing: 10px;
+    padding: 3px 0;
+}
+
+#SettingsPage QCheckBox[settingsRole="check"]::indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1px solid #c7d4e2;
+    background: #ffffff;
+}
+
+#SettingsPage QCheckBox[settingsRole="check"]::indicator:hover {
+    border-color: #ff8c33;
+}
+
+#SettingsPage QCheckBox[settingsRole="check"]::indicator:checked {
+    background: #ff6b00;
+    border-color: #ff6b00;
+}
+
+#SettingsSaveButton {
+    background-color: #ff6b00;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+#SettingsSaveButton:hover {
+    background-color: #ff7d1f;
+}
+
+#SettingsSaveButton:pressed {
+    background-color: #e55f00;
+}
+
 /* =========================================
    FullScreen View Styles (Light)
    ========================================= */
@@ -331,7 +544,7 @@ QLineEdit:focus {
     color: #374151;
     border: none;
     padding: 8px 15px;
-    font-size: 13px; font-weight: 500; font-family: 'Segoe UI', sans-serif;
+    font-size: 13px; font-weight: 500; font-family: 'Pretendard';
 }
 #controlBar QPushButton:hover {
     background-color: rgba(255, 255, 255, 1.0);

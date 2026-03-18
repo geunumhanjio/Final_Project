@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QTimer>
 #include <QDateTime>
+#include <QMouseEvent>
 
 class TopBar : public QWidget
 {
@@ -23,6 +24,12 @@ signals:
     void sidebarToggled();       // Sidebar toggle signal
     void modeChanged(int index); // Mode change signal
     void themeToggled();         // Theme toggle signal
+    void closeRequested();
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
 private:
     void setupUi();
@@ -39,11 +46,15 @@ private:
     // Right Side
     QLabel *timeLabel;
     QLabel *dateLabel; // Added dateLabel
+    QPushButton *btnEmergencyStop;
     QPushButton *btnTheme;
+    QPushButton *btnClose;
     QLabel *userIcon;
     QLabel *titleLabel;
     
     QTimer *timer;
+    bool m_isDraggingWindow = false;
+    QPoint m_windowDragOffset;
 };
 
 #endif // TOPBAR_H
