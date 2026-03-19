@@ -9,7 +9,8 @@
 #include <QMutex>
 #include <QRectF>
 #include <QElapsedTimer>
-#include "osdwidget.h" // [New] Include OSDWidget
+#include "osdwidget.h"
+#include "rtsppinger.h" // [New]
 
 class VideoWidget : public QWidget
 {
@@ -54,6 +55,10 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     QPaintEngine *paintEngine() const override { return nullptr; }
 
+    // [New] Common stream state
+    QString currentUrl;
+    int currentLatency;
+
     // Helpers for subclasses
     bool setPipeline(GstElement *p);
     GstElement* getPipeline() const { return pipeline; }
@@ -78,7 +83,7 @@ private:
 
     // [New] OSD Widget
     OsdWidget *m_osdWidget;
-    QTimer *m_syncTimer; // [New]
+    RtspPinger *m_pinger; // [New]
     void syncOverlayPosition(); // [New]
 
     QTimer *m_statsTimer; // [New] For pulling GST stats
@@ -86,10 +91,14 @@ private:
 
     uint64_t m_lastBytes = 0;
     uint64_t m_lastPackets = 0;
+    int32_t  m_lastLost = 0;
+    uint64_t m_lastFrames = 0;
+    uint64_t m_actualFrameCount = 0; // [New] Actual rendered frame count
     guint m_lastRendered = 0;
     QElapsedTimer m_statsClock;
 
     static GstBusSyncReply busSyncHandler(GstBus *bus, GstMessage *msg, gpointer user_data);
+    static GstPadProbeReturn sinkPadProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data); // [New]
 };
 
 #endif // VIDEOWIDGET_H

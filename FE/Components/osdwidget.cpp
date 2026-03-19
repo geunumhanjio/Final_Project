@@ -40,6 +40,7 @@ void OsdWidget::setMetricValue(Metric metric, const QString &value)
 QString OsdWidget::getMetricName(Metric metric)
 {
     switch (metric) {
+        case Protocol:   return "Protocol"; // [New]
         case PacketLoss: return "Packet Loss";
         case Jitter:     return "Jitter";
         case Bitrate:    return "Bitrate";

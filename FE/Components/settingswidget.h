@@ -27,6 +27,13 @@ public:
         portEdit = new QLineEdit(this);
         robotIpEdit = new QLineEdit(this); // [New] Robot IP
         
+        rtspsOptionCheck = new QCheckBox("Use Secure RTSPS (Port 8322)", this); // [New]
+        rtspsOptionCheck->setStyleSheet(
+            "QCheckBox { color: #ffffff; font-weight: bold; font-size: 16px; padding: 5px; background: transparent; }"
+            "QCheckBox::indicator { width: 24px; height: 24px; border: 2px solid #F59E0B; background: #222; border-radius: 4px; }"
+            "QCheckBox::indicator:checked { background-color: #F59E0B; border-color: #F59E0B; }"
+        );
+        
         cctvOptionCheck = new QCheckBox("Use Custom CCTV URL", this); // Initialize cctvOptionCheck
         cctvOptionCheck->setStyleSheet(
             "QCheckBox { color: #ffffff; font-weight: bold; font-size: 16px; padding: 5px; background: transparent; }"
@@ -44,6 +51,7 @@ public:
         portEdit->setText(ConfigManager::instance().getCameraPort());
         robotIpEdit->setText(ConfigManager::instance().getRobotIp()); // [New]
         cctvOptionCheck->setChecked(ConfigManager::instance().getUseCustomCCTV());
+        rtspsOptionCheck->setChecked(ConfigManager::instance().getUseRtsps()); // [New]
 
         manualControlCheck = new QCheckBox("Enable Manual Control (WASD)", this);
         manualControlCheck->setStyleSheet(cctvOptionCheck->styleSheet());
@@ -65,11 +73,15 @@ public:
         QLabel *optionHint = new QLabel("Check to use: rtsp://admin:5hanwha!@<IP>:<PORT>/<ID>/H.264/media.smp", this);
         optionHint->setStyleSheet("color: #888; font-size: 11px; margin-bottom: 8px;");
 
+        QLabel *rtspsLabel = new QLabel("Security Mode:", this); // [New]
+        rtspsLabel->setStyleSheet("color: #ddd; font-weight: bold;");
+
         QLabel *robotIpLabel = new QLabel("ROS2 Bridge WS:", this); // [New]
         robotIpLabel->setStyleSheet("color: #ddd; font-weight: bold;");
 
         form->addRow(ipLabel, ipEdit);
         form->addRow(portLabel, portEdit);
+        form->addRow(rtspsLabel, rtspsOptionCheck); // [New]
         form->addRow(optionLabel, cctvOptionCheck);
         form->addRow("", optionHint);
         form->addRow(robotIpLabel, robotIpEdit); // [New]
@@ -111,6 +123,7 @@ public:
         ConfigManager::instance().setCameraPort(portEdit->text());
         ConfigManager::instance().setRobotIp(robotIpEdit->text()); // [New]
         ConfigManager::instance().setUseCustomCCTV(cctvOptionCheck->isChecked());
+        ConfigManager::instance().setUseRtsps(rtspsOptionCheck->isChecked()); // [New]
         ConfigManager::instance().setManualControl(manualControlCheck->isChecked());
         
         // 2. 스트림 매니저 리로드 (URL 재생성)
@@ -123,6 +136,7 @@ private:
     QLineEdit *ipEdit;
     QLineEdit *portEdit;
     QLineEdit *robotIpEdit; // [New]
+    QCheckBox *rtspsOptionCheck; // [New]
     QCheckBox *cctvOptionCheck;
     QCheckBox *manualControlCheck;
 };

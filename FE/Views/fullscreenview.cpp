@@ -228,9 +228,7 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
                 cbAll->setChecked(allChecked);
                 cbAll->blockSignals(false);
                 
-                // Emit signal to trigger stream stats
-                int expectedChannel = (currentChannelId < 4) ? (currentChannelId + 1) : 9;
-                emit streamStatsRequested(expectedChannel, anyChecked);
+                Q_UNUSED(anyChecked);
             });
         }
 
@@ -733,20 +731,3 @@ void FullScreenView::syncOverlayPosition() {
     }
 }
 
-void FullScreenView::updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs)
-{
-    int expectedChannel = (currentChannelId < 4) ? (currentChannelId + 1) : 9;
-    if (channelId == expectedChannel && videoWidget && videoWidget->getOsdWidget()) {
-        OsdWidget *osd = videoWidget->getOsdWidget();
-        
-        if (osd->isMetricVisible(OsdWidget::FPS)) {
-            osd->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
-        }
-        if (osd->isMetricVisible(OsdWidget::Bitrate)) {
-            osd->setMetricValue(OsdWidget::Bitrate, QString::number(bitrateKbps / 1024.0, 'f', 2) + " Mbps");
-        }
-        if (osd->isMetricVisible(OsdWidget::Latency)) {
-            osd->setMetricValue(OsdWidget::Latency, QString::number(proxyLatencyMs, 'f', 3) + " ms");
-        }
-    }
-}

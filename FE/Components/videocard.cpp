@@ -320,8 +320,7 @@ void VideoCard::showSettingsMenu()
             cbAll->setChecked(allChecked);
             cbAll->blockSignals(false);
             
-            // Emit signal to dynamically connect to camera server WebSocket
-            emit streamStatsRequested(m_channelId, anyChecked);
+            Q_UNUSED(anyChecked);
         });
     }
 
@@ -342,11 +341,3 @@ void VideoCard::showSettingsMenu()
     popup->show();
 }
 
-void VideoCard::updateStreamStats(double fps, double bitrateKbps, double proxyLatencyMs)
-{
-    // [Mod] External stats rendering removed.
-    // Relying solely on local qualitymonitor (qmon) in VideoWidget::extractGstStats.
-    Q_UNUSED(fps);
-    Q_UNUSED(bitrateKbps);
-    Q_UNUSED(proxyLatencyMs);
-}

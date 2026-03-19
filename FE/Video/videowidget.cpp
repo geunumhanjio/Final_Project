@@ -3,7 +3,6 @@
 #include <QDebug>
 #include <QApplication>
 #include <QMutexLocker>
-#include <QFile>
 #include "Gst/GstQualityMonitor.hpp"
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
@@ -26,12 +25,15 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     m_osdWidget = new OsdWidget(this);
     m_osdWidget->hide(); // 초기엔 숨김 처리 안함(비어있으면 안그려짐), 필요시 토글
 
+    m_pinger = new RtspPinger(this); // [New]
+
     // [New] 글로벌 애플리케이션 포커스 상태 변경 감지
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
         if (state != Qt::ApplicationActive) {
             if (m_osdWidget) m_osdWidget->hide();
         } else {
-            if (m_osdWidget && this->isVisible()) {
+            // 앱이 다시 활성화되었을 때, 이 위젯이 보이고 최소화 상태가 아닐 때만 OSD 표시
+            if (m_osdWidget && this->isVisible() && !this->window()->isMinimized()) {
                 bool anyVisible = false;
                 for (int i = 0; i < OsdWidget::MetricCount; ++i) {
                     if (m_osdWidget->isMetricVisible(static_cast<OsdWidget::Metric>(i))) {
@@ -40,17 +42,10 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
                     }
                 }
                 if (anyVisible) m_osdWidget->show();
-                
-                QPoint globalPos = this->mapToGlobal(QPoint(0, 0));
-                m_osdWidget->setGeometry(globalPos.x(), globalPos.y(), this->width(), this->height());
+                syncOverlayPosition();
             }
         }
     });
-
-    // [New] Timer to constantly sync OSD position when app moves
-    m_syncTimer = new QTimer(this);
-    connect(m_syncTimer, &QTimer::timeout, this, &VideoWidget::syncOverlayPosition);
-    m_syncTimer->start(16); // ~60fps sync rate
 
     // [New] Timer to extract GStreamer stats (packet loss, jitter)
     m_statsTimer = new QTimer(this);
@@ -79,6 +74,29 @@ bool VideoWidget::setPipeline(GstElement *p) {
     pipeline = p;
     if (!pipeline) return false;
 
+    // [New] Start Pinger for RTT measurement
+    GstElement *src = gst_bin_get_by_name(GST_BIN(pipeline), "src");
+    if (src) {
+        gchar *location = nullptr;
+        g_object_get(src, "location", &location, NULL);
+        if (location) {
+            m_pinger->startPinger(QString::fromUtf8(location));
+            g_free(location);
+        }
+        gst_object_unref(src);
+    }
+
+    // [New] Attach Pad Probe to Sink to count actual rendered frames
+    GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
+    if (sink) {
+        GstPad *sinkpad = gst_element_get_static_pad(sink, "sink");
+        if (sinkpad) {
+            gst_pad_add_probe(sinkpad, GST_PAD_PROBE_TYPE_BUFFER, sinkPadProbe, this, nullptr);
+            gst_object_unref(sinkpad);
+        }
+        gst_object_unref(sink);
+    }
+
     // Check for cropper
     cropper = gst_bin_get_by_name(GST_BIN(pipeline), "crop");
     if (!cropper) {
@@ -103,6 +121,8 @@ void VideoWidget::stop()
 {
     m_isPlaying = false;
     
+    if (m_pinger) m_pinger->stop(); // [New] Stop pinger when stream stops
+
     if (busTimer->isActive()) busTimer->stop();
 
     if (cropper) { gst_object_unref(cropper); cropper = nullptr; }
@@ -289,6 +309,20 @@ void VideoWidget::syncOverlayPosition() {
 void VideoWidget::extractGstStats() {
     if (!pipeline || !m_isPlaying || !m_osdWidget) return;
 
+    // 0. Update Protocol Info
+    GstElement *src = gst_bin_get_by_name(GST_BIN(pipeline), "src");
+    if (src) {
+        gchar *location = nullptr;
+        g_object_get(src, "location", &location, NULL);
+        if (location) {
+            QString urlStr = QString::fromUtf8(location);
+            QString proto = urlStr.split("://").first().toUpper();
+            m_osdWidget->setMetricValue(OsdWidget::Protocol, proto);
+            g_free(location);
+        }
+        gst_object_unref(src);
+    }
+
     // 1. Find the qualitymonitor element by name
     GstElement* qmon = gst_bin_get_by_name(GST_BIN(pipeline), "qmon");
     if (qmon) {
@@ -300,8 +334,44 @@ void VideoWidget::extractGstStats() {
             double elapsedSec = m_statsClock.isValid() ? m_statsClock.restart() / 1000.0 : 1.0;
             if (elapsedSec <= 0) elapsedSec = 1.0;
 
-            // 1. Packet Loss
-            m_osdWidget->setMetricValue(OsdWidget::PacketLoss, QString::number(m.packets_lost) + " pkts");
+            // [New] Reset deltas if the counters have reset (pipeline restart/zoom switch)
+            if (m.packets_received < m_lastPackets) {
+                m_lastPackets = 0;
+                m_lastBytes = 0;
+                m_lastLost = 0;
+                m_lastFrames = 0;
+                m_lastRendered = 0;
+            }
+
+            // 1. Packet Loss (Sequence-Number based Interval Rate)
+            int32_t deltaLost = m.packets_lost - m_lastLost;
+            uint64_t deltaRecv = m.packets_received - m_lastPackets;
+            
+            // Handle negative deltas on pipeline reset
+            if (deltaLost < 0) deltaLost = 0;
+            if (m.packets_received < m_lastPackets) deltaRecv = 0;
+
+            uint64_t expected = deltaRecv + static_cast<uint64_t>(deltaLost);
+            QString lossText;
+
+            if (expected > 0) {
+                // Standard RTP Loss Rate: missed / expected
+                double lossRate = (deltaLost * 100.0) / (double)expected;
+                lossText = QString("%1%").arg(lossRate, 0, 'f', 1);
+            } else {
+                // [Watchdog] If no packets expected/received in this interval:
+                // If the stream is supposed to be playing but absolute silence for 1s+, 
+                // it's effectively 100% signal loss.
+                if (m_isPlaying) {
+                    lossText = "100% (Signal Loss)";
+                } else {
+                    lossText = "0%";
+                }
+            }
+            m_osdWidget->setMetricValue(OsdWidget::PacketLoss, lossText);
+            
+            m_lastLost = m.packets_lost;
+            m_lastPackets = m.packets_received;
 
             // 2. Jitter
             m_osdWidget->setMetricValue(OsdWidget::Jitter, QString::number(m.jitter_ms, 'f', 2) + " ms");
@@ -313,40 +383,19 @@ void VideoWidget::extractGstStats() {
             }
             m_lastBytes = m.bytes_received;
 
-            // 4. FPS Calculation
-            // Attempt to get precise rendered frames from sink first
-            GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
-            bool fpsSet = false;
-            if (sink) {
-                // Check if 'stats' property exists to avoid GObject warnings
-                if (g_object_class_find_property(G_OBJECT_GET_CLASS(sink), "stats")) {
-                    GstStructure *stats = nullptr;
-                    g_object_get(sink, "stats", &stats, NULL);
-                    if (stats) {
-                        guint rendered = 0;
-                        if (gst_structure_get_uint(stats, "rendered", &rendered)) {
-                            // Using rendered frame count difference for FPS
-                            if (rendered >= m_lastRendered) {
-                                double fps = (rendered - m_lastRendered) / elapsedSec;
-                                m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
-                                fpsSet = true;
-                            }
-                            m_lastRendered = rendered;
-                        }
-                        gst_structure_free(stats);
-                    }
-                }
-                gst_object_unref(sink);
-            }
-            // Fallback to packet-based estimation if sink stats failed or not available
-            if (!fpsSet && m.packets_received >= m_lastPackets) {
-                double fps_est = (m.packets_received - m_lastPackets) / elapsedSec;
-                m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps_est)));
-            }
+            // 4. FPS Calculation (Using actual rendered frames from Sink Probe)
+            double sourceFps = (m.frames_received - m_lastFrames) / elapsedSec;
+            double renderFps = (m_actualFrameCount - m_lastRendered) / elapsedSec;
+
+            m_osdWidget->setMetricValue(OsdWidget::FPS, QString::number(renderFps, 'f', 1));
+
+            m_lastRendered = m_actualFrameCount;
+            m_lastFrames = m.frames_received;
             m_lastPackets = m.packets_received;
 
-            // 5. Latency (RTT) - Clean, stable label
-            m_osdWidget->setMetricValue(OsdWidget::Latency, QString::number(m.rtt_ms, 'f', 1) + " ms (RTT)");
+            // 5. Latency (RTT) - Use RtspPinger solely for network RTT
+            double rtt = m_pinger->getRttMs();
+            m_osdWidget->setMetricValue(OsdWidget::Latency, QString::number(rtt, 'f', 1) + " ms (RTT)");
         }
         gst_object_unref(qmon);
     }
@@ -375,4 +424,13 @@ GstBusSyncReply VideoWidget::busSyncHandler(GstBus *bus, GstMessage *msg, gpoint
         return GST_BUS_DROP;
     }
     return GST_BUS_PASS;
+}
+
+// [New] Pad probe callback to count actual rendered frames
+GstPadProbeReturn VideoWidget::sinkPadProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data) {
+    VideoWidget *self = static_cast<VideoWidget*>(user_data);
+    if (info->type & GST_PAD_PROBE_TYPE_BUFFER) {
+        self->m_actualFrameCount++;
+    }
+    return GST_PAD_PROBE_OK;
 }

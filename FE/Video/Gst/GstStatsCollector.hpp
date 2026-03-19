@@ -13,25 +13,32 @@ struct RtpQualityMetrics {
     double   jitter_ms = 0.0;
     uint64_t bytes_received = 0;
     double   rtt_ms = 0.0;
+    uint64_t frames_received = 0; // RTP Marker bit based frame count
 };
 
 class GstStatsCollector {
 public:
-    GstStatsCollector() : rtp_session_(nullptr) {}
+    GstStatsCollector() : rtp_session_(nullptr), pipeline_(nullptr), frames_count_(0) {}
     ~GstStatsCollector() {
         if (rtp_session_) {
             g_object_unref(rtp_session_);
         }
+        if (pipeline_) {
+            gst_object_unref(pipeline_);
+        }
     }
 
-    // 파이프라인 내에서 rtpbin을 찾아 시그널을 연결합니다.
+    void incrementFrames() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        frames_count_++;
+    }
+
     void attach(GstElement* pipeline) {
-        // rtspsrc를 사용하는 경우 'new-manager' 시그널을 통해 rtpbin을 얻어야 할 수도 있습니다.
-        // 여기서는 일반적인 bin 구조에서 rtpbin을 찾는 방식을 우선 시도합니다.
+        if (pipeline_) gst_object_unref(pipeline_);
+        pipeline_ = (GstElement*)gst_object_ref(pipeline);
+
         GstElement* rtpbin = gst_bin_get_by_name(GST_BIN(pipeline), "rtpbin");
-        
         if (!rtpbin) {
-            // 만약 rtpbin이라는 이름이 없다면 rtspsrc 내부의 manager를 찾아야 합니다.
             GstElement* src = gst_bin_get_by_name(GST_BIN(pipeline), "src");
             if (src) {
                 g_signal_connect(src, "new-manager", G_CALLBACK(on_new_manager), this);
@@ -46,6 +53,8 @@ public:
     RtpQualityMetrics getMetrics() {
         std::lock_guard<std::mutex> lock(mutex_);
         RtpQualityMetrics metrics;
+        metrics.frames_received = frames_count_; 
+
         if (!rtp_session_) return metrics;
 
         GstStructure *stats_struct = nullptr;
@@ -55,7 +64,6 @@ public:
             const GValue *val = gst_structure_get_value(stats_struct, "source-stats");
             if (val && G_VALUE_HOLDS(val, G_TYPE_VALUE_ARRAY)) {
                 GValueArray *arr = (GValueArray *)g_value_get_boxed(val);
-
                 for (guint i = 0; i < arr->n_values; ++i) {
                     const GValue *sval = g_value_array_get_nth(arr, i);
                     GstStructure *src_stats = (GstStructure *)g_value_get_boxed(sval);
@@ -66,13 +74,11 @@ public:
                     gst_structure_get_boolean(src_stats, "internal", &internal);
                     gst_structure_get_boolean(src_stats, "is-sender", &is_sender);
 
-                    // 원격 송신자(카메라 또는 상대방 서버)의 통계만 추출
                     if (!internal && is_sender) {
                         uint64_t pkts = 0, bytes = 0;
                         int32_t lost = 0;
                         guint jitter_units = 0;
                         gint clock_rate = 90000;
-                        guint rb_round_trip = 0;
 
                         gst_structure_get_uint64(src_stats, "packets-received", &pkts);
                         gst_structure_get_int(src_stats, "packets-lost", &lost);
@@ -84,12 +90,14 @@ public:
                         metrics.packets_lost = lost;
                         metrics.bytes_received = bytes;
                         metrics.jitter_ms = (clock_rate > 0) ? (jitter_units * 1000.0 / clock_rate) : 0.0;
-
-                        if (gst_structure_get_uint(src_stats, "rb-round-trip", &rb_round_trip)) {
+                        
+                        // We check rb-round-trip just in case, but VideoWidget prefers Pinger
+                        guint rb_round_trip = 0;
+                        if (gst_structure_get_uint(src_stats, "rb-round-trip", &rb_round_trip) && rb_round_trip > 0) {
                             double rtt_seconds = (rb_round_trip >> 16) + static_cast<double>(rb_round_trip & 0xFFFF) / 65536.0;
                             metrics.rtt_ms = rtt_seconds * 1000.0;
                         }
-                        break; 
+                        break;
                     }
                 }
             }
@@ -110,19 +118,21 @@ private:
 
     static void on_ssrc_active(GstElement* rtpbin, guint sessid, guint ssrc, gpointer data) {
         auto* self = static_cast<GstStatsCollector*>(data);
-        if (sessid != 0) return; // 비디오 세션(보통 0)만 감시
+        if (sessid != 0) return; 
 
         std::lock_guard<std::mutex> lock(self->mutex_);
         if (!self->rtp_session_) {
             GstElement *session_elem = nullptr;
             g_signal_emit_by_name(rtpbin, "get-internal-session", sessid, &session_elem);
             if (session_elem) {
-                self->rtp_session_ = G_OBJECT(session_elem); // refcount 관리 주의
+                self->rtp_session_ = G_OBJECT(session_elem); 
             }
         }
     }
 
     GObject* rtp_session_;
+    GstElement* pipeline_;
+    uint64_t frames_count_; 
     std::mutex mutex_;
 };
 
