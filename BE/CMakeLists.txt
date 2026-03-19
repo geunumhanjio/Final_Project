@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Find Packages
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-rtsp-server-1.0 gstreamer-app-1.0 gio-2.0)
+pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-rtsp-server-1.0 gstreamer-rtsp-1.0 gstreamer-app-1.0 gio-2.0)
 find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system thread) 
 find_package(OpenSSL REQUIRED)
