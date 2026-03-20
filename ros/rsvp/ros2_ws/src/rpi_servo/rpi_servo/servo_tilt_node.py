@@ -6,15 +6,15 @@ servo_tilt_node.py
 
 하드웨어:
   - GPIO 핀: 기본 GPIO 18 (pigpio hardware PWM 지원 핀)
-  - 서보 PWM: 50Hz, 펄스폭 500~2500µs
-  - 중립(0°): 1500µs / +30°: ~1833µs / -30°: ~1167µs
+  - 서보 PWM: 50Hz, 펄스폭 500~2500µs (180° 서보 기준)
+  - 0°: 500µs / 90°: 1500µs / 180°: 2500µs
 
 의존성:
   - pigpio: sudo apt install pigpio python3-pigpio
   - pigpiod 데몬 실행 필요: sudo systemctl enable pigpiod && sudo systemctl start pigpiod
 
 구독:
-  /camera/tilt  (std_msgs/Float32)  각도 명령 (deg, 범위: tilt_min ~ tilt_max)
+  /camera/tilt  (std_msgs/Float32)  각도 명령 (deg, 범위: tilt_min ~ tilt_max, 절대각 0~180°)
 
 발행:
   /camera/tilt_status  (std_msgs/Float32)  현재 서보 각도
@@ -31,15 +31,15 @@ except ImportError:
     PIGPIO_AVAILABLE = False
 
 
-# ── 서보 PWM 변환 상수 ──────────────────────────────────────────────────────
-CENTER_PW   = 1500   # µs (0°)
-RANGE_PW    = 1000   # µs (+90° = CENTER + RANGE, -90° = CENTER - RANGE)
+# ── 서보 PWM 변환 상수 (180° 서보 기준) ────────────────────────────────────
+MIN_PW      = 500    # µs (0°)
+MAX_PW      = 2500   # µs (180°)
 SERVO_FREQ  = 50     # Hz
 
 
 def angle_to_pulsewidth(angle_deg: float) -> int:
-    """각도(deg) → 펄스폭(µs) 변환. 90° → +1000µs 기준."""
-    return int(CENTER_PW + (angle_deg / 90.0) * RANGE_PW)
+    """절대각(0~180°) → 펄스폭(µs) 변환. 0°=500µs, 180°=2500µs."""
+    return int(MIN_PW + (angle_deg / 180.0) * (MAX_PW - MIN_PW))
 
 
 class ServoTiltNode(Node):
@@ -49,9 +49,9 @@ class ServoTiltNode(Node):
 
         # ── 파라미터 ──────────────────────────────────────────────────────
         self.declare_parameter('gpio_pin',  18)      # hardware PWM 핀
-        self.declare_parameter('tilt_min', -30.0)    # 최소 각도 (deg)
-        self.declare_parameter('tilt_max',  30.0)    # 최대 각도 (deg)
-        self.declare_parameter('init_angle', 0.0)    # 시작 각도 (deg)
+        self.declare_parameter('tilt_min',  50.0)    # 최소 각도 (deg)
+        self.declare_parameter('tilt_max', 160.0)    # 최대 각도 (deg)
+        self.declare_parameter('init_angle', 90.0)   # 시작 각도 (deg)
 
         self._pin       = self.get_parameter('gpio_pin').value
         self._tilt_min  = self.get_parameter('tilt_min').value
@@ -72,7 +72,7 @@ class ServoTiltNode(Node):
                 self._set_angle(self._cur_angle)
                 self.get_logger().info(
                     f'pigpio 연결 완료. GPIO {self._pin}, '
-                    f'범위 [{self._tilt_min}°, {self._tilt_max}°]'
+                    f'범위 [{self._tilt_min}°, {self._tilt_max}°] (180° 서보)'
                 )
         else:
             self.get_logger().warn(
