@@ -49,9 +49,9 @@ class ServoTiltNode(Node):
 
         # ── 파라미터 ──────────────────────────────────────────────────────
         self.declare_parameter('gpio_pin',  18)      # hardware PWM 핀
-        self.declare_parameter('tilt_min',  50.0)    # 최소 각도 (deg)
-        self.declare_parameter('tilt_max', 160.0)    # 최대 각도 (deg)
-        self.declare_parameter('init_angle', 90.0)   # 시작 각도 (deg)
+        self.declare_parameter('tilt_min',  15.0)    # 최소 각도 (deg)
+        self.declare_parameter('tilt_max',  90.0)    # 최대 각도 (deg)
+        self.declare_parameter('init_angle', 15.0)   # 시작 각도 (deg)
 
         self._pin       = self.get_parameter('gpio_pin').value
         self._tilt_min  = self.get_parameter('tilt_min').value

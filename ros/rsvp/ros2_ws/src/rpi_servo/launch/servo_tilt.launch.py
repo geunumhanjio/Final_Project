@@ -18,9 +18,9 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('gpio_pin',   default_value='18',    description='서보 PWM GPIO 핀 번호'),
-        DeclareLaunchArgument('tilt_min',   default_value='50.0',  description='최소 틸트 각도 (deg, 절대각 0~180)'),
-        DeclareLaunchArgument('tilt_max',   default_value='160.0', description='최대 틸트 각도 (deg, 절대각 0~180)'),
-        DeclareLaunchArgument('init_angle', default_value='90.0',  description='초기 각도 (deg)'),
+        DeclareLaunchArgument('tilt_min',   default_value='15.0',  description='최소 틸트 각도 (deg, 절대각 0~180)'),
+        DeclareLaunchArgument('tilt_max',   default_value='90.0',  description='최대 틸트 각도 (deg, 절대각 0~180)'),
+        DeclareLaunchArgument('init_angle', default_value='15.0',  description='초기 각도 (deg)'),
 
         Node(
             package='rpi_servo',
