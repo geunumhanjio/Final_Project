@@ -9,6 +9,20 @@ pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-rtsp-server-1.0 gstreamer
 find_package(OpenCV REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system thread) 
 find_package(OpenSSL REQUIRED)
+set(JWT_CPP_INCLUDE_DIR "" CACHE PATH "Directory containing jwt-cpp/jwt.h")
+
+find_path(JWT_CPP_INCLUDE_DIR jwt-cpp/jwt.h
+    HINTS
+        ${JWT_CPP_INCLUDE_DIR}
+        /opt/vcpkg/packages/jwt-cpp_arm64-linux/include
+        /opt/vcpkg/installed/arm64-linux/include
+        /usr/include
+        /usr/local/include
+)
+
+if (NOT JWT_CPP_INCLUDE_DIR)
+    message(FATAL_ERROR "jwt-cpp header not found. Install jwt-cpp so that jwt-cpp/jwt.h is available or pass -DJWT_CPP_INCLUDE_DIR=/path/to/include.")
+endif()
 # Note: Beast is header-only but depends on system/thread usually. 
 # If Boost is header-only in the system, COMPONENTS might not be needed, but 'system' is safer.
 
@@ -18,6 +32,7 @@ include_directories(${GST_INCLUDE_DIRS})
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${Boost_INCLUDE_DIRS})
 include_directories(${OPENSSL_INCLUDE_DIR})
+include_directories(${JWT_CPP_INCLUDE_DIR})
 
 # Source Files
 set(SOURCES
