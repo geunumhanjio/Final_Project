@@ -3,6 +3,7 @@
  * @brief Sidebar implementation
  */
 #include "sidebar.h"
+#include "channelcatalog.h"
 
 #include <QAbstractButton>
 #include <QButtonGroup>
@@ -28,6 +29,9 @@ Sidebar::Sidebar(const QString &title, QWidget *parent)
 
 Sidebar::RobotMode Sidebar::currentRobotMode() const
 {
+    if (patrolModeButton && patrolModeButton->isChecked()) {
+        return PatrolMode;
+    }
     if (controlModeButton && controlModeButton->isChecked()) {
         return ControlMode;
     }
@@ -37,9 +41,26 @@ Sidebar::RobotMode Sidebar::currentRobotMode() const
     return ManualMode;
 }
 
+Sidebar::SettingsSection Sidebar::currentSettingsSection() const
+{
+    if (settingsButtonGroup) {
+        const int checkedId = settingsButtonGroup->checkedId();
+        if (checkedId >= 0) {
+            return static_cast<SettingsSection>(checkedId);
+        }
+    }
+
+    return CameraSettingsSection;
+}
+
 bool Sidebar::isControlButtonActive() const
 {
     return activateControlButton && activateControlButton->isChecked();
+}
+
+bool Sidebar::isPatrolAddPointActive() const
+{
+    return addPatrolPointButton && addPatrolPointButton->isChecked();
 }
 
 void Sidebar::setControlButtonActive(bool active)
@@ -64,10 +85,61 @@ void Sidebar::setControlButtonActive(bool active)
     emit controlButtonToggled(active);
 }
 
+void Sidebar::setPatrolAddPointActive(bool active)
+{
+    if (!addPatrolPointButton) {
+        return;
+    }
+
+    const QString nextText = active ? QStringLiteral("Adding Points") : QStringLiteral("Add Point");
+    const bool stateChanged = (addPatrolPointButton->isChecked() != active);
+    const bool textChanged = (addPatrolPointButton->text() != nextText);
+
+    if (!stateChanged && !textChanged) {
+        return;
+    }
+
+    addPatrolPointButton->blockSignals(true);
+    addPatrolPointButton->setChecked(active);
+    addPatrolPointButton->setText(nextText);
+    addPatrolPointButton->blockSignals(false);
+
+    emit patrolAddPointToggled(active);
+}
+
+void Sidebar::setPatrolPointCount(int count)
+{
+    m_patrolPointCount = qMax(0, count);
+    if (!finalizePatrolButton) {
+        return;
+    }
+
+    finalizePatrolButton->setEnabled((currentRobotMode() == PatrolMode) && m_patrolPointCount > 0);
+}
+
 void Sidebar::setRobotMode(RobotMode mode)
 {
     const bool modeChanged = (currentRobotMode() != mode);
     applyRobotModeSelection(mode, modeChanged);
+}
+
+void Sidebar::setSettingsSection(SettingsSection section)
+{
+    if (!settingsButtonGroup) {
+        return;
+    }
+
+    if (QAbstractButton *button = settingsButtonGroup->button(section)) {
+        const bool sectionChanged = (currentSettingsSection() != section);
+        if (!button->isChecked()) {
+            const QSignalBlocker blocker(settingsButtonGroup);
+            button->setChecked(true);
+        }
+
+        if (sectionChanged) {
+            emit settingsSectionSelected(section);
+        }
+    }
 }
 
 void Sidebar::setupUi()
@@ -80,9 +152,11 @@ void Sidebar::setupUi()
 
     setupLiveUI();
     setupPlaybackUI();
+    setupSettingsUI();
 
     mainStack->addWidget(liveWidget);
     mainStack->addWidget(playbackWidget);
+    mainStack->addWidget(settingsWidget);
 
     setWidget(container);
 }
@@ -92,9 +166,12 @@ void Sidebar::setMode(SidebarMode mode)
     if (mode == Live) {
         mainStack->setCurrentIndex(0);
         setWindowTitle("Channel List");
-    } else {
+    } else if (mode == Playback) {
         mainStack->setCurrentIndex(1);
         setWindowTitle("Recordings");
+    } else {
+        mainStack->setCurrentIndex(2);
+        setWindowTitle("Settings");
     }
 }
 
@@ -134,20 +211,24 @@ void Sidebar::setupLiveUI()
     manualModeButton = new QRadioButton("Manual Mode", modePanel);
     autoModeButton = new QRadioButton("Auto Mode", modePanel);
     controlModeButton = new QRadioButton("Control Mode", modePanel);
+    patrolModeButton = new QRadioButton("Patrol Mode", modePanel);
     manualModeButton->setObjectName("SidebarModeOption");
     autoModeButton->setObjectName("SidebarModeOption");
     controlModeButton->setObjectName("SidebarModeOption");
+    patrolModeButton->setObjectName("SidebarModeOption");
 
     modeButtonGroup = new QButtonGroup(modePanel);
     modeButtonGroup->setExclusive(true);
     modeButtonGroup->addButton(manualModeButton, ManualMode);
     modeButtonGroup->addButton(autoModeButton, AutoMode);
     modeButtonGroup->addButton(controlModeButton, ControlMode);
+    modeButtonGroup->addButton(patrolModeButton, PatrolMode);
     manualModeButton->setChecked(true);
 
     modeLayout->addWidget(manualModeButton);
     modeLayout->addWidget(autoModeButton);
     modeLayout->addWidget(controlModeButton);
+    modeLayout->addWidget(patrolModeButton);
 
     activateControlButton = new QPushButton("Start Control", modePanel);
     activateControlButton->setObjectName("SidebarControlButton");
@@ -155,6 +236,21 @@ void Sidebar::setupLiveUI()
     activateControlButton->setCheckable(true);
     activateControlButton->setEnabled(false);
     modeLayout->addWidget(activateControlButton);
+
+    addPatrolPointButton = new QPushButton("Add Point", modePanel);
+    addPatrolPointButton->setObjectName("SidebarControlButton");
+    addPatrolPointButton->setMinimumHeight(40);
+    addPatrolPointButton->setCheckable(true);
+    addPatrolPointButton->setVisible(false);
+    addPatrolPointButton->setEnabled(false);
+    modeLayout->addWidget(addPatrolPointButton);
+
+    finalizePatrolButton = new QPushButton(QStringLiteral("설정 완료"), modePanel);
+    finalizePatrolButton->setObjectName("SidebarControlButton");
+    finalizePatrolButton->setMinimumHeight(40);
+    finalizePatrolButton->setVisible(false);
+    finalizePatrolButton->setEnabled(false);
+    modeLayout->addWidget(finalizePatrolButton);
 
     emergencyStopButton = new QPushButton(QStringLiteral("즉시 정지"), modePanel);
     emergencyStopButton->setObjectName("SidebarEmergencyStopButton");
@@ -175,7 +271,14 @@ void Sidebar::setupLiveUI()
         activateControlButton->setText(checked ? "Stop Control" : "Start Control");
         emit controlButtonToggled(checked);
     });
+    connect(addPatrolPointButton, &QPushButton::toggled, this, [this](bool checked) {
+        addPatrolPointButton->setText(checked ? "Adding Points" : "Add Point");
+        emit patrolAddPointToggled(checked);
+    });
+    connect(finalizePatrolButton, &QPushButton::clicked, this, &Sidebar::patrolFinalizeRequested);
     connect(emergencyStopButton, &QPushButton::clicked, this, &Sidebar::emergencyStopRequested);
+
+    applyRobotModeSelection(currentRobotMode(), false);
 }
 
 void Sidebar::applyRobotModeSelection(RobotMode mode, bool emitModeSignal)
@@ -190,11 +293,25 @@ void Sidebar::applyRobotModeSelection(RobotMode mode, bool emitModeSignal)
     }
 
     const bool controlModeSelected = (mode == ControlMode);
+    const bool patrolModeSelected = (mode == PatrolMode);
+    const bool stopAvailable = controlModeSelected || patrolModeSelected;
     if (activateControlButton) {
         activateControlButton->setEnabled(controlModeSelected);
+        activateControlButton->setVisible(controlModeSelected);
+    }
+    if (addPatrolPointButton) {
+        addPatrolPointButton->setVisible(patrolModeSelected);
+        addPatrolPointButton->setEnabled(patrolModeSelected);
+        if (!patrolModeSelected) {
+            setPatrolAddPointActive(false);
+        }
+    }
+    if (finalizePatrolButton) {
+        finalizePatrolButton->setVisible(patrolModeSelected);
+        finalizePatrolButton->setEnabled(patrolModeSelected && m_patrolPointCount > 0);
     }
     if (emergencyStopButton) {
-        emergencyStopButton->setEnabled(controlModeSelected);
+        emergencyStopButton->setEnabled(stopAvailable);
     }
 
     if (emitModeSignal) {
@@ -220,32 +337,64 @@ void Sidebar::setupPlaybackUI()
     categoryList->setObjectName("CategoryList");
     categoryList->setFocusPolicy(Qt::NoFocus);
 
-    struct Category {
-        int id;
-        QString name;
-    };
-    const QList<Category> categories = {
-        {0, "All Recordings"},
-        {1, "CCTV 1 (Low)"},
-        {2, "CCTV 2 (Low)"},
-        {3, "CCTV 3 (Low)"},
-        {4, "CCTV 4 (Low)"},
-        {5, "CCTV 1 (High)"},
-        {6, "CCTV 2 (High)"},
-        {7, "CCTV 3 (High)"},
-        {8, "CCTV 4 (High)"},
-        {9, "RC Car Camera"},
-        {10, "Lidar Map"}
-    };
-
-    for (const auto &cat : categories) {
-        QListWidgetItem *item = new QListWidgetItem(cat.name);
-        item->setData(Qt::UserRole, cat.id);
+    for (const PlaybackCategoryDefinition &category : ChannelCatalog::playbackCategories()) {
+        QListWidgetItem *item = new QListWidgetItem(category.name);
+        item->setData(Qt::UserRole, category.id);
         categoryList->addItem(item);
     }
 
     layout->addWidget(categoryList);
     connect(categoryList, &QListWidget::itemClicked, this, &Sidebar::onCategoryClicked);
+}
+
+void Sidebar::setupSettingsUI()
+{
+    settingsWidget = new QWidget(container);
+    QVBoxLayout *layout = new QVBoxLayout(settingsWidget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+
+    QWidget *panel = new QWidget(settingsWidget);
+    panel->setObjectName("SettingsSidebarPanel");
+    QVBoxLayout *panelLayout = new QVBoxLayout(panel);
+    panelLayout->setContentsMargins(16, 20, 16, 20);
+    panelLayout->setSpacing(12);
+
+    QLabel *titleLabel = new QLabel(QStringLiteral("SETTINGS"), panel);
+    titleLabel->setObjectName("SettingsSidebarTitle");
+
+    QLabel *subtitleLabel = new QLabel(QStringLiteral("Choose a configuration group for the center panel."), panel);
+    subtitleLabel->setObjectName("SettingsSidebarSubtitle");
+    subtitleLabel->setWordWrap(true);
+
+    cameraSettingsButton = new QPushButton(QStringLiteral("Camera Settings"), panel);
+    cameraSettingsButton->setObjectName("SettingsSidebarButton");
+    cameraSettingsButton->setCheckable(true);
+    cameraSettingsButton->setMinimumHeight(44);
+
+    robotCarSettingsButton = new QPushButton(QStringLiteral("Robot Car Settings"), panel);
+    robotCarSettingsButton->setObjectName("SettingsSidebarButton");
+    robotCarSettingsButton->setCheckable(true);
+    robotCarSettingsButton->setMinimumHeight(44);
+
+    settingsButtonGroup = new QButtonGroup(panel);
+    settingsButtonGroup->setExclusive(true);
+    settingsButtonGroup->addButton(cameraSettingsButton, CameraSettingsSection);
+    settingsButtonGroup->addButton(robotCarSettingsButton, RobotCarSettingsSection);
+    cameraSettingsButton->setChecked(true);
+
+    panelLayout->addWidget(titleLabel);
+    panelLayout->addWidget(subtitleLabel);
+    panelLayout->addSpacing(8);
+    panelLayout->addWidget(cameraSettingsButton);
+    panelLayout->addWidget(robotCarSettingsButton);
+    panelLayout->addStretch();
+
+    layout->addWidget(panel, 1);
+
+    connect(settingsButtonGroup, QOverload<int>::of(&QButtonGroup::idClicked), this, [this](int id) {
+        emit settingsSectionSelected(id);
+    });
 }
 
 void Sidebar::onCategoryClicked(QListWidgetItem *item)
@@ -335,13 +484,7 @@ void Sidebar::addChannelItem(int index, QString name, bool isLidar, bool useText
 
 QString Sidebar::getChannelName(int index)
 {
-    if (index < 4) {
-        return QString("Channel 0%1 - Camera").arg(index + 1);
-    }
-    if (index == 4) {
-        return "RC Front Cam";
-    }
-    return "Lidar Map Stream";
+    return ChannelCatalog::sidebarTitleForIndex(index);
 }
 
 void Sidebar::onItemClicked(QListWidgetItem *item)

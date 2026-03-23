@@ -6,6 +6,7 @@
 #include <QPushButton>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
+#include <QJsonArray>
 #include <QLabel>
 #include <QJsonObject>
 #include <QProgressBar> // [New]

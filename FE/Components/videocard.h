@@ -16,6 +16,8 @@
 #endif
 #include "videowidget.h"
 
+class GoalArrowOverlayWidget;
+
 class VideoCard : public QWidget
 {
     Q_OBJECT
@@ -74,7 +76,7 @@ private:
     // Overlays
     QWidget *m_topOverlay;
     QWidget *m_bottomOverlay; // In-video bottom overlay (e.g. resolution info)
-    QWidget *m_goalOverlay;
+    GoalArrowOverlayWidget *m_goalOverlay;
     
     // Status Bar (Below video)
     QFrame *m_statusBar;
@@ -104,6 +106,7 @@ private:
     QPointF m_committedGoalStartLocal;
     QPointF m_committedGoalEndLocal;
     QRectF m_committedGoalDisplayRect;
+    QRectF m_committedGoalCropRect;
     bool m_preserveLocalCommittedGoalOnNextSet = false;
     QTimer *m_goalOverlaySyncTimer = nullptr;
 };

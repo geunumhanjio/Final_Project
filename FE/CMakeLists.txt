@@ -10,8 +10,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 1. Qt 라이브러리 찾기
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets WebSockets)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets WebSockets)
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets WebSockets Network)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets WebSockets Network)
 
 # -------------------------------------------------------------------------
 # 2. [수동 연결] GStreamer MinGW 라이브러리 직접 지정
@@ -45,12 +45,30 @@ else()
     message(STATUS "Selected GStreamer Root (MinGW): ${GST_ROOT}")
 endif()
 
+set(OPENCV_ROOT "C:/opencv/build")
+set(OPENCV_INCLUDE_DIR "${OPENCV_ROOT}/include")
+
+if(MSVC)
+    set(OPENCV_LIB_DIR "${OPENCV_ROOT}/x64/vc16/lib")
+    set(OPENCV_BIN_DIR "${OPENCV_ROOT}/x64/vc16/bin")
+else()
+    set(OPENCV_LIB_DIR "${OPENCV_ROOT}/x64/mingw/lib")
+    set(OPENCV_BIN_DIR "${OPENCV_ROOT}/x64/mingw/bin")
+endif()
+
+if(EXISTS "${OPENCV_INCLUDE_DIR}" AND EXISTS "${OPENCV_LIB_DIR}")
+    message(STATUS "Selected OpenCV Root: ${OPENCV_ROOT}")
+else()
+    message(FATAL_ERROR "OpenCV was not found at ${OPENCV_ROOT}. Please install OpenCV or update OPENCV_ROOT.")
+endif()
+
 # (1) 헤더 파일 경로 추가 (공통)
 # (1) 헤더 파일 경로 추가 (공통)
 include_directories(
     "${GST_ROOT}/include/gstreamer-1.0"
     "${GST_ROOT}/include/glib-2.0"
     "${GST_ROOT}/lib/glib-2.0/include"
+    "${OPENCV_INCLUDE_DIR}"
     # [New] Modularized Paths
     "${CMAKE_CURRENT_SOURCE_DIR}/Views"
     "${CMAKE_CURRENT_SOURCE_DIR}/Components"
@@ -62,6 +80,7 @@ include_directories(
 
 # (2) bin 경로 정의 (main.cpp에서 DLL 로딩용)
 add_compile_definitions(GST_BIN_PATH="${GST_ROOT}/bin")
+add_compile_definitions(OPENCV_BIN_PATH="${OPENCV_BIN_DIR}")
 
 # -------------------------------------------------------------------------
 
@@ -69,6 +88,8 @@ add_compile_definitions(GST_BIN_PATH="${GST_ROOT}/bin")
 set(PROJECT_SOURCES
         main.cpp
         mainwindow.cpp mainwindow.h
+        mainwindow_ui.cpp
+        mainwindow_session.cpp
         Components/topbar.h Components/topbar.cpp
         Components/sidebar.h Components/sidebar.cpp
         Views/liveview.h Views/liveview.cpp
@@ -76,17 +97,24 @@ set(PROJECT_SOURCES
         Video/videowidget.h Video/videowidget.cpp
         Video/livevideowidget.h Video/livevideowidget.cpp
         Video/recordedvideowidget.h Video/recordedvideowidget.cpp
+        Video/frucvideoprocessor.h Video/frucvideoprocessor.cpp
         Video/rtsppinger.h Video/rtsppinger.cpp
         Video/Gst/GstQualityMonitor.hpp Video/Gst/GstQualityMonitor.cpp
         Video/Gst/GstStatsCollector.hpp
         Components/videocard.h Components/videocard.cpp
         Components/slammapwidget.h Components/slammapwidget.cpp
         Network/streammanager.h Network/streammanager.cpp
+        Network/authmanager.h Network/authmanager.cpp
         Network/rosbridgeclient.h Network/rosbridgeclient.cpp
         Network/cameracontrolclient.h Network/cameracontrolclient.cpp
         Views/playbackview.h Views/playbackview.cpp
         Utils/configmanager.h
-        Components/settingswidget.h
+        Utils/channelcatalog.h Utils/channelcatalog.cpp
+        Utils/goaloverlaycontroller.h Utils/goaloverlaycontroller.cpp
+        Utils/framelessconfirmdialog.h Utils/framelessconfirmdialog.cpp
+        Components/settingswidget.h Components/settingswidget.cpp
+        Components/logindialog.h Components/logindialog.cpp
+        Components/signupdialog.h Components/signupdialog.cpp
         Components/osdwidget.h Components/osdwidget.cpp # [New]
 )
 
@@ -104,7 +132,18 @@ else()
 endif()
 
 # 5. 라이브러리 연결
-target_link_libraries(VEDA_QT_1 PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VERSION_MAJOR}::WebSockets)
+target_link_libraries(VEDA_QT_1 PRIVATE
+    Qt${QT_VERSION_MAJOR}::Widgets
+    Qt${QT_VERSION_MAJOR}::WebSockets
+    Qt${QT_VERSION_MAJOR}::Network
+)
+
+if(MSVC)
+    target_link_options(VEDA_QT_1 PRIVATE
+        $<$<CONFIG:Debug>:/INCREMENTAL:NO>
+        $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL:NO>
+    )
+endif()
 
 
 # -------------------------------------------------------------------------
@@ -114,9 +153,12 @@ target_link_libraries(VEDA_QT_1 PRIVATE Qt${QT_VERSION_MAJOR}::Widgets Qt${QT_VE
 if(MSVC)
     # MSVC는 .lib 파일을 링크
     target_link_libraries(VEDA_QT_1 PRIVATE
+        $<$<CONFIG:Debug>:${OPENCV_LIB_DIR}/opencv_world4120d.lib>
+        $<$<NOT:$<CONFIG:Debug>>:${OPENCV_LIB_DIR}/opencv_world4120.lib>
         "${GST_ROOT}/lib/gstreamer-1.0.lib"
         "${GST_ROOT}/lib/gstvideo-1.0.lib"
         "${GST_ROOT}/lib/gstrtp-1.0.lib"
+        "${GST_ROOT}/lib/gstrtsp-1.0.lib"
         "${GST_ROOT}/lib/gobject-2.0.lib"
         "${GST_ROOT}/lib/glib-2.0.lib"
         "${GST_ROOT}/lib/gstapp-1.0.lib"
@@ -125,9 +167,11 @@ if(MSVC)
 else()
     # MinGW는 .dll.a 파일을 링크
     target_link_libraries(VEDA_QT_1 PRIVATE
+        "${OPENCV_LIB_DIR}/libopencv_world.dll.a"
         "${GST_ROOT}/lib/libgstreamer-1.0.dll.a"
         "${GST_ROOT}/lib/libgstvideo-1.0.dll.a"
         "${GST_ROOT}/lib/libgstrtp-1.0.dll.a"
+        "${GST_ROOT}/lib/libgstrtsp-1.0.dll.a"
         "${GST_ROOT}/lib/libgobject-2.0.dll.a"
         "${GST_ROOT}/lib/libglib-2.0.dll.a"
         "${GST_ROOT}/lib/libgstapp-1.0.dll.a"

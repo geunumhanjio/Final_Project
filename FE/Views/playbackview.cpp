@@ -1,4 +1,5 @@
 #include "playbackview.h"
+#include "channelcatalog.h"
 #include <QJsonArray>
 #include <QDateTime>
 #include <QDebug>
@@ -63,26 +64,15 @@ PlaybackView::PlaybackView(QWidget *parent) : QWidget(parent)
 
 void PlaybackView::filterRecordings(int categoryId)
 {
+    m_currentCategory = categoryId;
     m_listWidget->clear();
+    m_titleLabel->setText(QStringLiteral("Videos - %1").arg(ChannelCatalog::playbackCategoryName(categoryId)));
     
     for(const QJsonObject &obj : m_allRecordings) {
-         QString name = obj["name"].toString();
-         
-         // Parse Channel ID from filename: "rec_ch{id}_{date}_{time}.mp4"
-         // Example: rec_ch6_20260212_110919.mp4 -> ID 6
-         int id = -1;
-         if (name.startsWith("rec_ch")) {
-             int start = 6; // len("rec_ch")
-             int end = name.indexOf('_', start);
-             if (end > start) {
-                 bool ok;
-                 id = name.mid(start, end - start).toInt(&ok);
-                 if (!ok) id = -1;
-             }
-         }
+         const QString name = obj["name"].toString();
+         const int id = ChannelCatalog::parseRecordingChannelId(name);
          
          if (categoryId == 0 || id == categoryId) {
-             QString date = obj["date"].toString(); // Display date formatted or raw
              QString displayText = QString("[%1] %2").arg(obj["dateFormatted"].toString(), name);
              
              QListWidgetItem *item = new QListWidgetItem(displayText);

@@ -1,35 +1,29 @@
 #include "fullscreenview.h"
-#include <algorithm>
+#include "goaloverlaycontroller.h"
+
+#include <cmath>
 #include <QDebug>
 #include <QCursor>
 #include <QPainter>
 #include <QFileInfo>
 #include <QMenu>         // [New]
 #include <QAction>       // [New]
+#include <QGridLayout>
+#include <QButtonGroup>
 #include <QCheckBox>     // [New]
 #include <QLabel>        // [New]
+#include <QRadioButton>
+#include <QResizeEvent>
+#include <QSignalBlocker>
+#include <QWheelEvent>
 #include "osdwidget.h"   // [New]
 #include <QGuiApplication>
 #include <QApplication>
 
 namespace {
 
-bool nearlyEqual(qreal a, qreal b, qreal epsilon = 0.01)
-{
-    return std::abs(a - b) <= epsilon;
-}
-
-bool samePoint(const QPointF &lhs, const QPointF &rhs, qreal epsilon = 0.01)
-{
-    return nearlyEqual(lhs.x(), rhs.x(), epsilon) && nearlyEqual(lhs.y(), rhs.y(), epsilon);
-}
-
-bool sameRect(const QRectF &lhs, const QRectF &rhs, qreal epsilon = 0.01)
-{
-    return samePoint(lhs.topLeft(), rhs.topLeft(), epsilon)
-           && nearlyEqual(lhs.width(), rhs.width(), epsilon)
-           && nearlyEqual(lhs.height(), rhs.height(), epsilon);
-}
+constexpr double kWheelZoomStepFactor = 1.2;
+constexpr double kMinCropExtent = 0.001;
 
 QRectF selectionRectToCropRect(VideoWidget *videoWidget, const QRect &selectionRect)
 {
@@ -434,17 +428,101 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
 
     // 3. Bottom Control Bar (Stacked Bottom)
     underBar = new FullUnderBar(videoContainer);
-    
-    QWidget *bottomWrapper = new QWidget(videoContainer);
-    bottomWrapper->setAttribute(Qt::WA_TranslucentBackground);
-    QVBoxLayout *bwLayout = new QVBoxLayout(bottomWrapper);
-    bwLayout->setContentsMargins(0, 0, 0, 10); // Margin reduced (40 -> 10)
-    bwLayout->addWidget(underBar, 0, Qt::AlignHCenter);
-    
-    // Add BottomWrapper to VBox
-    videoLayout->addWidget(bottomWrapper);
+    modeQuickPanel = new QWidget(videoContainer);
+    modeQuickPanel->setObjectName("FS_ModeQuickPanel");
+    modeQuickPanel->setAttribute(Qt::WA_StyledBackground, true);
+    modeQuickPanel->setStyleSheet(
+        "#FS_ModeQuickPanel {"
+        "  background-color: rgba(15, 23, 42, 0.82);"
+        "  border: 1px solid rgba(255, 255, 255, 0.12);"
+        "  border-radius: 12px;"
+        "}"
+        "#FS_ModeQuickTitle {"
+        "  color: rgba(226, 232, 240, 0.78);"
+        "  font-size: 10px;"
+        "  font-weight: 700;"
+        "  letter-spacing: 1px;"
+        "}"
+        "QRadioButton#FS_ModeQuickOption {"
+        "  color: #E2E8F0;"
+        "  font-size: 11px;"
+        "  font-weight: 600;"
+        "  spacing: 6px;"
+        "}"
+        "QRadioButton#FS_ModeQuickOption::indicator {"
+        "  width: 11px;"
+        "  height: 11px;"
+        "  border-radius: 6px;"
+        "  border: 1px solid rgba(148, 163, 184, 0.75);"
+        "  background: transparent;"
+        "}"
+        "QRadioButton#FS_ModeQuickOption::indicator:checked {"
+        "  background: #F59E0B;"
+        "  border: 1px solid #F59E0B;"
+        "}"
+        "QPushButton#FS_ModeQuickStopButton {"
+        "  margin-top: 4px;"
+        "  min-height: 28px;"
+        "  padding: 0 10px;"
+        "  border-radius: 8px;"
+        "  border: 1px solid rgba(248, 113, 113, 0.42);"
+        "  background-color: rgba(127, 29, 29, 0.9);"
+        "  color: #FEE2E2;"
+        "  font-size: 11px;"
+        "  font-weight: 700;"
+        "}"
+        "QPushButton#FS_ModeQuickStopButton:disabled {"
+        "  background-color: rgba(51, 65, 85, 0.72);"
+        "  border: 1px solid rgba(148, 163, 184, 0.22);"
+        "  color: rgba(226, 232, 240, 0.5);"
+        "}"
+        "QPushButton#FS_ModeQuickStopButton:hover:!disabled {"
+        "  background-color: rgba(153, 27, 27, 0.95);"
+        "}");
+
+    QVBoxLayout *modeQuickLayout = new QVBoxLayout(modeQuickPanel);
+    modeQuickLayout->setContentsMargins(12, 10, 12, 10);
+    modeQuickLayout->setSpacing(4);
+
+    modeQuickTitle = new QLabel("ROBOT", modeQuickPanel);
+    modeQuickTitle->setObjectName("FS_ModeQuickTitle");
+    modeQuickLayout->addWidget(modeQuickTitle);
+
+    modeQuickGroup = new QButtonGroup(modeQuickPanel);
+    modeQuickGroup->setExclusive(true);
+
+    modeQuickManualButton = new QRadioButton("Manual", modeQuickPanel);
+    modeQuickAutoButton = new QRadioButton("Auto", modeQuickPanel);
+    modeQuickControlButton = new QRadioButton("Control", modeQuickPanel);
+    modeQuickPatrolButton = new QRadioButton("Patrol", modeQuickPanel);
+    for (QRadioButton *button : {modeQuickManualButton, modeQuickAutoButton, modeQuickControlButton, modeQuickPatrolButton}) {
+        button->setObjectName("FS_ModeQuickOption");
+        button->setCursor(Qt::PointingHandCursor);
+        button->setFocusPolicy(Qt::NoFocus);
+        modeQuickLayout->addWidget(button);
+    }
+
+    modeQuickStopButton = new QPushButton(QStringLiteral("정지"), modeQuickPanel);
+    modeQuickStopButton->setObjectName("FS_ModeQuickStopButton");
+    modeQuickStopButton->setCursor(Qt::PointingHandCursor);
+    modeQuickStopButton->setFocusPolicy(Qt::NoFocus);
+    modeQuickStopButton->setEnabled(false);
+    modeQuickLayout->addWidget(modeQuickStopButton);
+
+    modeQuickGroup->addButton(modeQuickManualButton, 0);
+    modeQuickGroup->addButton(modeQuickAutoButton, 1);
+    modeQuickGroup->addButton(modeQuickControlButton, 2);
+    modeQuickGroup->addButton(modeQuickPatrolButton, 3);
+    modeQuickManualButton->setChecked(true);
+    modeQuickPanel->setVisible(true);
+    modeQuickPanel->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+    // Add Bottom Bar to VBox
+    videoLayout->addWidget(underBar);
 
     mainLayout->addWidget(videoContainer);
+    updateModeQuickPanelGeometry();
+    modeQuickPanel->raise();
 
     connect(underBar, &FullUnderBar::reqZoomIn, this, &FullScreenView::onZoomIn);
     connect(underBar, &FullUnderBar::reqZoomOut, this, &FullScreenView::onZoomOut);
@@ -452,6 +530,10 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
 
     connect(underBar, &FullUnderBar::reqResetZoom, this, &FullScreenView::onResetZoom);
     connect(underBar, &FullUnderBar::reqControlMode, this, &FullScreenView::onControlModeToggled);
+    connect(modeQuickGroup, QOverload<int>::of(&QButtonGroup::idClicked), this, [this](int id) {
+        emit robotModeSelectionRequested(id);
+    });
+    connect(modeQuickStopButton, &QPushButton::clicked, this, &FullScreenView::emergencyStopRequested);
 
     // [New] Record Connection
     connect(underBar, &FullUnderBar::reqRecord, [this](bool start){
@@ -509,7 +591,10 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     });
 
     rubberBand = nullptr;
-    controlOverlay = new ControlOverlay(this);
+    GoalOverlay::ArrowStyle overlayStyle;
+    overlayStyle.penWidth = 4.0;
+    overlayStyle.arrowSize = 15.0;
+    controlOverlay = new GoalArrowOverlayWidget(overlayStyle, this);
     controlOverlay->hide();
 
     // [New] 글로벌 애플리케이션 포커스 상태 변경 감지
@@ -518,13 +603,12 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
             if (controlOverlay) controlOverlay->hide();
         } else {
             if (controlOverlay && this->isVisible() &&
-                (currentMode == ControlMode || static_cast<ControlOverlay *>(controlOverlay)->hasCommittedArrow)) {
+                (currentMode == ControlMode || controlOverlay->hasCommittedArrow())) {
                 controlOverlay->show();
             }
         }
     });
 
-    // [New] Timer to constantly sync ControlOverlay position when app moves
     syncTimer = new QTimer(this);
     connect(syncTimer, &QTimer::timeout, this, &FullScreenView::syncOverlayPosition);
     syncTimer->start(16); // ~60fps sync rate
@@ -559,7 +643,7 @@ void FullScreenView::setControlModeChecked(bool checked)
     }
 
     if (currentMode == ControlMode) {
-        if (zoomHistory.isEmpty()) {
+        if (!hasActiveZoom()) {
             setMode(Normal);
         } else {
             setMode(Zoomed);
@@ -567,13 +651,56 @@ void FullScreenView::setControlModeChecked(bool checked)
     }
 }
 
+void FullScreenView::setRobotModeSelection(int mode)
+{
+    if (!modeQuickGroup) {
+        return;
+    }
+
+    if (QAbstractButton *button = modeQuickGroup->button(mode)) {
+        const QSignalBlocker blocker(modeQuickGroup);
+        button->setChecked(true);
+    }
+
+    if (modeQuickStopButton) {
+        modeQuickStopButton->setEnabled(mode == 2 || mode == 3);
+    }
+}
+
+void FullScreenView::updateModeQuickPanelGeometry()
+{
+    if (!modeQuickPanel) {
+        return;
+    }
+
+    QWidget *parent = modeQuickPanel->parentWidget();
+    if (!parent) {
+        return;
+    }
+
+    const QSize panelSize = modeQuickPanel->sizeHint().expandedTo(modeQuickPanel->minimumSizeHint());
+    const int leftMargin = 18;
+    const int bottomMargin = (underBar ? underBar->height() : 0) + 10;
+    const int x = leftMargin;
+    const int y = qMax(0, parent->height() - bottomMargin - panelSize.height());
+
+    modeQuickPanel->setGeometry(x, y, panelSize.width(), panelSize.height());
+    modeQuickPanel->raise();
+}
+
+void FullScreenView::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    updateModeQuickPanelGeometry();
+}
+
 void FullScreenView::setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd)
 {
     const bool preserveLocalCache = m_preserveVideoGoalLocalCacheOnNextSet
                                     && m_hasVideoGoalOverlay
                                     && m_videoGoalOverlayChannelIndex == channelIndex
-                                    && samePoint(m_videoGoalStartNormalized, normalizedStart)
-                                    && samePoint(m_videoGoalEndNormalized, normalizedEnd);
+                                    && GoalOverlay::samePoint(m_videoGoalStartNormalized, normalizedStart, GoalOverlay::kPointCacheEpsilon)
+                                    && GoalOverlay::samePoint(m_videoGoalEndNormalized, normalizedEnd, GoalOverlay::kPointCacheEpsilon);
     m_preserveVideoGoalLocalCacheOnNextSet = false;
     m_hasVideoGoalOverlay = true;
     m_videoGoalOverlayChannelIndex = channelIndex;
@@ -627,7 +754,7 @@ void FullScreenView::clearGoalOverlay()
     m_videoGoalCropRect = QRectF();
     m_preserveVideoGoalLocalCacheOnNextSet = false;
     if (controlOverlay) {
-        static_cast<ControlOverlay *>(controlOverlay)->clearAll();
+        controlOverlay->clearAll();
     }
 }
 
@@ -657,6 +784,10 @@ void FullScreenView::play(const QString &url, int index)
     // [Mod] Show/Hide Playback Controls & Switch Widget
     bool isFile = QFileInfo::exists(url);
     underBar->setMode(isFile);
+    if (modeQuickPanel) {
+        modeQuickPanel->setVisible(!isFile);
+        updateModeQuickPanelGeometry();
+    }
     
     if(isFile) {
          titleLabel->setText(QString("Playback: %1").arg(QFileInfo(url).fileName()));
@@ -695,7 +826,7 @@ void FullScreenView::stop()
         rubberBand->hide();
     }
     if (controlOverlay) {
-        static_cast<ControlOverlay *>(controlOverlay)->clearAll();
+        controlOverlay->clearAll();
         controlOverlay->hide();
     }
 
@@ -723,8 +854,8 @@ void FullScreenView::setMode(Mode mode)
     isSettingDirection = false;
     if(rubberBand) rubberBand->hide();
     if(controlOverlay) {
-        ControlOverlay *overlay = static_cast<ControlOverlay *>(controlOverlay);
-        if (!overlay->hasCommittedArrow) {
+        controlOverlay->setActive(mode == ControlMode);
+        if (!controlOverlay->hasCommittedArrow()) {
             controlOverlay->hide();
         }
     }
@@ -831,7 +962,7 @@ void FullScreenView::onZoomOut() {
 
 void FullScreenView::onRectZoomToggled(bool checked) {
     if (currentMode == Drawing) {
-        if (zoomHistory.isEmpty()) setMode(Normal);
+        if (!hasActiveZoom()) setMode(Normal);
         else {
             currentMode = Zoomed;
             videoWidget->setCursor(Qt::OpenHandCursor);
@@ -859,7 +990,7 @@ void FullScreenView::onControlModeToggled(bool checked) {
             underBar->setControlModeChecked(false);
         }
     } else {
-        if (zoomHistory.isEmpty()) setMode(Normal);
+        if (!hasActiveZoom()) setMode(Normal);
         else setMode(Zoomed);
     }
 }
@@ -874,6 +1005,60 @@ bool FullScreenView::canControlCurrentVideo() const
     return (videoWidget == liveWidget) && currentChannelId >= 0 && currentChannelId < 4;
 }
 
+bool FullScreenView::hasActiveZoom() const
+{
+    if (!videoWidget) {
+        return false;
+    }
+
+    const QRectF currentCrop = videoWidget->getCurrentCrop();
+    return currentCrop.width() < 0.99 || currentCrop.height() < 0.99;
+}
+
+void FullScreenView::applyWheelZoom(const QPointF &widgetPoint, double steps)
+{
+    if (!videoWidget || qFuzzyIsNull(steps)) {
+        return;
+    }
+
+    const QRectF currentCrop = videoWidget->getCurrentCrop();
+    if (!currentCrop.isValid() || currentCrop.width() <= 0.0 || currentCrop.height() <= 0.0) {
+        return;
+    }
+
+    bool ok = false;
+    QPointF anchor = videoWidget->widgetPointToVideoNormalized(widgetPoint, &ok);
+    if (!ok) {
+        anchor = currentCrop.center();
+    }
+
+    const double zoomScale = std::pow(1.0 / kWheelZoomStepFactor, steps);
+    const double newW = qBound(kMinCropExtent, currentCrop.width() * zoomScale, 1.0);
+    const double newH = qBound(kMinCropExtent, currentCrop.height() * zoomScale, 1.0);
+
+    if (newW >= 0.99 || newH >= 0.99) {
+        setMode(Normal);
+        return;
+    }
+
+    const double anchorRatioX = currentCrop.width() > 0.0
+        ? (anchor.x() - currentCrop.x()) / currentCrop.width()
+        : 0.5;
+    const double anchorRatioY = currentCrop.height() > 0.0
+        ? (anchor.y() - currentCrop.y()) / currentCrop.height()
+        : 0.5;
+
+    double newX = anchor.x() - (anchorRatioX * newW);
+    double newY = anchor.y() - (anchorRatioY * newH);
+    newX = qBound(0.0, newX, 1.0 - newW);
+    newY = qBound(0.0, newY, 1.0 - newH);
+
+    videoWidget->applyCrop(QRectF(newX, newY, newW, newH));
+    currentMode = Zoomed;
+    videoWidget->setCursor(Qt::OpenHandCursor);
+    underBar->setRectButtonMode(2);
+}
+
 bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
 {
     if (obj != liveWidget && obj != recordedWidget) {
@@ -886,12 +1071,27 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
 
     if (event->type() == QEvent::Resize) {
         if (controlOverlay && controlOverlay->isVisible() && isVisible()) {
-            const QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
-            controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
-            static_cast<ControlOverlay *>(controlOverlay)->setClipRect(videoWidget->getVideoDisplayRect());
+            controlOverlay->syncToWidget(videoWidget);
+            controlOverlay->setClipRect(videoWidget->getVideoDisplayRect());
         }
         updateCommittedGoalOverlay();
         return QWidget::eventFilter(obj, event);
+    }
+
+    if (event->type() == QEvent::Wheel && currentMode != Drawing && currentMode != ControlMode) {
+        QWheelEvent *wheelEvent = static_cast<QWheelEvent *>(event);
+        if (wheelEvent->angleDelta().y() == 0) {
+            return QWidget::eventFilter(obj, event);
+        }
+
+        if (wheelEvent->angleDelta().y() < 0 && !hasActiveZoom()) {
+            return QWidget::eventFilter(obj, event);
+        }
+
+        applyWheelZoom(wheelEvent->position(),
+                       static_cast<double>(wheelEvent->angleDelta().y()) / 120.0);
+        wheelEvent->accept();
+        return true;
     }
 
     if (event->type() == QEvent::MouseButtonDblClick) {
@@ -1002,11 +1202,10 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
             return true;
         }
 
-        ControlOverlay *overlay = static_cast<ControlOverlay *>(controlOverlay);
+        GoalArrowOverlayWidget *overlay = controlOverlay;
         if (event->type() == QEvent::Leave && isSettingDirection) {
             if (overlay) {
-                overlay->endPos = goalStartPos;
-                overlay->update();
+                overlay->setPreviewArrow(goalStartPos, goalStartPos);
             }
             return true;
         }
@@ -1022,55 +1221,41 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
 
         if (event->type() == QEvent::MouseButtonPress && me->button() == Qt::LeftButton) {
             if (!overlay) {
-                controlOverlay = new ControlOverlay(this);
-                overlay = static_cast<ControlOverlay *>(controlOverlay);
-            }
-
-            const QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
-            controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
-            overlay->setClipRect(videoWidget->getVideoDisplayRect());
-
-            if (!isSettingDirection) {
-                bool ok = false;
-                videoWidget->widgetPointToVideoNormalized(mousePos, &ok);
-                if (!ok) {
-                    return true;
-                }
-
-                emit goalInteractionStarted();
-                goalStartPos = mousePos;
-                overlay->startPos = goalStartPos;
-                overlay->endPos = goalStartPos;
-                overlay->isDrawingArrow = true;
-                overlay->show();
-                overlay->raise();
-                isSettingDirection = true;
                 return true;
             }
 
-            if (videoWidget->width() <= 0 || videoWidget->height() <= 0) {
-                return true;
-            }
-
+            overlay->syncToWidget(videoWidget);
             const QRectF displayRect = videoWidget->getVideoDisplayRect();
-            const qreal clampedX = std::clamp(static_cast<qreal>(mousePos.x()),
-                                              static_cast<qreal>(displayRect.left()),
-                                              static_cast<qreal>(displayRect.right()));
-            const qreal clampedY = std::clamp(static_cast<qreal>(mousePos.y()),
-                                              static_cast<qreal>(displayRect.top()),
-                                              static_cast<qreal>(displayRect.bottom()));
-            const QPointF clampedEnd(clampedX, clampedY);
-
+            overlay->setClipRect(displayRect);
             bool ok = false;
-            const QPointF normalizedStart = videoWidget->widgetPointToVideoNormalized(goalStartPos, &ok);
+            videoWidget->widgetPointToVideoNormalized(mousePos, &ok);
             if (!ok) {
-                isSettingDirection = false;
-                overlay->clearPreview();
                 return true;
             }
 
-            const QPointF normalizedEnd = videoWidget->widgetPointToVideoNormalized(clampedEnd, &ok);
-            if (!ok) {
+            emit goalInteractionStarted();
+            goalStartPos = mousePos;
+            overlay->setActive(true);
+            overlay->setPreviewArrow(goalStartPos, goalStartPos);
+            overlay->show();
+            overlay->raise();
+            isSettingDirection = true;
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseMove && isSettingDirection) {
+            if (overlay) {
+                const QRectF displayRect = videoWidget->getVideoDisplayRect();
+                overlay->setPreviewArrow(goalStartPos, GoalOverlay::clampPointToRect(mousePos, displayRect));
+                overlay->setClipRect(displayRect);
+            }
+            return true;
+        }
+
+        if (event->type() == QEvent::MouseButtonRelease && me->button() == Qt::LeftButton && isSettingDirection) {
+            const std::optional<GoalOverlay::CommitResult> commit =
+                GoalOverlay::buildCommitResult(videoWidget, goalStartPos, mousePos);
+            if (!commit.has_value()) {
                 isSettingDirection = false;
                 overlay->clearPreview();
                 return true;
@@ -1078,45 +1263,29 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
 
             m_hasVideoGoalOverlay = true;
             m_videoGoalOverlayChannelIndex = currentChannelId;
-            m_videoGoalStartNormalized = normalizedStart;
-            m_videoGoalEndNormalized = normalizedEnd;
+            m_videoGoalStartNormalized = commit->normalizedStart;
+            m_videoGoalEndNormalized = commit->normalizedEnd;
             m_hasVideoGoalLocalCache = true;
-            m_videoGoalStartLocal = goalStartPos;
-            m_videoGoalEndLocal = clampedEnd;
-            m_videoGoalDisplayRect = displayRect;
-            m_videoGoalCropRect = videoWidget->getCurrentCrop();
+            m_videoGoalStartLocal = commit->localStart;
+            m_videoGoalEndLocal = commit->localEnd;
+            m_videoGoalDisplayRect = commit->displayRect;
+            m_videoGoalCropRect = commit->cropRect;
             m_preserveVideoGoalLocalCacheOnNextSet = true;
-
-            overlay->commitArrow(goalStartPos, clampedEnd);
-            emit videoGoalOverlayCommitted(currentChannelId, normalizedStart, normalizedEnd);
+            overlay->commitArrow(commit->localStart, commit->localEnd);
+            emit videoGoalOverlayCommitted(currentChannelId, commit->normalizedStart, commit->normalizedEnd);
             emit goalCommitted();
 
             bool worldOk = false;
-            const QPointF worldPoint = quadrantToWorld(normalizedStart, &worldOk);
+            const QPointF worldPoint = quadrantToWorld(commit->normalizedStart, &worldOk);
             if (worldOk) {
-                const double theta = std::atan2(goalStartPos.y() - clampedEnd.y(),
-                                                clampedEnd.x() - goalStartPos.x());
                 qDebug().noquote() << QStringLiteral("x: %1  y: %2  angle: %3")
                                           .arg(worldPoint.x(), 0, 'f', 3)
                                           .arg(worldPoint.y(), 0, 'f', 3)
-                                          .arg(theta, 0, 'f', 3);
-                emit reqGoalPose(worldPoint.x(), worldPoint.y(), theta);
+                                          .arg(commit->angleRadians, 0, 'f', 3);
+                emit reqGoalPose(worldPoint.x(), worldPoint.y(), commit->angleRadians);
             }
 
             isSettingDirection = false;
-            return true;
-        }
-
-        if (event->type() == QEvent::MouseMove && isSettingDirection) {
-            if (overlay) {
-                overlay->endPos = mousePos;
-                overlay->setClipRect(videoWidget->getVideoDisplayRect());
-                overlay->update();
-            }
-            return true;
-        }
-
-        if (event->type() == QEvent::MouseButtonRelease && me->button() == Qt::LeftButton) {
             return true;
         }
 
@@ -1125,6 +1294,7 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
 
     return QWidget::eventFilter(obj, event);
 
+#if 0
     if (obj == videoWidget) {
         if (event->type() == QEvent::MouseButtonDblClick) {
             if (currentMode != Normal) return true;
@@ -1414,17 +1584,14 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
         updateCommittedGoalOverlay();
     }
     return QWidget::eventFilter(obj, event);
+#endif
 }
 
 void FullScreenView::syncOverlayPosition() {
     updateCommittedGoalOverlay();
     if (controlOverlay && controlOverlay->isVisible() && this->isVisible() && videoWidget) {
-        QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
-        QRect currentRect = controlOverlay->geometry();
-        QRect newRect(globalTopLeft, videoWidget->size());
-        if (currentRect != newRect) {
-            controlOverlay->setGeometry(newRect);
-        }
+        controlOverlay->syncToWidget(videoWidget);
+        controlOverlay->setClipRect(videoWidget->getVideoDisplayRect());
     }
 }
 
@@ -1434,7 +1601,6 @@ void FullScreenView::updateCommittedGoalOverlay()
         return;
     }
 
-    ControlOverlay *overlay = static_cast<ControlOverlay *>(controlOverlay);
     const bool canShowSharedOverlay = this->isVisible()
                                       && (videoWidget == liveWidget)
                                       && currentChannelId >= 0
@@ -1445,30 +1611,36 @@ void FullScreenView::updateCommittedGoalOverlay()
                                       && videoWidget->height() > 0;
 
     if (!canShowSharedOverlay) {
-        overlay->setCommittedArrow(QPointF(), QPointF(), false);
+        controlOverlay->setCommittedArrow(QPointF(), QPointF(), false);
         return;
     }
 
-    const QPoint globalTopLeft = videoWidget->mapToGlobal(QPoint(0, 0));
-    controlOverlay->setGeometry(QRect(globalTopLeft, videoWidget->size()));
     const QRectF displayRect = videoWidget->getVideoDisplayRect();
     const QRectF cropRect = videoWidget->getCurrentCrop();
-    overlay->setClipRect(displayRect);
+    controlOverlay->syncToWidget(videoWidget);
+    controlOverlay->setClipRect(displayRect);
     if (m_hasVideoGoalLocalCache
-        && sameRect(cropRect, m_videoGoalCropRect)
-        && sameRect(displayRect, m_videoGoalDisplayRect)) {
-        overlay->setCommittedArrow(m_videoGoalStartLocal, m_videoGoalEndLocal, true);
+        && GoalOverlay::sameRect(cropRect, m_videoGoalCropRect, GoalOverlay::kCropRectCacheEpsilon)
+        && GoalOverlay::sameRect(displayRect, m_videoGoalDisplayRect, GoalOverlay::kDisplayRectCacheEpsilon)) {
+        controlOverlay->setCommittedArrow(m_videoGoalStartLocal, m_videoGoalEndLocal, true);
         return;
     }
 
-    const QPointF startPoint = videoWidget->videoNormalizedToWidgetPoint(m_videoGoalStartNormalized);
-    const QPointF endPoint = videoWidget->videoNormalizedToWidgetPoint(m_videoGoalEndNormalized);
+    const std::optional<GoalOverlay::ProjectionResult> projection =
+        GoalOverlay::projectCommittedGoal(videoWidget,
+                                          m_videoGoalStartNormalized,
+                                          m_videoGoalEndNormalized);
+    if (!projection.has_value()) {
+        controlOverlay->setCommittedArrow(QPointF(), QPointF(), false);
+        return;
+    }
+
     m_hasVideoGoalLocalCache = true;
-    m_videoGoalStartLocal = startPoint;
-    m_videoGoalEndLocal = endPoint;
-    m_videoGoalDisplayRect = displayRect;
-    m_videoGoalCropRect = cropRect;
-    overlay->setCommittedArrow(startPoint, endPoint, true);
+    m_videoGoalStartLocal = projection->localStart;
+    m_videoGoalEndLocal = projection->localEnd;
+    m_videoGoalDisplayRect = projection->displayRect;
+    m_videoGoalCropRect = projection->cropRect;
+    controlOverlay->setCommittedArrow(projection->localStart, projection->localEnd, true);
 }
 
 QPointF FullScreenView::widgetPointToVideoNormalized(const QPointF &widgetPoint) const

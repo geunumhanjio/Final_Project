@@ -1,6 +1,16 @@
 #include "streammanager.h"
 #include "configmanager.h"
 #include <QDebug>
+#include <QUrl>
+
+namespace {
+
+QString encodeUserInfo(const QString &value)
+{
+    return QString::fromUtf8(QUrl::toPercentEncoding(value));
+}
+
+} // namespace
 
 StreamManager::StreamManager(QObject *parent) : QObject(parent)
 {
@@ -16,6 +26,8 @@ void StreamManager::loadConfig()
     QString ip = ConfigManager::instance().getCameraIp();
     QString port = ConfigManager::instance().getCameraPort();
     bool useCustomCCTV = ConfigManager::instance().getUseCustomCCTV();
+    const QString customCctvUser = ConfigManager::instance().getCustomCctvUsername();
+    const QString customCctvPassword = ConfigManager::instance().getCustomCctvPassword();
     bool useRtsps = ConfigManager::instance().getUseRtsps(); // [New]
 
     // [New] If RTSPS mode, override scheme and port
@@ -32,9 +44,14 @@ void StreamManager::loadConfig()
         
         // 가져온 변수 사용
         if (useCustomCCTV) {
-            // Checked: rtsps?://admin:5hanwha!@IP:PORT/ID/H.264/media.smp
-            QString url = QString("%1://admin:5hanwha!@%2:%3/%4/H.264/media.smp")
-                              .arg(scheme, ip, port).arg(i);
+            // Checked: rtsps?://<user>:<password>@IP:PORT/ID/H.264/media.smp
+            const QString url = QString("%1://%2:%3@%4:%5/%6/H.264/media.smp")
+                                    .arg(scheme,
+                                         encodeUserInfo(customCctvUser),
+                                         encodeUserInfo(customCctvPassword),
+                                         ip,
+                                         port,
+                                         QString::number(i));
             config.urlLow = url;
             config.urlHigh = url; 
         } else {

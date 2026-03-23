@@ -1,4 +1,5 @@
 #include "liveview.h"
+#include "channelcatalog.h"
 #include "streammanager.h"
 #include "configmanager.h"
 #include <QDebug>
@@ -28,8 +29,8 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
         cctvWidgets[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
         cctvWidgets[i]->setMinimumWidth(280);
         cctvWidgets[i]->setMinimumHeight(0);
-        cctvWidgets[i]->setChannelName(QString("Channel %1 - Camera").arg(i+1));
-        cctvWidgets[i]->setChannelId(i + 1); // 1-based ID
+        cctvWidgets[i]->setChannelName(ChannelCatalog::liveCardTitleForIndex(i));
+        cctvWidgets[i]->setChannelId(ChannelCatalog::liveRecordChannelIdForIndex(i));
         
         // Connect internal fullscreen button signal
         connect(cctvWidgets[i], &VideoCard::fullScreenRequested, [=](){
@@ -74,8 +75,8 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     rcCarCamWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     rcCarCamWidget->setMinimumWidth(280);
     rcCarCamWidget->setMinimumHeight(0);
-    rcCarCamWidget->setChannelName("RC Car - Front Cam");
-    rcCarCamWidget->setChannelId(9); // ID 9 for RC Car (Avoid conflict with High Quality ID 5)
+    rcCarCamWidget->setChannelName(ChannelCatalog::liveCardTitleForIndex(4));
+    rcCarCamWidget->setChannelId(ChannelCatalog::liveRecordChannelIdForIndex(4));
 
     // Connect internal fullscreen button signal for RC Car
     connect(rcCarCamWidget, &VideoCard::fullScreenRequested, [=](){
@@ -117,6 +118,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     connect(slamMapWidget, &SlamMapWidget::goalInteractionStarted, this, &LiveView::goalInteractionStarted);
     connect(slamMapWidget, &SlamMapWidget::goalCommitted, this, &LiveView::goalCommitted);
     connect(slamMapWidget, &SlamMapWidget::goalRequested, this, &LiveView::goalPoseRequested);
+    connect(slamMapWidget, &SlamMapWidget::patrolPointsChanged, this, &LiveView::patrolPointsChanged);
         
     slamLayout->addWidget(slamHeader);
     slamLayout->addWidget(slamMapWidget);
@@ -300,6 +302,29 @@ void LiveView::clearGoalOverlays()
     }
 }
 
+void LiveView::clearPathOverlay()
+{
+    if (slamMapWidget) {
+        slamMapWidget->clearPathOverlay();
+    }
+}
+
+void LiveView::clearPatrolOverlay()
+{
+    if (slamMapWidget) {
+        slamMapWidget->clearPatrolOverlay();
+    }
+}
+
+QVector<QPointF> LiveView::patrolPoints() const
+{
+    if (!slamMapWidget) {
+        return {};
+    }
+
+    return slamMapWidget->patrolPoints();
+}
+
 void LiveView::setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd)
 {
     for (int i = 0; i < 4; ++i) {
@@ -368,6 +393,20 @@ void LiveView::setGoalTargetingEnabled(bool enabled)
 
     if (slamMapWidget) {
         slamMapWidget->setGoalTargetingEnabled(enabled);
+    }
+}
+
+void LiveView::setPatrolPlanningEnabled(bool enabled)
+{
+    if (slamMapWidget) {
+        slamMapWidget->setPatrolPlanningEnabled(enabled);
+    }
+}
+
+void LiveView::setPatrolAddPointMode(bool enabled)
+{
+    if (slamMapWidget) {
+        slamMapWidget->setPatrolAddPointMode(enabled);
     }
 }
 

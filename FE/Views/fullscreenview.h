@@ -15,6 +15,12 @@
 #include "recordedvideowidget.h"
 #include "full_underbar.h"
 
+class QButtonGroup;
+class GoalArrowOverlayWidget;
+class QRadioButton;
+class QResizeEvent;
+class QWheelEvent;
+
 class FullScreenView : public QWidget
 {
     Q_OBJECT
@@ -24,6 +30,7 @@ public:
     void stop();
     void setControlModeAvailable(bool available);
     void setControlModeChecked(bool checked);
+    void setRobotModeSelection(int mode);
     void setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd);
     void clearVideoGoalOverlay();
     void setMapGeometry(const QPointF &origin, int widthCells, int heightCells, double resolution);
@@ -33,6 +40,8 @@ signals:
     void closeRequested();
     void recordRequested(int channelId, bool start); // [New]
     void controlModeRequested(bool enabled);
+    void robotModeSelectionRequested(int mode);
+    void emergencyStopRequested();
     void reqGoalPose(double x, double y, double theta);
     void goalInteractionStarted();
     void goalCommitted();
@@ -41,6 +50,7 @@ signals:
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private slots:
     void onZoomIn();
@@ -51,6 +61,7 @@ private slots:
 
 private:
     void requestCloseView();
+    void updateModeQuickPanelGeometry();
     QStackedWidget *videoStack; // [New]
     LiveVideoWidget *liveWidget; // [New]
     RecordedVideoWidget *recordedWidget; // [New]
@@ -64,11 +75,19 @@ private:
     QLabel *liveBadge;
     QPushButton *btnSettings; // [New]
     QPushButton *btnClose;
+    QWidget *modeQuickPanel;
+    QLabel *modeQuickTitle;
+    QButtonGroup *modeQuickGroup;
+    QRadioButton *modeQuickManualButton;
+    QRadioButton *modeQuickAutoButton;
+    QRadioButton *modeQuickControlButton;
+    QRadioButton *modeQuickPatrolButton;
+    QPushButton *modeQuickStopButton;
 
     // [수정] QRubberBand* -> QWidget* 으로 변경
     QWidget *rubberBand;
 
-    QWidget *controlOverlay;
+    GoalArrowOverlayWidget *controlOverlay;
     QTimer *syncTimer; // [New]
     void syncOverlayPosition(); // [New]
 
@@ -87,6 +106,8 @@ private:
 
     QString getChannelName(int index);
     bool canControlCurrentVideo() const;
+    bool hasActiveZoom() const;
+    void applyWheelZoom(const QPointF &widgetPoint, double steps);
     void setMode(Mode mode);
     QPointF quadrantToWorld(const QPointF &normalizedPoint, bool *ok = nullptr) const;
     void updateCommittedGoalOverlay();
