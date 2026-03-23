@@ -68,6 +68,9 @@ private:
     bool setupChannels();
     static void runReceiverThread(ChannelContext* ctx);
     static void mediaConfigure(GstRTSPMediaFactory* factory, GstRTSPMedia* media, gpointer user_data);
+    static void onClientConnected(GstRTSPServer* server, GstRTSPClient* client, gpointer user_data);
+    static GstRTSPStatusCode onPreDescribeRequest(GstRTSPClient* client, GstRTSPContext* ctx, gpointer user_data);
+    static GstRTSPStatusCode onPreSetupRequest(GstRTSPClient* client, GstRTSPContext* ctx, gpointer user_data);
 
     // Helper to start the receiver thread
     void startReceiverThreads();
@@ -76,6 +79,8 @@ private:
     bool initSSLContext();
     void runRTSPSLoop(int port);
     void handleSecureClient(SecureClient* client);
+    bool loadJwtSecretFromEnvironment();
+    GstRTSPStatusCode authorizeClientRequest(GstRTSPContext* ctx);
 
 private:
     GMainLoop* mainLoop;
@@ -87,6 +92,8 @@ private:
     std::vector<ChannelContext*> channels;
     std::vector<std::thread> receiverThreads;
     std::atomic<bool> running;
+    bool jwtAuthEnabled;
+    std::string jwtSecret;
     OnStatsUpdate statsCb;
 };
 

@@ -13,6 +13,125 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <cstring>
+#include <cstdlib>
+#include <algorithm>
+#include <jwt-cpp/traits/nlohmann-json/defaults.h>
+
+namespace {
+
+std::string trimCopy(const std::string& value) {
+    auto begin = std::find_if_not(value.begin(), value.end(), [](unsigned char ch) {
+        return std::isspace(ch) != 0;
+    });
+    auto end = std::find_if_not(value.rbegin(), value.rend(), [](unsigned char ch) {
+        return std::isspace(ch) != 0;
+    }).base();
+
+    if (begin >= end) {
+        return "";
+    }
+    return std::string(begin, end);
+}
+
+bool readFileTrimmed(const std::string& path, std::string& out) {
+    std::ifstream input(path);
+    if (!input.is_open()) {
+        return false;
+    }
+
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    out = trimCopy(buffer.str());
+    return !out.empty();
+}
+
+std::string extractBearerToken(const GstRTSPContext* ctx) {
+    if (ctx == nullptr || ctx->request == nullptr) {
+        return "";
+    }
+
+    gchar* headerValue = nullptr;
+    if (gst_rtsp_message_get_header(ctx->request, GST_RTSP_HDR_AUTHORIZATION, &headerValue, 0) == GST_RTSP_OK &&
+        headerValue != nullptr) {
+        std::string header = trimCopy(headerValue);
+        constexpr const char* prefix = "Bearer ";
+        if (header.rfind(prefix, 0) == 0) {
+            return trimCopy(header.substr(std::strlen(prefix)));
+        }
+    }
+
+    if (ctx->uri == nullptr || ctx->uri->query == nullptr) {
+        return "";
+    }
+
+    std::stringstream queryStream(ctx->uri->query);
+    std::string item;
+    while (std::getline(queryStream, item, '&')) {
+        const auto pos = item.find('=');
+        if (pos == std::string::npos) {
+            continue;
+        }
+
+        std::string key = item.substr(0, pos);
+        if (key != "token") {
+            continue;
+        }
+
+        gchar* decoded = g_uri_unescape_string(item.substr(pos + 1).c_str(), nullptr);
+        if (decoded == nullptr) {
+            return item.substr(pos + 1);
+        }
+
+        std::string token(decoded);
+        g_free(decoded);
+        return token;
+    }
+
+    return "";
+}
+
+bool validateAccessToken(const std::string& token, const std::string& secret, std::string& error) {
+    try {
+        auto decoded = jwt::decode(token);
+
+        auto verifier = jwt::verify()
+            .allow_algorithm(jwt::algorithm::hs256{secret})
+            .with_issuer("login-server");
+
+        verifier.verify(decoded);
+
+        if (!decoded.has_payload_claim("token_type")) {
+            error = "token_type claim is missing";
+            return false;
+        }
+
+        const auto tokenType = decoded.get_payload_claim("token_type").as_string();
+        if (tokenType != "access") {
+            error = "token_type must be access";
+            return false;
+        }
+
+        if (decoded.get_subject().empty()) {
+            error = "subject is missing";
+            return false;
+        }
+
+        return true;
+    } catch (const std::exception& ex) {
+        error = ex.what();
+        return false;
+    }
+}
+
+void addUnauthorizedHeader(GstRTSPContext* ctx) {
+    if (ctx != nullptr && ctx->response != nullptr) {
+        gst_rtsp_message_add_header_by_name(ctx->response,
+                                            "WWW-Authenticate",
+                                            "Bearer realm=\"ProxyServer\"");
+    }
+}
+
+} // namespace
 
 // ==================================================================================
 // [Constants] CCTV Config
@@ -260,7 +379,14 @@ calc_latency:
 // [Class] RtspProxy Implementation
 // ==================================================================================
 
-RtspProxy::RtspProxy() : mainLoop(nullptr), server(nullptr), secure_server(nullptr), ssl_ctx(nullptr), rtsps_listen_fd(-1), running(false) {
+RtspProxy::RtspProxy()
+    : mainLoop(nullptr),
+      server(nullptr),
+      secure_server(nullptr),
+      ssl_ctx(nullptr),
+      rtsps_listen_fd(-1),
+      running(false),
+      jwtAuthEnabled(false) {
 }
 
 // channel context 소멸자가 있나?? 체크 필요
@@ -400,12 +526,8 @@ bool RtspProxy::startRTSPS(int port) {
     gst_rtsp_server_set_auth(secure_server, auth);
     g_object_unref(auth);
 
-    // [FIX] Add connection log for TLS Handshake phase
-    g_signal_connect(secure_server, "client-connected", G_CALLBACK(+[](GstRTSPServer* server, GstRTSPClient* client, gpointer user_data) {
-        GstRTSPConnection* conn = gst_rtsp_client_get_connection(client);
-        const gchar* ip = gst_rtsp_connection_get_ip(conn);
-        std::cout << "🛡️ [RTSPS] New secure connection attempt from: " << (ip ? ip : "unknown") << std::endl;
-    }), NULL);
+    loadJwtSecretFromEnvironment();
+    g_signal_connect(secure_server, "client-connected", G_CALLBACK(RtspProxy::onClientConnected), this);
 
     GstRTSPMountPoints *mounts = gst_rtsp_server_get_mount_points(secure_server);
 
@@ -435,7 +557,11 @@ bool RtspProxy::startRTSPS(int port) {
         return false;
     }
 
-    std::cout << "✅ [RTSPS] Native Secure RTSP Server is operational (Anonymous Allowed)." << std::endl;
+    if (jwtAuthEnabled) {
+        std::cout << "✅ [RTSPS] Native Secure RTSP Server is operational (JWT auth enabled)." << std::endl;
+    } else {
+        std::cout << "⚠️ [RTSPS] Native Secure RTSP Server is operational (JWT auth disabled, anonymous access still allowed)." << std::endl;
+    }
 
     return true;
 }
@@ -786,6 +912,94 @@ void RtspProxy::mediaConfigure(GstRTSPMediaFactory *factory, GstRTSPMedia *media
     }
 
     gst_object_unref(element);
+}
+
+void RtspProxy::onClientConnected(GstRTSPServer* server, GstRTSPClient* client, gpointer user_data) {
+    auto* proxy = static_cast<RtspProxy*>(user_data);
+    GstRTSPConnection* conn = gst_rtsp_client_get_connection(client);
+    const gchar* ip = conn ? gst_rtsp_connection_get_ip(conn) : nullptr;
+
+    std::cout << "🛡️ [RTSPS] New secure connection attempt from: " << (ip ? ip : "unknown") << std::endl;
+
+    if (proxy == nullptr || !proxy->jwtAuthEnabled) {
+        return;
+    }
+
+    g_signal_connect(client, "pre-describe-request", G_CALLBACK(RtspProxy::onPreDescribeRequest), proxy);
+    g_signal_connect(client, "pre-setup-request", G_CALLBACK(RtspProxy::onPreSetupRequest), proxy);
+}
+
+GstRTSPStatusCode RtspProxy::onPreDescribeRequest(GstRTSPClient* client, GstRTSPContext* ctx, gpointer user_data) {
+    auto* proxy = static_cast<RtspProxy*>(user_data);
+    if (proxy == nullptr) {
+        return GST_RTSP_STS_INTERNAL_SERVER_ERROR;
+    }
+    return proxy->authorizeClientRequest(ctx);
+}
+
+GstRTSPStatusCode RtspProxy::onPreSetupRequest(GstRTSPClient* client, GstRTSPContext* ctx, gpointer user_data) {
+    auto* proxy = static_cast<RtspProxy*>(user_data);
+    if (proxy == nullptr) {
+        return GST_RTSP_STS_INTERNAL_SERVER_ERROR;
+    }
+    return proxy->authorizeClientRequest(ctx);
+}
+
+bool RtspProxy::loadJwtSecretFromEnvironment() {
+    const char* secretFile = std::getenv("JWT_SECRET_FILE");
+    if (secretFile != nullptr && *secretFile != '\0') {
+        std::string loadedSecret;
+        if (!readFileTrimmed(secretFile, loadedSecret)) {
+            std::cerr << "❌ [RTSPS] Failed to read JWT secret file: " << secretFile << std::endl;
+            jwtAuthEnabled = false;
+            jwtSecret.clear();
+            return false;
+        }
+
+        jwtSecret = loadedSecret;
+        jwtAuthEnabled = true;
+        std::cout << "🔐 [RTSPS] JWT auth enabled via JWT_SECRET_FILE." << std::endl;
+        return true;
+    }
+
+    const char* secretEnv = std::getenv("JWT_SECRET");
+    if (secretEnv != nullptr) {
+        jwtSecret = trimCopy(secretEnv);
+    } else {
+        jwtSecret.clear();
+    }
+
+    jwtAuthEnabled = !jwtSecret.empty();
+    if (jwtAuthEnabled) {
+        std::cout << "🔐 [RTSPS] JWT auth enabled via JWT_SECRET fallback." << std::endl;
+        return true;
+    }
+
+    std::cerr << "⚠️ [RTSPS] JWT auth disabled because JWT_SECRET_FILE and JWT_SECRET are not set." << std::endl;
+    return false;
+}
+
+GstRTSPStatusCode RtspProxy::authorizeClientRequest(GstRTSPContext* ctx) {
+    if (!jwtAuthEnabled) {
+        return GST_RTSP_STS_OK;
+    }
+
+    const std::string token = extractBearerToken(ctx);
+    if (token.empty()) {
+        addUnauthorizedHeader(ctx);
+        std::cerr << "❌ [RTSPS] Missing access token for path "
+                  << ((ctx && ctx->uri && ctx->uri->abspath) ? ctx->uri->abspath : "(unknown)") << std::endl;
+        return GST_RTSP_STS_UNAUTHORIZED;
+    }
+
+    std::string error;
+    if (!validateAccessToken(token, jwtSecret, error)) {
+        addUnauthorizedHeader(ctx);
+        std::cerr << "❌ [RTSPS] Access token rejected: " << error << std::endl;
+        return GST_RTSP_STS_UNAUTHORIZED;
+    }
+
+    return GST_RTSP_STS_OK;
 }
 
 void RtspProxy::runReceiverThread(ChannelContext *ctx) {
