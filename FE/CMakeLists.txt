@@ -9,6 +9,8 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(VEDA_ENABLE_FRUC "Enable OpenCV-based FRUC generation" ON)
+
 # 1. Qt 라이브러리 찾기
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets WebSockets Network)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets WebSockets Network)
@@ -45,21 +47,58 @@ else()
     message(STATUS "Selected GStreamer Root (MinGW): ${GST_ROOT}")
 endif()
 
-set(OPENCV_ROOT "C:/opencv/build")
-set(OPENCV_INCLUDE_DIR "${OPENCV_ROOT}/include")
+set(OPENCV_ROOT "" CACHE PATH "Optional OpenCV root used for FRUC support")
+set(OPENCV_BIN_DIR "")
+set(VEDA_HAS_OPENCV OFF)
 
-if(MSVC)
-    set(OPENCV_LIB_DIR "${OPENCV_ROOT}/x64/vc16/lib")
-    set(OPENCV_BIN_DIR "${OPENCV_ROOT}/x64/vc16/bin")
-else()
-    set(OPENCV_LIB_DIR "${OPENCV_ROOT}/x64/mingw/lib")
-    set(OPENCV_BIN_DIR "${OPENCV_ROOT}/x64/mingw/bin")
-endif()
+if(VEDA_ENABLE_FRUC)
+    if(OPENCV_ROOT AND EXISTS "${OPENCV_ROOT}")
+        list(PREPEND CMAKE_PREFIX_PATH "${OPENCV_ROOT}")
+    endif()
 
-if(EXISTS "${OPENCV_INCLUDE_DIR}" AND EXISTS "${OPENCV_LIB_DIR}")
-    message(STATUS "Selected OpenCV Root: ${OPENCV_ROOT}")
+    if(DEFINED ENV{OpenCV_DIR} AND NOT "$ENV{OpenCV_DIR}" STREQUAL "")
+        list(PREPEND CMAKE_PREFIX_PATH "$ENV{OpenCV_DIR}")
+    endif()
+
+    find_package(OpenCV QUIET COMPONENTS core imgproc video videoio)
+
+    if(OpenCV_FOUND)
+        set(VEDA_HAS_OPENCV ON)
+
+        if(MSVC)
+            set(_opencv_bin_suffix "x64/vc16/bin")
+        else()
+            set(_opencv_bin_suffix "x64/mingw/bin")
+        endif()
+
+        if(OPENCV_ROOT AND EXISTS "${OPENCV_ROOT}")
+            set(OPENCV_BIN_DIR "${OPENCV_ROOT}/${_opencv_bin_suffix}")
+        elseif(DEFINED OpenCV_DIR AND NOT "${OpenCV_DIR}" STREQUAL "")
+            get_filename_component(_opencv_dir_abs "${OpenCV_DIR}" ABSOLUTE)
+            set(_opencv_bin_candidates
+                "${_opencv_dir_abs}/${_opencv_bin_suffix}"
+                "${_opencv_dir_abs}/bin"
+                "${_opencv_dir_abs}/../bin"
+                "${_opencv_dir_abs}/../../${_opencv_bin_suffix}"
+            )
+
+            foreach(_opencv_bin_candidate IN LISTS _opencv_bin_candidates)
+                if(EXISTS "${_opencv_bin_candidate}")
+                    set(OPENCV_BIN_DIR "${_opencv_bin_candidate}")
+                    break()
+                endif()
+            endforeach()
+        endif()
+
+        message(STATUS "OpenCV found. FRUC support enabled.")
+        if(OPENCV_BIN_DIR)
+            message(STATUS "OpenCV bin path: ${OPENCV_BIN_DIR}")
+        endif()
+    else()
+        message(WARNING "OpenCV was not found. FRUC support will be disabled. Set OPENCV_ROOT or OpenCV_DIR to enable it.")
+    endif()
 else()
-    message(FATAL_ERROR "OpenCV was not found at ${OPENCV_ROOT}. Please install OpenCV or update OPENCV_ROOT.")
+    message(STATUS "VEDA_ENABLE_FRUC=OFF. Building without OpenCV/FRUC support.")
 endif()
 
 # (1) 헤더 파일 경로 추가 (공통)
@@ -68,7 +107,6 @@ include_directories(
     "${GST_ROOT}/include/gstreamer-1.0"
     "${GST_ROOT}/include/glib-2.0"
     "${GST_ROOT}/lib/glib-2.0/include"
-    "${OPENCV_INCLUDE_DIR}"
     # [New] Modularized Paths
     "${CMAKE_CURRENT_SOURCE_DIR}/Views"
     "${CMAKE_CURRENT_SOURCE_DIR}/Components"
@@ -81,6 +119,11 @@ include_directories(
 # (2) bin 경로 정의 (main.cpp에서 DLL 로딩용)
 add_compile_definitions(GST_BIN_PATH="${GST_ROOT}/bin")
 add_compile_definitions(OPENCV_BIN_PATH="${OPENCV_BIN_DIR}")
+
+if(VEDA_HAS_OPENCV)
+    include_directories("${OpenCV_INCLUDE_DIRS}")
+    add_compile_definitions(VEDA_HAS_OPENCV=1)
+endif()
 
 # -------------------------------------------------------------------------
 
@@ -97,7 +140,6 @@ set(PROJECT_SOURCES
         Video/videowidget.h Video/videowidget.cpp
         Video/livevideowidget.h Video/livevideowidget.cpp
         Video/recordedvideowidget.h Video/recordedvideowidget.cpp
-        Video/frucvideoprocessor.h Video/frucvideoprocessor.cpp
         Video/rtsppinger.h Video/rtsppinger.cpp
         Video/Gst/GstQualityMonitor.hpp Video/Gst/GstQualityMonitor.cpp
         Video/Gst/GstStatsCollector.hpp
@@ -117,6 +159,12 @@ set(PROJECT_SOURCES
         Components/signupdialog.h Components/signupdialog.cpp
         Components/osdwidget.h Components/osdwidget.cpp # [New]
 )
+
+if(VEDA_HAS_OPENCV)
+    list(APPEND PROJECT_SOURCES
+        Video/frucvideoprocessor.h Video/frucvideoprocessor.cpp
+    )
+endif()
 
 # 4. 실행 파일 생성
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -145,6 +193,10 @@ if(MSVC)
     )
 endif()
 
+if(VEDA_HAS_OPENCV)
+    target_link_libraries(VEDA_QT_1 PRIVATE ${OpenCV_LIBS})
+endif()
+
 
 # -------------------------------------------------------------------------
 # [수동 연결] 라이브러리 파일 직접 링크 (MSVC vs MinGW)
@@ -153,8 +205,6 @@ endif()
 if(MSVC)
     # MSVC는 .lib 파일을 링크
     target_link_libraries(VEDA_QT_1 PRIVATE
-        $<$<CONFIG:Debug>:${OPENCV_LIB_DIR}/opencv_world4120d.lib>
-        $<$<NOT:$<CONFIG:Debug>>:${OPENCV_LIB_DIR}/opencv_world4120.lib>
         "${GST_ROOT}/lib/gstreamer-1.0.lib"
         "${GST_ROOT}/lib/gstvideo-1.0.lib"
         "${GST_ROOT}/lib/gstrtp-1.0.lib"
@@ -167,7 +217,6 @@ if(MSVC)
 else()
     # MinGW는 .dll.a 파일을 링크
     target_link_libraries(VEDA_QT_1 PRIVATE
-        "${OPENCV_LIB_DIR}/libopencv_world.dll.a"
         "${GST_ROOT}/lib/libgstreamer-1.0.dll.a"
         "${GST_ROOT}/lib/libgstvideo-1.0.dll.a"
         "${GST_ROOT}/lib/libgstrtp-1.0.dll.a"

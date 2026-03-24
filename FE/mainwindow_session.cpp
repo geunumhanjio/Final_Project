@@ -60,6 +60,16 @@ bool MainWindow::reopenLoginDialog(const QString &message)
 
 void MainWindow::startFrucProcessing(const QString &filePath)
 {
+#ifndef VEDA_HAS_OPENCV
+    Q_UNUSED(filePath);
+
+    static bool frucUnavailableLogged = false;
+    if (!frucUnavailableLogged) {
+        qWarning() << "[MainWindow] OpenCV is not available. FRUC post-processing is disabled for this build.";
+        frucUnavailableLogged = true;
+    }
+    return;
+#else
     const QString normalizedPath = QDir::cleanPath(filePath);
     if (!FrucVideoProcessor::shouldProcessSourceFile(normalizedPath)) {
         return;
@@ -104,6 +114,7 @@ void MainWindow::startFrucProcessing(const QString &filePath)
 
     startVariant(FrucVideoProcessor::Variant::Fast);
     startVariant(FrucVideoProcessor::Variant::HighQuality);
+#endif
 }
 
 void MainWindow::updateTopBarUserInfo()

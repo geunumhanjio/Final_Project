@@ -1,6 +1,6 @@
 # VEDA_QT_1 FE
 
-Qt Widgets, GStreamer, OpenCV 기반의 CCTV 통합 관제 및 로봇 제어 프론트엔드입니다.
+Qt Widgets, GStreamer 기반의 CCTV 통합 관제 및 로봇 제어 프론트엔드입니다. OpenCV가 설치된 환경에서는 FRUC 후처리도 함께 활성화됩니다.
 
 이 애플리케이션은 다음 기능을 하나의 데스크톱 앱에서 제공합니다.
 
@@ -95,7 +95,7 @@ Qt Widgets, GStreamer, OpenCV 기반의 CCTV 통합 관제 및 로봇 제어 프
 - 서버 녹화 목록을 받아 PlaybackView에 표시합니다.
 - 더블 클릭 시 로컬 파일이 있으면 바로 재생하고, 없으면 다운로드를 요청합니다.
 - 다운로드 완료 후 로컬 파일 목록에 추가합니다.
-- 원본 MP4에 대해 `_FRUC_FAST`, `_FRUC_HQ` 파생 파일을 자동 생성합니다.
+- OpenCV가 활성화된 빌드에서는 원본 MP4에 대해 `_FRUC_FAST`, `_FRUC_HQ` 파생 파일을 자동 생성합니다.
 
 관련 코드:
 
@@ -480,6 +480,8 @@ Custom CCTV 모드:
 
 ### 8.4 FRUC
 
+이 기능은 OpenCV가 활성화된 빌드에서만 동작합니다.
+
 원본 MP4 파일에 대해 자동으로 두 가지 파생 파일을 생성합니다.
 
 - `*_FRUC_FAST.mp4`
@@ -543,12 +545,12 @@ Custom CCTV 모드:
 - CMake 3.16+
 - Qt Widgets / WebSockets / Network
 - GStreamer 1.0
-- OpenCV
+- OpenCV (선택, FRUC 기능용)
 - MSVC 또는 MinGW
 
-현재 `CMakeLists.txt`에서 참조하는 경로:
+현재 `CMakeLists.txt` 기준 참고 경로:
 
-- OpenCV 루트: `C:/opencv/build`
+- OpenCV는 자동 탐색하거나, 필요하면 `OPENCV_ROOT` 또는 `OpenCV_DIR`로 지정할 수 있습니다.
 - GStreamer(MSVC) 후보:
   - `C:/Program Files/gstreamer/1.0/msvc_x86_64`
   - `C:/gstreamer/1.0/msvc_x86_64`
@@ -565,6 +567,20 @@ cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="C:/Qt/6.8.0/msvc2022_64"
 cmake --build build --config Debug
 ```
 
+OpenCV까지 함께 쓰고 싶으면:
+
+```powershell
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="C:/Qt/6.8.0/msvc2022_64" -DOPENCV_ROOT="C:/opencv/build"
+cmake --build build --config Debug
+```
+
+다른 PC에서 OpenCV 없이 먼저 빌드만 하고 싶으면:
+
+```powershell
+cmake -S . -B build -G Ninja -DCMAKE_PREFIX_PATH="C:/Qt/6.8.0/msvc2022_64" -DVEDA_ENABLE_FRUC=OFF
+cmake --build build --config Debug
+```
+
 실행 파일 예시:
 
 ```text
@@ -578,6 +594,7 @@ build/Debug/VEDA_QT_1.exe
 - OpenCV DLL 경로를 `PATH`에 추가
 - GStreamer DLL / plugin 경로를 `PATH`, `GST_PLUGIN_PATH`, `GST_PLUGIN_SCANNER`에 반영
 - 번들된 `gstreamer/` 폴더가 있으면 우선 사용
+- OpenCV를 찾지 못한 빌드에서는 FRUC 기능만 비활성화되고 앱 자체는 계속 빌드됩니다.
 
 ---
 
@@ -666,8 +683,10 @@ build/Debug/VEDA_QT_1.exe
 
 확인할 점:
 
-- `CMakeLists.txt`의 설치 경로가 현재 PC와 맞는지
+- GStreamer 설치 경로가 현재 PC와 맞는지
 - DLL 및 plugin 경로가 런타임에 올바르게 잡혔는지
+- OpenCV가 없으면 FRUC만 꺼진 상태로 빌드되는지
+- OpenCV까지 쓰려면 `-DOPENCV_ROOT=...` 또는 `OpenCV_DIR` 환경 변수를 지정했는지
 
 ---
 
