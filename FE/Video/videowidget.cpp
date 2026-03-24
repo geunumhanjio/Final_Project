@@ -1,4 +1,5 @@
 #include "videowidget.h"
+#include <cmath>
 #include <QVBoxLayout>
 #include <QDebug>
 #include <QApplication>
@@ -69,6 +70,12 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
 }
 
 VideoWidget::~VideoWidget() { stop(); }
+
+void VideoWidget::onGstError(const QString &errorText, const QString &debugText)
+{
+    Q_UNUSED(errorText);
+    Q_UNUSED(debugText);
+}
 
 // Protected Helper to set Pipeline from Subclass
 bool VideoWidget::setPipeline(GstElement *p) {
@@ -213,18 +220,24 @@ void VideoWidget::applyCrop(const QRectF &rect)
         }
     }
 
-    int left = static_cast<int>(requestedRect.left() * sourceWidth);
-    int right = static_cast<int>((1.0 - requestedRect.right()) * sourceWidth);
-    int top = static_cast<int>(requestedRect.top() * sourceHeight);
-    int bottom = static_cast<int>((1.0 - requestedRect.bottom()) * sourceHeight);
+    const int visibleWidth = qBound(1,
+                                    static_cast<int>(std::lround(requestedRect.width() * sourceWidth)),
+                                    qMax(1, sourceWidth));
+    const int visibleHeight = qBound(1,
+                                     static_cast<int>(std::lround(requestedRect.height() * sourceHeight)),
+                                     qMax(1, sourceHeight));
 
-    left = qBound(0, left, qMax(0, sourceWidth - 1));
-    top = qBound(0, top, qMax(0, sourceHeight - 1));
-    right = qBound(0, right, qMax(0, sourceWidth - left - 1));
-    bottom = qBound(0, bottom, qMax(0, sourceHeight - top - 1));
+    const int maxLeft = qMax(0, sourceWidth - visibleWidth);
+    const int maxTop = qMax(0, sourceHeight - visibleHeight);
+    const int left = qBound(0,
+                            static_cast<int>(std::lround(requestedRect.x() * sourceWidth)),
+                            maxLeft);
+    const int top = qBound(0,
+                           static_cast<int>(std::lround(requestedRect.y() * sourceHeight)),
+                           maxTop);
+    const int right = qMax(0, sourceWidth - left - visibleWidth);
+    const int bottom = qMax(0, sourceHeight - top - visibleHeight);
 
-    const int visibleWidth = qMax(1, sourceWidth - left - right);
-    const int visibleHeight = qMax(1, sourceHeight - top - bottom);
     currentCropRect = QRectF(static_cast<double>(left) / static_cast<double>(sourceWidth),
                              static_cast<double>(top) / static_cast<double>(sourceHeight),
                              static_cast<double>(visibleWidth) / static_cast<double>(sourceWidth),
@@ -364,6 +377,27 @@ void VideoWidget::pollGstBus()
                 }
             } break;
         case GST_MESSAGE_ERROR:
+        {
+            GError *error = nullptr;
+            gchar *debugInfo = nullptr;
+            gst_message_parse_error(msg, &error, &debugInfo);
+
+            const QString errorText = error ? QString::fromUtf8(error->message) : QStringLiteral("Unknown GStreamer error");
+            const QString debugText = debugInfo ? QString::fromUtf8(debugInfo) : QString();
+            qWarning() << "[VideoWidget] GST error:" << errorText << debugText;
+            onGstError(errorText, debugText);
+
+            if (error) {
+                g_error_free(error);
+            }
+            if (debugInfo) {
+                g_free(debugInfo);
+            }
+
+            m_isPlaying = false;
+            startRetryTimer();
+            break;
+        }
         case GST_MESSAGE_EOS:
             m_isPlaying = false; 
             startRetryTimer(); // Calls virtual method (overridden by Live/Recorded)

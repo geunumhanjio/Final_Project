@@ -15,6 +15,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QUrl>
@@ -43,6 +44,11 @@ QString fileNameFromRecordingUrl(const QString &url)
 QString downloadPathFor(const QString &fileName)
 {
     return QDir(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation)).filePath(fileName);
+}
+
+QString calibrationControlServerIp()
+{
+    return QStringLiteral("192.168.0.110");
 }
 
 } // namespace
@@ -215,6 +221,32 @@ void MainWindow::initConnections()
     connect(m_fullPage, &FullScreenView::videoGoalOverlayCommitted, this, &MainWindow::setSharedVideoGoalOverlay);
     connect(m_fullPage, &FullScreenView::videoGoalOverlayClearRequested, this, &MainWindow::clearSharedVideoGoalOverlay);
     connect(m_fullPage, &FullScreenView::goalCommitted, this, &MainWindow::deactivateControlSession);
+    connect(m_livePage, &LiveView::calibrationClickRequested, this,
+            [this](int channelIndex, double normalizedX, double normalizedY) {
+                if (!m_cameraClient || channelIndex != 1) {
+                    return;
+                }
+
+                const QString serverIp = calibrationControlServerIp();
+                m_cameraClient->sendCalibrationClick(serverIp, normalizedX, normalizedY);
+                qDebug().noquote() << QStringLiteral("[MainWindow] Sent CALIBRATION_CLICK to ws://%1:9000 x=%2 y=%3")
+                                          .arg(serverIp)
+                                          .arg(normalizedX, 0, 'f', 4)
+                                          .arg(normalizedY, 0, 'f', 4);
+            });
+    connect(m_fullPage, &FullScreenView::calibrationClickRequested, this,
+            [this](int channelIndex, double normalizedX, double normalizedY) {
+                if (!m_cameraClient || channelIndex != 1) {
+                    return;
+                }
+
+                const QString serverIp = calibrationControlServerIp();
+                m_cameraClient->sendCalibrationClick(serverIp, normalizedX, normalizedY);
+                qDebug().noquote() << QStringLiteral("[MainWindow] Sent CALIBRATION_CLICK to ws://%1:9000 x=%2 y=%3")
+                                          .arg(serverIp)
+                                          .arg(normalizedX, 0, 'f', 4)
+                                          .arg(normalizedY, 0, 'f', 4);
+            });
 
     connect(m_rosClient, &RosBridgeClient::mapReceived, m_livePage, &LiveView::updateMap);
     connect(m_rosClient, &RosBridgeClient::mapReceived, this, [this](const QJsonObject &data) {
@@ -246,6 +278,20 @@ void MainWindow::initConnections()
     });
 
     if (m_cameraClient) {
+        connect(m_cameraClient, &CameraControlClient::slamMappingErrorReceived, this,
+                [this](const QString &reason, double normalizedX, double normalizedY) {
+                    const QString mappedReason = reason.trimmed().isEmpty()
+                        ? QStringLiteral("unknown")
+                        : reason.trimmed();
+                    QMessageBox::warning(
+                        this,
+                        QStringLiteral("SLAM Mapping Error"),
+                        QStringLiteral("Calibration click mapping failed.\nReason: %1\nNormalized: (%2, %3)")
+                            .arg(mappedReason)
+                            .arg(normalizedX, 0, 'f', 2)
+                            .arg(normalizedY, 0, 'f', 2));
+                });
+
         connect(m_playbackPage, &PlaybackView::refreshRequested, this, [this]() {
             m_cameraClient->requestRecordings(currentCameraIp());
         });

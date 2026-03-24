@@ -5,6 +5,7 @@
 #include "topbar.h"
 #include <QStyle>
 #include <QAbstractButton>
+#include <QMenu>
 
 // Helper to update style
 void updateStyle(QWidget* w) {
@@ -109,12 +110,24 @@ void TopBar::setupUi()
     btnTheme->setObjectName("ThemeBtn");
     btnTheme->setStyleSheet("color: #94a3b8; font-size: 18px; border:none; background:transparent;");
     
-    userIcon = new QLabel("👤", this);
+    userIcon = new QPushButton(QStringLiteral("👤"), this);
     btnEmergencyStop = new QPushButton(QStringLiteral("즉시 정지"), this);
     btnEmergencyStop->hide();
     userIcon->setFixedSize(32, 32);
-    userIcon->setAlignment(Qt::AlignCenter);
-    userIcon->setStyleSheet("background-color: rgba(19, 91, 236, 0.2); color: #135bec; border: 1px solid rgba(19, 91, 236, 0.3); border-radius: 16px; font-size: 16px;");
+    userIcon->setCursor(Qt::PointingHandCursor);
+    userIcon->setObjectName("TopBarUserButton");
+    userIcon->setStyleSheet(
+        "QPushButton#TopBarUserButton {"
+        "background-color: rgba(19, 91, 236, 0.2);"
+        "color: #135bec;"
+        "border: 1px solid rgba(19, 91, 236, 0.3);"
+        "border-radius: 16px;"
+        "font-size: 16px;"
+        "}"
+        "QPushButton#TopBarUserButton:hover {"
+        "background-color: rgba(19, 91, 236, 0.2);"
+        "border-color: rgba(19, 91, 236, 0.3);"
+        "}");
 
     // Add to Main Layout
     layout->addWidget(btnToggle);
@@ -141,6 +154,30 @@ void TopBar::setupUi()
         else btnTheme->setText("☀");
     });
     
+    connect(userIcon, &QPushButton::clicked, this, [this]() {
+        QMenu menu(this);
+        menu.setStyleSheet(
+            "QMenu { background: #101827; color: #e2e8f0; border: 1px solid #334155; padding: 6px; }"
+            "QMenu::item { padding: 8px 14px; border-radius: 8px; }"
+            "QMenu::item:selected { background: #1d4ed8; color: white; }"
+            "QMenu::separator { height: 1px; background: #334155; margin: 6px 8px; }");
+
+        QAction *userAction = menu.addAction(QStringLiteral("User: %1").arg(m_currentUserId.isEmpty() ? QStringLiteral("Unknown") : m_currentUserId));
+        userAction->setEnabled(false);
+
+        QAction *emailAction = menu.addAction(QStringLiteral("Email: %1").arg(m_currentUserEmail.isEmpty() ? QStringLiteral("-") : m_currentUserEmail));
+        emailAction->setEnabled(false);
+
+        QAction *serverAction = menu.addAction(QStringLiteral("Server: %1").arg(m_currentServerHost.isEmpty() ? QStringLiteral("-") : m_currentServerHost));
+        serverAction->setEnabled(false);
+
+        menu.addSeparator();
+        QAction *logoutAction = menu.addAction(QStringLiteral("Log Out"));
+        if (menu.exec(userIcon->mapToGlobal(QPoint(0, userIcon->height()))) == logoutAction) {
+            emit logoutRequested();
+        }
+    });
+
     auto updateNav = [=](QPushButton* active){
         btnLive->setProperty("active", false);
         btnPlayback->setProperty("active", false);
@@ -164,6 +201,20 @@ void TopBar::setupUi()
         emit modeChanged(2); 
         updateNav(btnSettings);
     });
+}
+
+void TopBar::setCurrentUserInfo(const QString &userId, const QString &email, const QString &serverHost)
+{
+    m_currentUserId = userId.trimmed();
+    m_currentUserEmail = email.trimmed();
+    m_currentServerHost = serverHost.trimmed();
+
+    if (!userIcon) {
+        return;
+    }
+
+    userIcon->setText(QStringLiteral("👤"));
+    userIcon->setToolTip(QStringLiteral("Signed in as %1").arg(m_currentUserId.isEmpty() ? QStringLiteral("Unknown") : m_currentUserId));
 }
 
 void TopBar::updateTime()

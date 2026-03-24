@@ -43,6 +43,7 @@ signals:
     void robotModeSelectionRequested(int mode);
     void emergencyStopRequested();
     void reqGoalPose(double x, double y, double theta);
+    void calibrationClickRequested(int channelIndex, double normalizedX, double normalizedY);
     void goalInteractionStarted();
     void goalCommitted();
     void videoGoalOverlayCommitted(int channelIndex, QPointF normalizedStart, QPointF normalizedEnd);

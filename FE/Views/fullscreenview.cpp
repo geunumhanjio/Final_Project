@@ -1275,6 +1275,17 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
             emit videoGoalOverlayCommitted(currentChannelId, commit->normalizedStart, commit->normalizedEnd);
             emit goalCommitted();
 
+            if (currentChannelId == 1) {
+                qDebug().noquote() << QStringLiteral("[FullScreen] Channel 2 CALIBRATION_CLICK x=%1 y=%2")
+                                          .arg(commit->normalizedStart.x(), 0, 'f', 4)
+                                          .arg(commit->normalizedStart.y(), 0, 'f', 4);
+                emit calibrationClickRequested(currentChannelId,
+                                               commit->normalizedStart.x(),
+                                               commit->normalizedStart.y());
+                isSettingDirection = false;
+                return true;
+            }
+
             bool worldOk = false;
             const QPointF worldPoint = quadrantToWorld(commit->normalizedStart, &worldOk);
             if (worldOk) {

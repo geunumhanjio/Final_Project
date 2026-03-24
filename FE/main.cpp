@@ -3,6 +3,7 @@
  * @brief Program entry point. Initializes Qt, GStreamer, SSL, and opens the main window.
  */
 #include "mainwindow.h"
+#include "logindialog.h"
 #include <QApplication>
 #include <QDebug>
 #include <QDir>
@@ -14,6 +15,7 @@
 #include <QSslConfiguration>
 #include <gst/gst.h>
 #include "Video/Gst/GstQualityMonitor.hpp"
+#include "configmanager.h"
 
 /**
  * @brief Register the embedded RTSPS server certificate in the default Qt CA store.
@@ -49,6 +51,7 @@ int main(int argc, char *argv[])
     qDebug() << "=== VEDA CCTV System Starting ===";
 
     const QString appDir = QCoreApplication::applicationDirPath();
+    const QString opencvBinPath = QString::fromUtf8(OPENCV_BIN_PATH);
     const QString bundledGstRoot = QDir(appDir).filePath("gstreamer");
     const QString bundledGstBinPath = QDir(bundledGstRoot).filePath("bin");
     const QString bundledRootDll = QDir(appDir).filePath("gstreamer-1.0-0.dll");
@@ -73,6 +76,15 @@ int main(int argc, char *argv[])
         gstRootPath = configuredBinDir.absolutePath();
     }
 #endif
+
+    if (!opencvBinPath.isEmpty() && QDir(opencvBinPath).exists()) {
+        const QString nativeOpenCvPath = QDir::toNativeSeparators(opencvBinPath);
+        const QByteArray currentPath = qgetenv("PATH");
+        if (!currentPath.contains(nativeOpenCvPath.toLocal8Bit())) {
+            qputenv("PATH", nativeOpenCvPath.toLocal8Bit() + ";" + currentPath);
+        }
+        qDebug() << "[main] OpenCV bin path:" << nativeOpenCvPath;
+    }
 
     if (!gstBinPath.isEmpty()) {
         gstBinPath = QDir::toNativeSeparators(gstBinPath);
@@ -148,6 +160,14 @@ int main(int argc, char *argv[])
     qDebug() << "[main] GStreamer Initialized.";
 
     setupSslContext();
+
+    ConfigManager::instance().loadDefaults();
+
+    LoginDialog loginDialog;
+    if (loginDialog.exec() != QDialog::Accepted) {
+        qDebug() << "[main] Login canceled. Exiting application.";
+        return 0;
+    }
 
     qDebug() << "[main] Opening main window...";
     MainWindow w;

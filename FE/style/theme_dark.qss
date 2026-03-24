@@ -299,6 +299,48 @@ QRadioButton#SidebarModeOption::indicator:checked {
     border-color: transparent;
 }
 
+#SettingsSidebarPanel {
+    background-color: #111827;
+    border-right: 1px solid #2a3649;
+}
+
+#SettingsSidebarTitle {
+    color: #f8fafc;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: transparent;
+}
+
+#SettingsSidebarSubtitle {
+    color: #8ea3bf;
+    font-size: 11px;
+    line-height: 1.4;
+    background: transparent;
+}
+
+QPushButton#SettingsSidebarButton {
+    background-color: #182234;
+    color: #dbe7f6;
+    border: 1px solid #2b3a52;
+    border-radius: 12px;
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+QPushButton#SettingsSidebarButton:hover {
+    background-color: #1c2a40;
+    border-color: #3b82f6;
+}
+
+QPushButton#SettingsSidebarButton:checked {
+    background-color: #135bec;
+    color: #ffffff;
+    border-color: #60a5fa;
+}
+
 /* Sidebar Headers */
 #SidebarHeaderTitle {
     color: #94a3b8;

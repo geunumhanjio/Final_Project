@@ -22,12 +22,17 @@ public:
     void setOdomData(const QJsonObject &data);
     void setPathData(const QJsonObject &data);
     void setGoalTargetingEnabled(bool enabled);
+    void setPatrolPlanningEnabled(bool enabled);
+    void setPatrolAddPointMode(bool enabled);
     bool hasMapData() const;
     QPointF mapOrigin() const;
     double mapResolution() const;
     int mapWidthCells() const;
     int mapHeightCells() const;
+    QVector<QPointF> patrolPoints() const;
     void clearGoalOverlay();
+    void clearPathOverlay();
+    void clearPatrolOverlay();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -42,6 +47,7 @@ signals:
     void goalRequested(double x, double y, double yaw);
     void goalInteractionStarted();
     void goalCommitted();
+    void patrolPointsChanged(int count);
 
 private:
     enum class ProjectionMode {
@@ -91,6 +97,9 @@ private:
     bool m_hasCommittedGoalArrow = false;
     QPointF m_committedGoalStartWorldPos;
     QPointF m_committedGoalEndWorldPos;
+    bool m_patrolPlanningEnabled = false;
+    bool m_patrolAddPointMode = false;
+    QVector<QPointF> m_patrolPoints;
 
     double m_zoomFactor = 1.0;
     QPointF m_viewCenterImage;

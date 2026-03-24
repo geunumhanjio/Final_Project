@@ -228,6 +228,23 @@ void SlamMapWidget::setGoalTargetingEnabled(bool enabled)
     update();
 }
 
+void SlamMapWidget::setPatrolPlanningEnabled(bool enabled)
+{
+    m_patrolPlanningEnabled = enabled;
+    if (!enabled) {
+        m_patrolAddPointMode = false;
+    }
+    updateInteractionCursor();
+    update();
+}
+
+void SlamMapWidget::setPatrolAddPointMode(bool enabled)
+{
+    m_patrolAddPointMode = m_patrolPlanningEnabled && enabled;
+    updateInteractionCursor();
+    update();
+}
+
 bool SlamMapWidget::hasMapData() const
 {
     return m_hasMap && !m_mapImage.isNull() && m_mapWidth > 0 && m_mapHeight > 0 && m_resolution > 0.0;
@@ -253,6 +270,11 @@ int SlamMapWidget::mapHeightCells() const
     return m_mapHeight;
 }
 
+QVector<QPointF> SlamMapWidget::patrolPoints() const
+{
+    return m_patrolPoints;
+}
+
 void SlamMapWidget::clearGoalOverlay()
 {
     m_isSettingGoalDirection = false;
@@ -261,8 +283,34 @@ void SlamMapWidget::clearGoalOverlay()
     m_hasCommittedGoalArrow = false;
     m_committedGoalStartWorldPos = QPointF();
     m_committedGoalEndWorldPos = QPointF();
+    update();
+}
+
+void SlamMapWidget::clearPathOverlay()
+{
+    if (m_pathPoints.isEmpty()) {
+        update();
+        return;
+    }
+
     m_pathPoints.clear();
     update();
+}
+
+void SlamMapWidget::clearPatrolOverlay()
+{
+    m_patrolAddPointMode = false;
+    if (m_patrolPoints.isEmpty()) {
+        updateInteractionCursor();
+        update();
+        emit patrolPointsChanged(0);
+        return;
+    }
+
+    m_patrolPoints.clear();
+    updateInteractionCursor();
+    update();
+    emit patrolPointsChanged(0);
 }
 
 void SlamMapWidget::setMapData(const QJsonObject &data)
@@ -434,6 +482,25 @@ void SlamMapWidget::paintEvent(QPaintEvent *event)
         painter.drawPath(pathOverlay);
     }
 
+    if (!m_patrolPoints.isEmpty()) {
+        if (m_patrolPoints.size() > 1) {
+            QPainterPath patrolOverlay;
+            patrolOverlay.moveTo(toWidgetPoint(m_patrolPoints.first()));
+            for (int i = 1; i < m_patrolPoints.size(); ++i) {
+                patrolOverlay.lineTo(toWidgetPoint(m_patrolPoints.at(i)));
+            }
+
+            painter.setPen(QPen(QColor(34, 197, 94), 3.0));
+            painter.drawPath(patrolOverlay);
+        }
+
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(34, 197, 94));
+        for (const QPointF &point : m_patrolPoints) {
+            painter.drawEllipse(toWidgetPoint(point), 5.0, 5.0);
+        }
+    }
+
     if (m_hasOdom) {
         const QPointF robotCenter = toWidgetPoint(m_robotPosition);
         const qreal robotRadius = 6.0;
@@ -564,8 +631,7 @@ void SlamMapWidget::wheelEvent(QWheelEvent *event)
 
 void SlamMapWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    if (!m_goalTargetingEnabled && event->button() == Qt::LeftButton && hasMapData()) {
-        resetView();
+    if (event->button() == Qt::LeftButton && hasMapData()) {
         event->accept();
         return;
     }
@@ -645,7 +711,23 @@ QPointF SlamMapWidget::widgetToWorld(const QPointF &widgetPoint, bool *ok, bool 
 
 void SlamMapWidget::mousePressEvent(QMouseEvent *event)
 {
-    if (!m_goalTargetingEnabled && event->button() == Qt::LeftButton && canPan()) {
+    if (m_patrolPlanningEnabled && m_patrolAddPointMode && event->button() == Qt::LeftButton) {
+        bool ok = false;
+        const QPointF patrolWorldPoint = widgetToWorld(event->position(), &ok);
+        if (!ok) {
+            QWidget::mousePressEvent(event);
+            return;
+        }
+
+        m_patrolPoints.append(patrolWorldPoint);
+        update();
+        emit patrolPointsChanged(m_patrolPoints.size());
+        event->accept();
+        return;
+    }
+
+    if (!m_goalTargetingEnabled && !(m_patrolPlanningEnabled && m_patrolAddPointMode)
+        && event->button() == Qt::LeftButton && canPan()) {
         bool ok = false;
         widgetToImage(event->position(), &ok);
         if (ok) {
@@ -864,7 +946,7 @@ void SlamMapWidget::clampViewCenter()
 
 void SlamMapWidget::updateInteractionCursor()
 {
-    if (m_goalTargetingEnabled) {
+    if (m_goalTargetingEnabled || (m_patrolPlanningEnabled && m_patrolAddPointMode)) {
         setCursor(Qt::CrossCursor);
         return;
     }

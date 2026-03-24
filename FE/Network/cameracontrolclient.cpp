@@ -36,6 +36,20 @@ void CameraControlClient::connectToServer(const QString &cameraIp)
     }
 }
 
+void CameraControlClient::sendCalibrationClick(const QString &cameraIp, double normalizedX, double normalizedY)
+{
+    QJsonObject payload;
+    payload["x"] = normalizedX;
+    payload["y"] = normalizedY;
+
+    QJsonObject msg;
+    msg["type"] = "CALIBRATION_CLICK";
+    msg["payload"] = payload;
+
+    const QString jsonString = QJsonDocument(msg).toJson(QJsonDocument::Compact);
+    safeSend(jsonString, cameraIp);
+}
+
 void CameraControlClient::sendRecordCommand(const QString &cameraIp, int channelId, bool start)
 {
     // Construct JSON Payload
@@ -163,6 +177,18 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
         QJsonArray list = obj["payload"].toArray();
         qDebug() << "[CameraControl] Recording List Received:" << list.size() << "items";
         emit recordingListReceived(list);
+    }
+    else if (msgType == "SLAM_MAPPING_ERROR") {
+        const QJsonObject payload = obj["payload"].toObject();
+        const QString reason = payload["reason"].toString().trimmed();
+        const double normalizedX = payload["normalized_x"].toDouble();
+        const double normalizedY = payload["normalized_y"].toDouble();
+
+        qWarning().noquote() << QStringLiteral("[CameraControl] SLAM_MAPPING_ERROR reason=%1 normalized_x=%2 normalized_y=%3")
+                                    .arg(reason.isEmpty() ? QStringLiteral("unknown") : reason)
+                                    .arg(normalizedX, 0, 'f', 4)
+                                    .arg(normalizedY, 0, 'f', 4);
+        emit slamMappingErrorReceived(reason, normalizedX, normalizedY);
     }
     // [New] File Transfer Protocol
     else if (msgType == "FILE_TRANSFER_START") {

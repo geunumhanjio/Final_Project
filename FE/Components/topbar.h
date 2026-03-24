@@ -12,19 +12,21 @@
 #include <QTimer>
 #include <QDateTime>
 #include <QMouseEvent>
+#include <QString>
 
 class TopBar : public QWidget
 {
     Q_OBJECT
 public:
     explicit TopBar(QWidget *parent = nullptr);
- // Sync Text/Icon color
+    void setCurrentUserInfo(const QString &userId, const QString &email, const QString &serverHost);
 
 signals:
     void sidebarToggled();       // Sidebar toggle signal
     void modeChanged(int index); // Mode change signal
     void themeToggled();         // Theme toggle signal
     void closeRequested();
+    void logoutRequested();
 
 protected:
     void mousePressEvent(QMouseEvent *event) override;
@@ -49,12 +51,15 @@ private:
     QPushButton *btnEmergencyStop;
     QPushButton *btnTheme;
     QPushButton *btnClose;
-    QLabel *userIcon;
+    QPushButton *userIcon;
     QLabel *titleLabel;
     
     QTimer *timer;
     bool m_isDraggingWindow = false;
     QPoint m_windowDragOffset;
+    QString m_currentUserId;
+    QString m_currentUserEmail;
+    QString m_currentServerHost;
 };
 
 #endif // TOPBAR_H

@@ -47,6 +47,14 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
             emit videoGoalOverlayCommitted(i, normalizedStart, normalizedEnd);
         });
         connect(cctvWidgets[i], &VideoCard::goalRequested, this, [this, i](const QPointF &normalizedStart, double yaw) {
+            if (i == 1) {
+                qDebug().noquote() << QStringLiteral("[LiveView] Channel 2 CALIBRATION_CLICK x=%1 y=%2")
+                                          .arg(normalizedStart.x(), 0, 'f', 4)
+                                          .arg(normalizedStart.y(), 0, 'f', 4);
+                emit calibrationClickRequested(i, normalizedStart.x(), normalizedStart.y());
+                return;
+            }
+
             bool ok = false;
             const QPointF worldPoint = quadrantToWorld(i, normalizedStart, &ok);
             if (ok) {

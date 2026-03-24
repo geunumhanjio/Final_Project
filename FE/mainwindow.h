@@ -51,6 +51,11 @@ private:
     void handleGoalOdomUpdate(const QJsonObject &data);
     void handleGoalNavStatus(const QJsonObject &data);
     void handleGoalNavFeedback(const QJsonObject &data);
+    void finalizePatrolPath();
+    bool reopenLoginDialog(const QString &message = QString());
+    void startFrucProcessing(const QString &filePath);
+    void updateTopBarUserInfo();
+    void promptLogout();
     void deactivateControlSession();
     void updateSidebarForCurrentPage();
     void applySharedVideoGoalOverlay();
@@ -98,6 +103,8 @@ private:
     QPointF m_activeGoalPosition;
     double m_activeGoalYaw = 0.0;
     int m_goalArrivalStableCount = 0;
+    bool m_skipCloseConfirmation = false;
+    QSet<QString> m_pendingFrucJobs;
     
     // [New] Widget to return to after closing FullScreenView
     QWidget* m_returnToWidget = nullptr; 

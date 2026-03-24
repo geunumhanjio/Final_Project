@@ -18,6 +18,9 @@ public:
     void setChannelVisible(int index, bool visible);
     void stopAll();
     void clearGoalOverlays();
+    void clearPathOverlay();
+    void clearPatrolOverlay();
+    QVector<QPointF> patrolPoints() const;
     void setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd);
     void clearVideoGoalOverlay();
 
@@ -25,8 +28,10 @@ signals:
     void requestFullScreen(int index, QString url);
     void recordCommandRequested(int channelId, bool start);
     void goalPoseRequested(double x, double y, double yaw);
+    void calibrationClickRequested(int channelIndex, double normalizedX, double normalizedY);
     void goalInteractionStarted();
     void goalCommitted();
+    void patrolPointsChanged(int count);
     void videoGoalOverlayCommitted(int channelIndex, QPointF normalizedStart, QPointF normalizedEnd);
 
 protected:
@@ -40,6 +45,8 @@ public slots:
     void updateOdom(const QJsonObject &data);
     void updatePath(const QJsonObject &data);
     void setGoalTargetingEnabled(bool enabled);
+    void setPatrolPlanningEnabled(bool enabled);
+    void setPatrolAddPointMode(bool enabled);
 
 private:
     QGridLayout *gridLayout;

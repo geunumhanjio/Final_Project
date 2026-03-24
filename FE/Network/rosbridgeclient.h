@@ -3,8 +3,10 @@
 
 #include <QObject>
 #include <QWebSocket>
+#include <QPointF>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QVector>
 
 class RosBridgeClient : public QObject
 {
@@ -18,11 +20,11 @@ public:
     void sendCmdVel(double linear, double angular);
     void sendModeControl(const QString &mode);
     void sendNavGoto(double x, double y, double yaw);
-    void sendNavGotoWaypoint(const QString &name);
     void sendNavPatrol(const QString &route);
+    void sendNavQueue(const QVector<QPointF> &waypoints);
+    void sendNavSetSpeed(double speed);
     void sendNavCancel();
     void sendGoalPose(double x, double y, double theta, const QString &frame_id = "map");
-    void emergencyStop();
 
 signals:
     void connected();

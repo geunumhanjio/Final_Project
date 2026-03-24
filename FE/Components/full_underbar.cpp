@@ -87,7 +87,7 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     btnRectZoom = new QPushButton("Box Zoom", this);
     btnRectZoom->setCheckable(true);
 
-    btnControlMode = new QPushButton("Control Mode", this);
+    btnControlMode = new QPushButton("Start Control", this);
     btnControlMode->setCheckable(true);
     btnControlMode->setObjectName("controlModeBtn");
     btnControlMode->setStyleSheet(
@@ -105,7 +105,10 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     connect(btnZoomOut, &QPushButton::clicked, this, &FullUnderBar::reqZoomOut);
     connect(btnRectZoom, &QPushButton::toggled, this, &FullUnderBar::reqRectZoom);
     connect(btnResetZoom, &QPushButton::clicked, this, &FullUnderBar::reqResetZoom);
-    connect(btnControlMode, &QPushButton::toggled, this, &FullUnderBar::reqControlMode);
+    connect(btnControlMode, &QPushButton::toggled, this, [this](bool checked) {
+        updateControlModeButtonText(checked);
+        emit reqControlMode(checked);
+    });
 
     connect(btnRecord, &QPushButton::toggled, [this](bool checked) {
         btnRecord->setText(checked ? "STOP" : "REC");
@@ -212,15 +215,24 @@ void FullUnderBar::setControlModeAvailable(bool available)
         btnControlMode->setChecked(false);
         btnControlMode->blockSignals(false);
     }
+    updateControlModeButtonText(btnControlMode->isChecked());
 }
 
 void FullUnderBar::setControlModeChecked(bool checked)
 {
     if (btnControlMode->isChecked() == checked) {
+        updateControlModeButtonText(checked);
         return;
     }
 
     btnControlMode->blockSignals(true);
     btnControlMode->setChecked(checked);
     btnControlMode->blockSignals(false);
+    updateControlModeButtonText(checked);
+}
+
+void FullUnderBar::updateControlModeButtonText(bool checked)
+{
+    btnControlMode->setText(checked ? QStringLiteral("Stop Control")
+                                    : QStringLiteral("Start Control"));
 }

@@ -19,6 +19,7 @@ public:
     void connectToServer(const QString &cameraIp);
 
     // Connects to ws://[cameraIp]:9000 and sends the command
+    void sendCalibrationClick(const QString &cameraIp, double normalizedX, double normalizedY);
     void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
     void requestRecordings(const QString &cameraIp);
     void requestDownload(const QString &cameraIp, const QString &filename);
@@ -29,6 +30,7 @@ signals:
     void errorOccurred(QString error);
     void videoReceived(QString url);
     void recordingListReceived(QJsonArray list);
+    void slamMappingErrorReceived(QString reason, double normalizedX, double normalizedY);
 
     // File Transfer Signals
     void downloadProgress(qint64 received, qint64 total);

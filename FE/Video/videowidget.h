@@ -68,6 +68,7 @@ protected:
     void showPlaceholder(const QString &text);
     void setPlayingState(bool playing) { m_isPlaying = playing; }
     void updateSourceResolution(); // [New]
+    virtual void onGstError(const QString &errorText, const QString &debugText);
 
 protected slots:
     virtual void pollGstBus();

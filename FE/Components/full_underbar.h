@@ -43,6 +43,8 @@ signals:
     void reqSkipBackward();
 
 private:
+    void updateControlModeButtonText(bool checked);
+
     QPushButton *btnZoomIn;
     QPushButton *btnZoomOut;
     QPushButton *btnRectZoom;

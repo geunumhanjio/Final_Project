@@ -1,5 +1,7 @@
 #include "rosbridgeclient.h"
+#include <cmath>
 #include <QDebug>
+#include <QJsonArray>
 #include <QDateTime>
 
 namespace {
@@ -224,21 +226,6 @@ void RosBridgeClient::sendNavGoto(double x, double y, double yaw) {
     m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
 }
 
-void RosBridgeClient::sendNavGotoWaypoint(const QString &name) {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
-    QJsonObject data;
-    data["cmd"] = "goto_wp";
-    data["name"] = name;
-
-    QJsonObject msg;
-    msg["type"] = "nav_command";
-    msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-    msg["data"] = data;
-
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
-}
-
 void RosBridgeClient::sendNavPatrol(const QString &route) {
     if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
 
@@ -248,7 +235,61 @@ void RosBridgeClient::sendNavPatrol(const QString &route) {
 
     QJsonObject msg;
     msg["type"] = "nav_command";
-    msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    msg["data"] = data;
+
+    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+}
+
+void RosBridgeClient::sendNavQueue(const QVector<QPointF> &waypoints)
+{
+    if (m_webSocket.state() != QAbstractSocket::ConnectedState || waypoints.isEmpty()) {
+        return;
+    }
+
+    QJsonArray waypointArray;
+    for (int i = 0; i < waypoints.size(); ++i) {
+        double yaw = 0.0;
+        if (waypoints.size() > 1) {
+            QPointF direction;
+            if (i + 1 < waypoints.size()) {
+                direction = waypoints.at(i + 1) - waypoints.at(i);
+            } else {
+                direction = waypoints.at(i) - waypoints.at(i - 1);
+            }
+
+            if (!qFuzzyIsNull(direction.x()) || !qFuzzyIsNull(direction.y())) {
+                yaw = std::atan2(direction.y(), direction.x());
+            }
+        }
+
+        QJsonObject waypointObject;
+        waypointObject["x"] = waypoints.at(i).x();
+        waypointObject["y"] = waypoints.at(i).y();
+        waypointObject["yaw"] = yaw;
+        waypointArray.append(waypointObject);
+    }
+
+    QJsonObject data;
+    data["cmd"] = "queue";
+    data["waypoints"] = waypointArray;
+
+    QJsonObject msg;
+    msg["type"] = "nav_command";
+    msg["data"] = data;
+
+    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+}
+
+void RosBridgeClient::sendNavSetSpeed(double speed)
+{
+    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
+
+    QJsonObject data;
+    data["cmd"] = "set_speed";
+    data["speed"] = speed;
+
+    QJsonObject msg;
+    msg["type"] = "nav_command";
     msg["data"] = data;
 
     m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
@@ -267,24 +308,9 @@ void RosBridgeClient::sendNavCancel() {
 
     m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
 }
-
 void RosBridgeClient::sendGoalPose(double x, double y, double theta, const QString &frame_id) {
     Q_UNUSED(frame_id);
     sendNavGoto(x, y, theta);
-}
-
-void RosBridgeClient::emergencyStop() {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
-    QJsonObject data;
-    data["stop"] = true;
-
-    QJsonObject msg;
-    msg["type"] = "emergency_stop";
-    msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
-    msg["data"] = data;
-
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
 }
 
 void RosBridgeClient::onConnected() {
