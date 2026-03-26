@@ -7,6 +7,7 @@
 #include "constants.h"
 
 #include <QApplication>
+#include <QDateTime>
 #include <QDebug>
 #include <QJsonDocument>
 #include <QLineEdit>
@@ -210,6 +211,15 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
     QMainWindow::keyPressEvent(event);
 }
 
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    updateFallAlertPosition();
+    if (m_fallAlertPanel && m_fallAlertPanel->isVisible()) {
+        m_fallAlertPanel->raise();
+    }
+}
+
 void MainWindow::keyReleaseEvent(QKeyEvent *event)
 {
     QMainWindow::keyReleaseEvent(event);
@@ -247,8 +257,10 @@ void MainWindow::syncRobotModeToBackend(bool sendIdleMotion)
     }
 
     const bool isManualMode = (m_robotMode == Sidebar::ManualMode);
+    const bool isTrackingMode = (m_robotMode == Sidebar::AutoMode);
     m_rosClient->sendModeControl(isManualMode ? QStringLiteral("manual")
                                               : QStringLiteral("auto"));
+    m_rosClient->sendTrackingEnable(isTrackingMode);
 
     if (sendIdleMotion && isManualMode) {
         m_rosClient->sendCmdVel(0.0, 0.0);
@@ -443,6 +455,63 @@ void MainWindow::clearSharedVideoGoalOverlay()
     m_sharedVideoGoalStartNormalized = QPointF();
     m_sharedVideoGoalEndNormalized = QPointF();
     applySharedVideoGoalOverlay();
+}
+
+void MainWindow::showFallAlert(const QJsonObject &data)
+{
+    const QJsonObject alertData = data.value(QStringLiteral("data")).isObject()
+        ? data.value(QStringLiteral("data")).toObject()
+        : data;
+
+    const QJsonValue detectedValue = alertData.value(QStringLiteral("detected"));
+    const bool detected = detectedValue.isBool()
+        ? detectedValue.toBool()
+        : (detectedValue.toString().trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0);
+
+    qDebug() << "[MainWindow] fall_alert received:" << QJsonDocument(alertData).toJson(QJsonDocument::Compact);
+
+    if (!detected) {
+        hideFallAlert();
+        return;
+    }
+
+    const double angleDeg = alertData.value(QStringLiteral("angle_deg")).toDouble();
+    const double timestampSeconds = alertData.value(QStringLiteral("timestamp")).toDouble();
+
+    QDateTime alertTime = timestampSeconds > 0.0
+        ? QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(std::llround(timestampSeconds * 1000.0)))
+        : QDateTime();
+    if (!alertTime.isValid()) {
+        alertTime = QDateTime::currentDateTime();
+    }
+
+    if (m_topBar) {
+        m_topBar->appendFallAlertLog(
+            QStringLiteral("%1 | Angle %2 deg | 쓰러짐 감지")
+                .arg(alertTime.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")))
+                .arg(QString::number(angleDeg, 'f', 1)));
+    }
+
+    hideFallAlert();
+}
+
+void MainWindow::hideFallAlert()
+{
+    if (m_fallAlertPanel) {
+        m_fallAlertPanel->hide();
+    }
+}
+
+void MainWindow::updateFallAlertPosition()
+{
+    if (!m_fallAlertPanel || !m_centralStack) {
+        return;
+    }
+
+    const int rightMargin = 24;
+    const int topMargin = 24;
+    const int x = qMax(0, m_centralStack->width() - m_fallAlertPanel->width() - rightMargin);
+    m_fallAlertPanel->move(x, topMargin);
 }
 
 void MainWindow::deactivateControlSession()

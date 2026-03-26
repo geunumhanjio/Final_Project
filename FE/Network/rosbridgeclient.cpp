@@ -19,6 +19,9 @@ QString normalizedTopicType(const QString &topic)
     if (normalizedTopic.contains(QStringLiteral("nav_status"))) {
         return QStringLiteral("nav_status");
     }
+    if (normalizedTopic.contains(QStringLiteral("fall")) || normalizedTopic.contains(QStringLiteral("alert"))) {
+        return QStringLiteral("fall_alert");
+    }
     if (normalizedTopic.contains(QStringLiteral("path")) || normalizedTopic.contains(QStringLiteral("plan"))) {
         return QStringLiteral("path");
     }
@@ -37,8 +40,12 @@ QString normalizedTopicType(const QString &topic)
     return {};
 }
 
-QString normalizedType(const QJsonObject &object)
+QString normalizedType(const QJsonObject &object, int depth = 0)
 {
+    if (depth >= 4 || object.isEmpty()) {
+        return {};
+    }
+
     const QString directType = object.value("type").toString().trimmed().toLower();
     if (!directType.isEmpty()) {
         return directType;
@@ -46,7 +53,22 @@ QString normalizedType(const QJsonObject &object)
 
     const QString op = object.value("op").toString().trimmed().toLower();
     if (op == QStringLiteral("publish") || op == QStringLiteral("message")) {
-        return normalizedTopicType(object.value("topic").toString());
+        const QString topicType = normalizedTopicType(object.value("topic").toString());
+        if (!topicType.isEmpty()) {
+            return topicType;
+        }
+    }
+
+    for (const QString &key : {QStringLiteral("msg"), QStringLiteral("data"), QStringLiteral("payload"), QStringLiteral("values")}) {
+        const QJsonObject child = object.value(key).toObject();
+        if (child.isEmpty()) {
+            continue;
+        }
+
+        const QString childType = normalizedType(child, depth + 1);
+        if (!childType.isEmpty()) {
+            return childType;
+        }
     }
 
     return {};
@@ -89,6 +111,16 @@ QString compactPreview(const QJsonObject &object)
     return text;
 }
 
+QString compactPreview(const QString &text)
+{
+    QString preview = text;
+    constexpr int maxLength = 240;
+    if (preview.size() > maxLength) {
+        preview = preview.left(maxLength) + "...";
+    }
+    return preview;
+}
+
 bool looksLikeMapPayload(const QJsonObject &object)
 {
     const QJsonObject info = object.value(QStringLiteral("info")).toObject();
@@ -107,6 +139,87 @@ bool looksLikePathPayload(const QJsonObject &object)
     return object.value(QStringLiteral("poses")).isArray()
         || object.value(QStringLiteral("path")).isArray()
         || object.value(QStringLiteral("points")).isArray();
+}
+
+bool looksLikeFallAlertPayload(const QJsonObject &object)
+{
+    if (object.isEmpty()) {
+        return false;
+    }
+
+    if (object.contains(QStringLiteral("detected"))) {
+        return object.contains(QStringLiteral("angle_deg"))
+            || object.contains(QStringLiteral("timestamp"));
+    }
+
+    for (const QString &key : {QStringLiteral("data"), QStringLiteral("payload"), QStringLiteral("msg"), QStringLiteral("values")}) {
+        const QJsonObject child = object.value(key).toObject();
+        if (!child.isEmpty() && looksLikeFallAlertPayload(child)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+QJsonObject extractFallAlertObject(const QJsonValue &value, int depth = 0)
+{
+    if (depth >= 6 || value.isUndefined() || value.isNull()) {
+        return {};
+    }
+
+    if (value.isObject()) {
+        const QJsonObject object = value.toObject();
+        const QString directType = object.value(QStringLiteral("type")).toString().trimmed().toLower();
+        if (directType == QStringLiteral("fall_alert")) {
+            const QJsonObject nestedData = object.value(QStringLiteral("data")).toObject();
+            return nestedData.isEmpty() ? object : nestedData;
+        }
+
+        if (looksLikeFallAlertPayload(object)) {
+            const QJsonObject nestedData = object.value(QStringLiteral("data")).toObject();
+            if (!nestedData.isEmpty() && looksLikeFallAlertPayload(nestedData)) {
+                return nestedData;
+            }
+            return object;
+        }
+
+        for (auto it = object.constBegin(); it != object.constEnd(); ++it) {
+            const QJsonObject nested = extractFallAlertObject(it.value(), depth + 1);
+            if (!nested.isEmpty()) {
+                return nested;
+            }
+        }
+        return {};
+    }
+
+    if (value.isArray()) {
+        const QJsonArray array = value.toArray();
+        for (const QJsonValue &entry : array) {
+            const QJsonObject nested = extractFallAlertObject(entry, depth + 1);
+            if (!nested.isEmpty()) {
+                return nested;
+            }
+        }
+        return {};
+    }
+
+    if (value.isString()) {
+        QJsonParseError parseError;
+        const QByteArray raw = value.toString().trimmed().toUtf8();
+        const QJsonDocument nestedDoc = QJsonDocument::fromJson(raw, &parseError);
+        if (parseError.error != QJsonParseError::NoError) {
+            return {};
+        }
+        if (nestedDoc.isObject()) {
+            return extractFallAlertObject(nestedDoc.object(), depth + 1);
+        }
+        if (nestedDoc.isArray()) {
+            return extractFallAlertObject(nestedDoc.array(), depth + 1);
+        }
+    }
+
+    return {};
 }
 
 bool looksLikeOdomPayload(const QJsonObject &object)
@@ -140,6 +253,9 @@ QString inferredType(const QJsonObject &object, const QJsonObject &body)
         return type;
     }
 
+    if (looksLikeFallAlertPayload(body)) {
+        return QStringLiteral("fall_alert");
+    }
     if (looksLikeMapPayload(body)) {
         return QStringLiteral("map");
     }
@@ -160,6 +276,9 @@ RosBridgeClient::RosBridgeClient(QObject *parent) : QObject(parent)
     connect(&m_webSocket, &QWebSocket::connected, this, &RosBridgeClient::onConnected);
     connect(&m_webSocket, &QWebSocket::disconnected, this, &RosBridgeClient::onDisconnected);
     connect(&m_webSocket, &QWebSocket::textMessageReceived, this, &RosBridgeClient::onTextMessageReceived);
+    connect(&m_webSocket, &QWebSocket::binaryMessageReceived, this, [this](const QByteArray &message) {
+        onTextMessageReceived(QString::fromUtf8(message));
+    });
     connect(&m_webSocket, &QWebSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
         qWarning() << "[RosBridge] Socket error:" << m_webSocket.errorString();
         emit errorOccurred(m_webSocket.errorString());
@@ -221,6 +340,20 @@ void RosBridgeClient::sendModeControl(const QString &mode) {
     QJsonObject msg;
     msg["type"] = "mode_control";
     msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    msg["data"] = data;
+
+    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+}
+
+void RosBridgeClient::sendTrackingEnable(bool enabled)
+{
+    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
+
+    QJsonObject data;
+    data["enable"] = enabled;
+
+    QJsonObject msg;
+    msg["type"] = "tracking_enable";
     msg["data"] = data;
 
     m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
@@ -341,7 +474,25 @@ void RosBridgeClient::onDisconnected() {
 }
 
 void RosBridgeClient::onTextMessageReceived(const QString &message) {
-    const QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8());
+    QJsonParseError parseError;
+    const QJsonDocument doc = QJsonDocument::fromJson(message.toUtf8(), &parseError);
+    if (parseError.error != QJsonParseError::NoError) {
+        const QString lowered = message.toLower();
+        if (lowered.contains(QStringLiteral("fall")) || lowered.contains(QStringLiteral("detected")) || lowered.contains(QStringLiteral("angle_deg"))) {
+            qDebug() << "[RosBridge] Fall-like raw message (non-object):" << compactPreview(message);
+        }
+        return;
+    }
+
+    const QJsonObject fallAlertObject = doc.isObject()
+        ? extractFallAlertObject(doc.object())
+        : (doc.isArray() ? extractFallAlertObject(doc.array()) : QJsonObject());
+    const bool fallAlertHandled = !fallAlertObject.isEmpty();
+    if (fallAlertHandled) {
+        qDebug() << "[RosBridge] Fall alert message:" << compactPreview(fallAlertObject);
+        emit fallAlertReceived(fallAlertObject);
+    }
+
     if (!doc.isObject()) return;
 
     const QJsonObject obj = doc.object();
@@ -370,5 +521,7 @@ void RosBridgeClient::onTextMessageReceived(const QString &message) {
         emit navStatusReceived(body);
     } else if (type == "nav_feedback") {
         emit navFeedbackReceived(body);
+    } else if (type == "fall_alert" && !fallAlertHandled) {
+        emit fallAlertReceived(body);
     }
 }

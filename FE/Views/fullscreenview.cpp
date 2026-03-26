@@ -494,7 +494,7 @@ FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
     modeQuickGroup->setExclusive(true);
 
     modeQuickManualButton = new QRadioButton("Manual", modeQuickPanel);
-    modeQuickAutoButton = new QRadioButton("Auto", modeQuickPanel);
+    modeQuickAutoButton = new QRadioButton("Tracking", modeQuickPanel);
     modeQuickControlButton = new QRadioButton("Control", modeQuickPanel);
     modeQuickPatrolButton = new QRadioButton("Patrol", modeQuickPanel);
     for (QRadioButton *button : {modeQuickManualButton, modeQuickAutoButton, modeQuickControlButton, modeQuickPatrolButton}) {

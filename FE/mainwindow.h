@@ -5,6 +5,7 @@
 #include <QStackedWidget>
 #include <QLabel>
 #include <QCloseEvent>
+#include <QResizeEvent>
 #include "topbar.h"
 #include "sidebar.h"
 #include "liveview.h"
@@ -35,6 +36,7 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
     bool eventFilter(QObject *obj, QEvent *event) override; 
     void keyPressEvent(QKeyEvent *event) override;   
     void keyReleaseEvent(QKeyEvent *event) override; 
@@ -65,6 +67,9 @@ private:
     void applySharedVideoGoalOverlay();
     void setSharedVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd);
     void clearSharedVideoGoalOverlay();
+    void showFallAlert(const QJsonObject &data);
+    void hideFallAlert();
+    void updateFallAlertPosition();
 
 private slots:
     void processInput();
@@ -111,6 +116,9 @@ private:
     QSet<QString> m_pendingFrucJobs;
     QSet<FrucVideoProcessor *> m_activeFrucProcessors;
     double m_cameraTiltAngle = 0.0;
+    QWidget *m_fallAlertPanel = nullptr;
+    QLabel *m_fallAlertTitleLabel = nullptr;
+    QLabel *m_fallAlertDetailsLabel = nullptr;
 
     QWidget *m_returnToWidget = nullptr;
 };

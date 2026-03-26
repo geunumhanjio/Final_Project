@@ -20,6 +20,7 @@ public:
     void sendCmdVel(double linear, double angular);
     void sendCameraTilt(double angle);
     void sendModeControl(const QString &mode);
+    void sendTrackingEnable(bool enabled);
     void sendNavGoto(double x, double y, double yaw);
     void sendNavPatrol(const QString &route);
     void sendNavQueue(const QVector<QPointF> &waypoints);
@@ -36,6 +37,7 @@ signals:
     void pathReceived(const QJsonObject &data);
     void navStatusReceived(const QJsonObject &data);
     void navFeedbackReceived(const QJsonObject &data);
+    void fallAlertReceived(const QJsonObject &data);
 
 private slots:
     void onConnected();

@@ -148,6 +148,10 @@ QLineEdit:focus {
     background-color: transparent;
 }
 
+#TopBarBrandIcon {
+    background: transparent;
+}
+
 #DateLabel {
     color: #64748b;
     font-family: monospace;
@@ -162,6 +166,101 @@ QLineEdit:focus {
     font-weight: bold;
     font-size: 14px;
     background-color: transparent;
+}
+
+#TopBarAlertButton {
+    background: transparent;
+    color: #64748b;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+#TopBarAlertButton:hover {
+    background: rgba(15, 23, 42, 0.05);
+    color: #ea580c;
+}
+
+#TopBarAlertButton[hasUnread="true"] {
+    background: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+    border-color: rgba(239, 68, 68, 0.28);
+}
+
+#TopBarAlertPopup {
+    background: #ffffff;
+    border: 1px solid #d7e2ee;
+    border-radius: 14px;
+}
+
+#TopBarAlertPopupTitle {
+    background: transparent;
+    color: #0f172a;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+#TopBarAlertPopupEmpty {
+    background: transparent;
+    color: #64748b;
+    font-size: 12px;
+}
+
+#TopBarAlertPopupList {
+    background: transparent;
+    color: #0f172a;
+    border: none;
+    outline: none;
+}
+
+#TopBarAlertPopupList::item {
+    margin: 0 0 8px 0;
+    padding: 10px 12px;
+    color: #991b1b;
+    background: #fef2f2;
+    border: 1px solid #fca5a5;
+    border-radius: 10px;
+}
+
+#TopBarAlertPopupList::item:hover {
+    background: #fee2e2;
+}
+
+#FallAlertPanel {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #ef4444, stop:1 #dc2626);
+    border: 1px solid rgba(248, 113, 113, 0.35);
+    border-radius: 16px;
+}
+
+#FallAlertTitleLabel {
+    background: transparent;
+    color: #fff7ed;
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+}
+
+#FallAlertDetailsLabel {
+    background: transparent;
+    color: rgba(255, 247, 237, 0.95);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+#FallAlertAcknowledgeButton {
+    background: #ffffff;
+    color: #b91c1c;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+#FallAlertAcknowledgeButton:hover {
+    background: #fff7ed;
 }
 
 /* VideoCard */

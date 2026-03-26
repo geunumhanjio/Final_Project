@@ -209,7 +209,7 @@ void Sidebar::setupLiveUI()
     modeLayout->addWidget(modeTitle);
 
     manualModeButton = new QRadioButton("Manual Mode", modePanel);
-    autoModeButton = new QRadioButton("Auto Mode", modePanel);
+    autoModeButton = new QRadioButton("Tracking Mode", modePanel);
     controlModeButton = new QRadioButton("Control Mode", modePanel);
     patrolModeButton = new QRadioButton("Patrol Mode", modePanel);
     manualModeButton->setObjectName("SidebarModeOption");

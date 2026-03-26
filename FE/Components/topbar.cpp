@@ -3,10 +3,16 @@
  * @brief Top navigation bar implementation
  */
 #include "topbar.h"
+#include <QFontMetrics>
+#include <QGuiApplication>
 #include <QFont>
 #include <QStyle>
 #include <QAbstractButton>
+#include <QListWidget>
 #include <QMenu>
+#include <QPixmap>
+#include <QScreen>
+#include <QVBoxLayout>
 
 // Helper to update style
 void updateStyle(QWidget* w) {
@@ -44,6 +50,14 @@ void TopBar::setupUi()
     btnToggle->setObjectName("TopBarToggleBtn"); // [New]
     btnToggle->setStyleSheet("QPushButton { color: #94a3b8; font-size: 20px; border: none; background: transparent; } QPushButton:hover { color: white; background: rgba(255,255,255,0.05); border-radius: 4px; }");
     // Note: btnToggle icon color might need manual update or QIcon theme, keeping simple for now.
+
+    auto *brandIconLabel = new QLabel(this);
+    brandIconLabel->setObjectName("TopBarBrandIcon");
+    brandIconLabel->setFixedSize(32, 32);
+    brandIconLabel->setAlignment(Qt::AlignCenter);
+    brandIconLabel->setStyleSheet(QStringLiteral("background: transparent;"));
+    const QPixmap brandIcon(QStringLiteral(":/icons/assets/icons/nubigo_robot.svg"));
+    brandIconLabel->setPixmap(brandIcon.scaled(30, 30, Qt::KeepAspectRatio, Qt::SmoothTransformation));
 
     titleLabel = new QLabel(QStringLiteral("누비고 프로그램"), this);
     titleLabel->setObjectName("TopBarTitle");
@@ -104,6 +118,13 @@ void TopBar::setupUi()
     timeLayout->addWidget(dateLabel);
     timeLayout->addWidget(timeLabel);
 
+    btnAlert = new QPushButton(QStringLiteral("⚠"), this);
+    btnAlert->setFixedSize(34, 34);
+    btnAlert->setCursor(Qt::PointingHandCursor);
+    btnAlert->setObjectName("TopBarAlertButton");
+    btnAlert->setToolTip(QStringLiteral("Fall alert log"));
+    btnAlert->setProperty("hasUnread", false);
+
     btnClose = new QPushButton("X", this);
     btnClose->setFixedSize(36, 36);
     btnClose->setCursor(Qt::PointingHandCursor);
@@ -141,10 +162,12 @@ void TopBar::setupUi()
     // Add to Main Layout
     layout->addWidget(btnToggle);
     layout->addSpacing(8);
+    layout->addWidget(brandIconLabel);
     layout->addWidget(titleLabel);
     layout->addStretch(); 
     layout->addWidget(navContainer);
     layout->addStretch();
+    layout->addWidget(btnAlert);
     layout->addWidget(rightContainer);
     layout->addSpacing(10);
     layout->addWidget(btnTheme);
@@ -154,6 +177,7 @@ void TopBar::setupUi()
     // Connections
     connect(btnToggle, &QPushButton::clicked, this, &TopBar::sidebarToggled);
     connect(btnClose, &QPushButton::clicked, this, &TopBar::closeRequested);
+    connect(btnAlert, &QPushButton::clicked, this, &TopBar::showFallAlertHistoryPopup);
     
     // Theme Toggle
     connect(btnTheme, &QPushButton::clicked, [=](){
@@ -212,6 +236,22 @@ void TopBar::setupUi()
     });
 }
 
+void TopBar::appendFallAlertLog(const QString &entry)
+{
+    const QString trimmedEntry = entry.trimmed();
+    if (trimmedEntry.isEmpty()) {
+        return;
+    }
+
+    m_fallAlertLogs.append(trimmedEntry);
+    while (m_fallAlertLogs.size() > 50) {
+        m_fallAlertLogs.removeFirst();
+    }
+
+    m_hasUnreadFallAlerts = true;
+    updateAlertButtonState();
+}
+
 void TopBar::setCurrentUserInfo(const QString &userId, const QString &email, const QString &serverHost)
 {
     m_currentUserId = userId.trimmed();
@@ -232,6 +272,88 @@ void TopBar::updateTime()
     QDateTime now = QDateTime::currentDateTime();
     dateLabel->setText(now.toString("yyyy-MM-dd"));
     timeLabel->setText(now.toString("HH:mm:ss"));
+}
+
+void TopBar::showFallAlertHistoryPopup()
+{
+    if (!btnAlert) {
+        return;
+    }
+
+    QWidget *popup = new QWidget(this);
+    popup->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
+    popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->setObjectName("TopBarAlertPopup");
+
+    auto *popupLayout = new QVBoxLayout(popup);
+    popupLayout->setContentsMargins(14, 14, 14, 14);
+    popupLayout->setSpacing(10);
+
+    auto *titleLabel = new QLabel(QStringLiteral("쓰러짐 감지 로그"), popup);
+    titleLabel->setObjectName("TopBarAlertPopupTitle");
+    popupLayout->addWidget(titleLabel);
+
+    if (m_fallAlertLogs.isEmpty()) {
+        auto *emptyLabel = new QLabel(QStringLiteral("쓰러짐 감지 로그 없음"), popup);
+        emptyLabel->setObjectName("TopBarAlertPopupEmpty");
+        emptyLabel->setWordWrap(true);
+        popupLayout->addWidget(emptyLabel);
+    } else {
+        auto *listWidget = new QListWidget(popup);
+        listWidget->setObjectName("TopBarAlertPopupList");
+        listWidget->setSelectionMode(QAbstractItemView::NoSelection);
+        listWidget->setFocusPolicy(Qt::NoFocus);
+        listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+        listWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+
+        for (int i = m_fallAlertLogs.size() - 1; i >= 0; --i) {
+            listWidget->addItem(m_fallAlertLogs.at(i));
+        }
+
+        const int visibleRows = qMin(6, qMax(1, listWidget->count()));
+        const int rowHeight = listWidget->sizeHintForRow(0) > 0 ? listWidget->sizeHintForRow(0) : QFontMetrics(listWidget->font()).lineSpacing() + 12;
+        listWidget->setMinimumWidth(320);
+        listWidget->setFixedHeight((rowHeight * visibleRows) + (listWidget->frameWidth() * 2) + 4);
+        popupLayout->addWidget(listWidget);
+    }
+
+    popup->adjustSize();
+
+    QPoint globalPos = btnAlert->mapToGlobal(QPoint(btnAlert->width() - popup->width(), btnAlert->height() + 8));
+    if (QScreen *screen = QGuiApplication::screenAt(globalPos)) {
+        const QRect available = screen->availableGeometry();
+        if (globalPos.x() + popup->width() > available.right()) {
+            globalPos.setX(available.right() - popup->width());
+        }
+        if (globalPos.x() < available.left()) {
+            globalPos.setX(available.left());
+        }
+        if (globalPos.y() + popup->height() > available.bottom()) {
+            globalPos.setY(btnAlert->mapToGlobal(QPoint(0, 0)).y() - popup->height() - 8);
+        }
+        if (globalPos.y() < available.top()) {
+            globalPos.setY(available.top());
+        }
+    }
+
+    popup->move(globalPos);
+    popup->show();
+
+    m_hasUnreadFallAlerts = false;
+    updateAlertButtonState();
+}
+
+void TopBar::updateAlertButtonState()
+{
+    if (!btnAlert) {
+        return;
+    }
+
+    btnAlert->setProperty("hasUnread", m_hasUnreadFallAlerts);
+    btnAlert->setToolTip(m_fallAlertLogs.isEmpty()
+                             ? QStringLiteral("Fall alert log")
+                             : QStringLiteral("Fall alert log (%1)").arg(m_fallAlertLogs.size()));
+    updateStyle(btnAlert);
 }
 
 void TopBar::mousePressEvent(QMouseEvent *event)

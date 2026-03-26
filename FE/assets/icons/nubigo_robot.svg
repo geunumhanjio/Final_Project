@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120" viewBox="0 0 160 120">
+  <defs>
+    <linearGradient id="shellFill" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fefefe"/>
+      <stop offset="100%" stop-color="#d7e2f8"/>
+    </linearGradient>
+    <linearGradient id="outlineFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#283b8f"/>
+      <stop offset="100%" stop-color="#4c5cb6"/>
+    </linearGradient>
+    <linearGradient id="accentFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#49c5ff"/>
+      <stop offset="100%" stop-color="#1b74db"/>
+    </linearGradient>
+    <linearGradient id="visorFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2e2f76"/>
+      <stop offset="100%" stop-color="#4b57b8"/>
+    </linearGradient>
+    <linearGradient id="highlightFill" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <ellipse cx="80" cy="104" rx="46" ry="8" fill="#243372" opacity="0.12"/>
+    <rect x="60" y="10" width="38" height="14" rx="7" fill="url(#accentFill)" stroke="url(#outlineFill)" stroke-width="3"/>
+    <rect x="14" y="44" width="18" height="34" rx="8" fill="url(#accentFill)" stroke="url(#outlineFill)" stroke-width="3"/>
+    <rect x="128" y="22" width="6" height="44" rx="3" fill="url(#outlineFill)"/>
+    <circle cx="131" cy="18" r="7" fill="#b8ff80" stroke="#95da63" stroke-width="3"/>
+    <path d="M32 40C32 26 44 16 58 16H102C116 16 128 26 128 40V74C128 92 113 106 95 106H65C47 106 32 92 32 74V40Z"
+          fill="url(#shellFill)" stroke="url(#outlineFill)" stroke-width="4"/>
+    <path d="M46 42C46 33 53 26 62 26H98C107 26 114 33 114 42V71C114 79 107 86 99 86H61C53 86 46 79 46 71V42Z"
+          fill="url(#visorFill)"/>
+    <path d="M41 83C51 93 63 98 80 98C97 98 109 93 119 83"
+          fill="none" stroke="#9bb8f0" stroke-width="4" stroke-linecap="round"/>
+    <ellipse cx="64" cy="57" rx="12" ry="14" fill="#fbfdff"/>
+    <ellipse cx="96" cy="57" rx="12" ry="14" fill="#fbfdff"/>
+    <ellipse cx="64" cy="58" rx="4.5" ry="5.5" fill="#dfe8ff"/>
+    <ellipse cx="96" cy="58" rx="4.5" ry="5.5" fill="#dfe8ff"/>
+    <path d="M48 30C58 23 72 20 92 22C82 26 71 34 64 45C59 41 53 35 48 30Z"
+          fill="url(#highlightFill)"/>
+  </g>
+</svg>

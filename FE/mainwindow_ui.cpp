@@ -15,11 +15,15 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QFrame>
+#include <QHBoxLayout>
 #include <QMessageBox>
+#include <QPushButton>
 #include <QStandardPaths>
 #include <QStringList>
 #include <QTimer>
 #include <QUrl>
+#include <QVBoxLayout>
 
 namespace {
 
@@ -126,6 +130,37 @@ void MainWindow::initUI()
     m_centralStack->addWidget(m_playbackPage);
     m_centralStack->addWidget(m_settingsPage);
     m_centralStack->addWidget(m_fullPage);
+
+    m_fallAlertPanel = new QFrame(m_centralStack);
+    m_fallAlertPanel->setObjectName(QStringLiteral("FallAlertPanel"));
+    m_fallAlertPanel->setAttribute(Qt::WA_StyledBackground, true);
+    m_fallAlertPanel->setFixedWidth(320);
+
+    auto *fallAlertLayout = new QVBoxLayout(m_fallAlertPanel);
+    fallAlertLayout->setContentsMargins(18, 16, 18, 16);
+    fallAlertLayout->setSpacing(12);
+
+    m_fallAlertTitleLabel = new QLabel(QStringLiteral("FALL DETECTED"), m_fallAlertPanel);
+    m_fallAlertTitleLabel->setObjectName(QStringLiteral("FallAlertTitleLabel"));
+
+    m_fallAlertDetailsLabel = new QLabel(m_fallAlertPanel);
+    m_fallAlertDetailsLabel->setObjectName(QStringLiteral("FallAlertDetailsLabel"));
+    m_fallAlertDetailsLabel->setWordWrap(true);
+
+    auto *fallAlertAcknowledgeButton = new QPushButton(QStringLiteral("ACKNOWLEDGE"), m_fallAlertPanel);
+    fallAlertAcknowledgeButton->setObjectName(QStringLiteral("FallAlertAcknowledgeButton"));
+    fallAlertAcknowledgeButton->setCursor(Qt::PointingHandCursor);
+    fallAlertAcknowledgeButton->setMinimumHeight(42);
+
+    fallAlertLayout->addWidget(m_fallAlertTitleLabel);
+    fallAlertLayout->addWidget(m_fallAlertDetailsLabel);
+    fallAlertLayout->addWidget(fallAlertAcknowledgeButton);
+
+    connect(fallAlertAcknowledgeButton, &QPushButton::clicked, this, &MainWindow::hideFallAlert);
+
+    m_fallAlertPanel->hide();
+    updateFallAlertPosition();
+    m_fallAlertPanel->raise();
 
     qDebug() << "[MainWindow] initUI Completed.";
 }
@@ -283,6 +318,7 @@ void MainWindow::initConnections()
     connect(m_rosClient, &RosBridgeClient::pathReceived, m_livePage, &LiveView::updatePath);
     connect(m_rosClient, &RosBridgeClient::navStatusReceived, this, &MainWindow::handleGoalNavStatus);
     connect(m_rosClient, &RosBridgeClient::navFeedbackReceived, this, &MainWindow::handleGoalNavFeedback);
+    connect(m_rosClient, &RosBridgeClient::fallAlertReceived, this, &MainWindow::showFallAlert);
 
     connect(m_sidebar, &Sidebar::categorySelected, m_playbackPage, &PlaybackView::filterRecordings);
 

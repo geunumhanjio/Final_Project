@@ -13,6 +13,7 @@
 #include <QDateTime>
 #include <QMouseEvent>
 #include <QString>
+#include <QStringList>
 
 class TopBar : public QWidget
 {
@@ -20,6 +21,7 @@ class TopBar : public QWidget
 public:
     explicit TopBar(QWidget *parent = nullptr);
     void setCurrentUserInfo(const QString &userId, const QString &email, const QString &serverHost);
+    void appendFallAlertLog(const QString &entry);
 
 signals:
     void sidebarToggled();       // Sidebar toggle signal
@@ -36,6 +38,8 @@ protected:
 private:
     void setupUi();
     void updateTime();
+    void showFallAlertHistoryPopup();
+    void updateAlertButtonState();
 
     QHBoxLayout *layout;
     QPushButton *btnToggle;
@@ -48,6 +52,7 @@ private:
     // Right Side
     QLabel *timeLabel;
     QLabel *dateLabel; // Added dateLabel
+    QPushButton *btnAlert;
     QPushButton *btnEmergencyStop;
     QPushButton *btnTheme;
     QPushButton *btnClose;
@@ -60,6 +65,8 @@ private:
     QString m_currentUserId;
     QString m_currentUserEmail;
     QString m_currentServerHost;
+    QStringList m_fallAlertLogs;
+    bool m_hasUnreadFallAlerts = false;
 };
 
 #endif // TOPBAR_H

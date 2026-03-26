@@ -1,90 +1,212 @@
 # VEDA_QT_1 FE
 
 Windows 기반 Qt Widgets 프론트엔드입니다.  
-`누비고` UI에서 CCTV 모니터링, RC Car 영상 확인, ROS2 기반 로봇 제어, 녹화/다운로드/재생, 설정 관리까지 한 번에 처리합니다.
+하나의 데스크톱 애플리케이션에서 다음 기능을 통합합니다.
 
-핵심 스택:
+- 로그인 / 회원가입 / 비밀번호 재설정
+- CCTV 4채널 + RC Car 카메라 + SLAM 지도 모니터링
+- 로봇 주행 모드 전환과 ROS2 WebSocket 제어
+- 녹화 시작/정지, 녹화 목록 조회, 다운로드, 재생
+- 카메라/로봇 설정 관리
+- 쓰러짐 감지 로그 표시
 
-- Qt Widgets
-- Qt Network / WebSockets
-- GStreamer 1.0
-- OpenCV 선택 지원(FRUC 후처리용)
-
-이 README는 현재 `FE/` 코드 상태를 기준으로 작성되었습니다.
+이 문서는 현재 `FE/` 코드 상태를 기준으로 작성되었습니다.
 
 ---
 
 ## 1. 프로젝트 개요
 
-앱은 다음 순서로 동작합니다.
+앱의 기본 실행 흐름은 다음과 같습니다.
 
 1. `main.cpp`에서 `QApplication`을 생성합니다.
-2. `ApplicationInitializer`가 OpenCV, GStreamer, 폰트, SSL 인증서를 초기화합니다.
+2. `ApplicationInitializer`가 폰트, SSL 인증서, 런타임 경로를 초기화합니다.
 3. `ConfigManager`가 `settings.ini` 기본값을 보장합니다.
-4. `LoginDialog`를 먼저 띄웁니다.
-5. 로그인 성공 시 `MainWindow`를 열고 라이브/재생/설정 UI를 구동합니다.
+4. `LoginDialog`가 먼저 열립니다.
+5. 로그인 성공 시 `MainWindow`가 열리고 Live / Playback / Settings 화면을 제공합니다.
 
-중요한 점:
+핵심 포인트:
 
-- 초기화 일부가 실패해도 앱은 경고 로그만 남기고 계속 실행될 수 있습니다.
-- GStreamer가 없으면 스트림/재생이 제한됩니다.
-- OpenCV가 없으면 FRUC만 비활성화되고 앱 자체는 빌드/실행 가능합니다.
-
----
-
-## 2. 핵심 기능
-
-- 로그인, 회원가입, 비밀번호 재설정
-- CCTV 4채널 + RC Car 전면 카메라 + SLAM 맵 표시
-- RTSP / RTSPS 스트림 재생
-- 전체화면, 줌, 박스 줌, Goal Overlay
-- 로봇 Manual / Auto / Control / Patrol 모드 전환
-- 즉시정지 버튼 지원
-  - 사이드바와 전체화면 퀵 패널 모두에서 사용 가능
-  - 현재는 Manual / Auto / Control / Patrol 모든 모드에서 활성화됨
-- 녹화 시작/정지, 녹화 목록 조회, 다운로드, 로컬 재생
-- OpenCV 기반 FRUC 후처리
-  - `_FRUC_FAST`
-  - `_FRUC_HQ`
-- 다크/라이트 테마
-- 카메라/로봇 설정 저장
+- GStreamer는 필수입니다.
+- OpenCV는 선택 사항이며, 없으면 FRUC만 비활성화됩니다.
+- 설정 파일은 실행 파일과 같은 폴더의 `settings.ini`를 사용합니다.
 
 ---
 
-## 3. 현재 아키텍처
+## 2. 주요 기능
 
-### 3.1 엔트리 포인트
+### 2.1 로그인 / 인증
 
-- [main.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/main.cpp)
-  - `QApplication` 생성
-  - `ApplicationInitializer::initializeEnvironment()`
-  - `ConfigManager::loadDefaults()`
-  - `LoginDialog` 실행
-  - `MainWindow` 실행
+- 로그인 서버 IP는 `192.168.0.110` 같은 호스트/IP만 입력하면 됩니다.
+- 앱이 내부적으로 `http://<host>:8080` 형태로 정규화합니다.
+- 회원가입은 2단계 UI이지만 서버 IP 입력은 1단계에만 있습니다.
+- 로컬 마스터 우회 로그인 `admin / admin`을 지원합니다.
+- 인증 성공 시 JWT 세션을 유지하고, 필요한 경우 RTSP 인증 헤더에 활용합니다.
 
-### 3.2 MainWindow 분리 구조
+### 2.2 Live 모니터링
 
-`MainWindow` 관련 코드는 3개 파일로 나뉘어 있습니다.
+- CCTV 4채널과 RC Car 카메라를 동시에 표시합니다.
+- SLAM 지도와 로봇 경로 / 목표점 / 패트롤 포인트를 오버레이로 보여줍니다.
+- 각 영상 카드에서 전체화면, 녹화 제어, 목표 지정 등을 연결합니다.
 
-- [mainwindow.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/mainwindow.cpp)
-  - 키 입력 처리
-  - 수동 조종
-  - 카메라 틸트 입력
-  - Goal 추적
-  - 긴급 정지 공통 처리
-- [mainwindow_ui.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/mainwindow_ui.cpp)
-  - 메인 화면 조립
-  - 시그널/슬롯 연결
+### 2.3 로봇 모드
+
+사용자에게는 다음 4개 모드가 표시됩니다.
+
+- `Manual Mode`
+- `Tracking Mode`
+- `Control Mode`
+- `Patrol Mode`
+
+현재 동작 규칙:
+
+| UI 모드 | `mode_control` | `tracking_enable` | 비고 |
+|---|---|---|---|
+| Manual | `manual` | `false` | WASD 수동 주행 |
+| Tracking | `auto` | `true` | 추적 활성화 |
+| Control | `auto` | `false` | 목표 지정 제어 |
+| Patrol | `auto` | `false` | 순찰 포인트 지정 |
+
+추가 규칙:
+
+- 모드가 `Manual`이 아니면 수동 주행은 즉시 정지됩니다.
+- 즉시 정지 버튼은 모든 모드에서 항상 활성화됩니다.
+- 즉시 정지 시 `cmd_vel 0`, `nav cancel`, 예상 경로, 패트롤 포인트/선이 함께 정리됩니다.
+
+### 2.4 Patrol 모드
+
+`Patrol Mode`에서는 사이드바에 다음 버튼이 표시됩니다.
+
+- `Add Point`
+- `설정 완료`
+
+동작 방식:
+
+1. `Add Point`를 켜면 Live 화면의 SLAM 지도 클릭으로 포인트를 추가할 수 있습니다.
+2. 포인트는 초록 점으로 찍히고, 직전 포인트와 초록 선으로 연결됩니다.
+3. `설정 완료`를 누르면 현재 포인트 목록을 `nav_command / queue` JSON으로 전송합니다.
+4. 각 웨이포인트의 `yaw`는 “현재 점에서 다음 점을 향하는 방향”으로 자동 계산됩니다.
+
+중요:
+
+- 현재 UI는 Patrol 모드 진입 시 예전의 `nav_command / patrol` 메시지를 보내지 않습니다.
+- `RosBridgeClient` 안에 `sendNavPatrol()` 헬퍼는 남아 있지만, 현재 UI 흐름에서는 사용하지 않습니다.
+
+### 2.5 쓰러짐 감지 로그
+
+- ROS 쪽에서 `fall_alert` JSON을 수신하면 상단 경고 아이콘에 로그가 쌓입니다.
+- 예전의 빨간 오버레이 패널은 사용하지 않습니다.
+- 경고 아이콘 팝업에서 쓰러짐 감지 로그를 빨간색 카드 형태로 확인할 수 있습니다.
+- 로그는 최신순으로 보여주며 최대 50개까지 유지합니다.
+
+### 2.6 Playback
+
+- 녹화 목록 조회
+- 카테고리 필터링
+- 로컬 파일 재생
+- 서버 다운로드 후 재생
+- OpenCV 기반 FRUC 생성
+
+### 2.7 Settings
+
+설정 화면은 전용 사이드바를 사용하며, 두 섹션으로 나뉩니다.
+
+- `Camera Settings`
+- `Robot Car Settings`
+
+`Camera Settings`
+
+- Camera IP
+- RTSP Port
+- Use Secure RTSPS
+- Use Custom CCTV URL
+- Custom CCTV ID / Password
+
+`Robot Car Settings`
+
+- ROS2 Bridge Host
+- Enable Manual Control (WASD)
+- Linear X
+- Angular Z
+- Auto Speed
+
+저장 시:
+
+- `settings.ini`에 즉시 반영됩니다.
+- `StreamManager` 구성이 갱신됩니다.
+- `Auto Speed`는 `nav_command / set_speed` JSON으로 즉시 전송됩니다.
+
+---
+
+## 3. 화면 구성
+
+### 3.1 LoginDialog
+
+- 로그인 / 회원가입 / 비밀번호 재설정을 한 다이얼로그 안의 페이지 전환으로 처리합니다.
+- 제목 왼쪽에 브랜드 아이콘이 표시됩니다.
+- 로그인 서버 입력은 호스트/IP만 받습니다.
+
+관련 파일:
+
+- `Components/logindialog.h`
+- `Components/logindialog.cpp`
+
+### 3.2 MainWindow
+
+`MainWindow` 구현은 역할별로 나뉘어 있습니다.
+
+- `mainwindow.cpp`
+  - 입력 처리
+  - 로봇 모드 동기화
+  - 패트롤 완료 처리
+  - 즉시 정지
+  - 쓰러짐 감지 로그 연결
+- `mainwindow_ui.cpp`
+  - UI 조립
   - 페이지 전환
-  - 라이브/재생/전체화면 UI 연동
-- [mainwindow_session.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/mainwindow_session.cpp)
-  - 테마 전환
-  - 재로그인
-  - 로그아웃
-  - FRUC 후처리
-  - 백그라운드 작업 종료 처리
+  - 시그널 연결
+- `mainwindow_session.cpp`
+  - 세션 / 테마 / 설정 관련 보조 로직
 
-### 3.3 폴더 역할
+### 3.3 TopBar
+
+- Live / Playback / Settings 탭
+- 날짜 / 시간
+- 쓰러짐 감지 경고 버튼
+- 테마 토글
+- 사용자 메뉴
+- 닫기 버튼
+
+### 3.4 Sidebar
+
+모드별로 다른 사이드바를 사용합니다.
+
+- Live: 채널 목록 + 로봇 모드 + 즉시 정지
+- Playback: 카테고리 목록
+- Settings: Camera Settings / Robot Car Settings 섹션 선택
+
+### 3.5 LiveView
+
+- CCTV 4분할 + RC Car + SLAM 맵
+- 목표 지정
+- 패트롤 포인트 입력
+- 경로 오버레이 표시
+
+### 3.6 FullScreenView
+
+- Live / Playback 공용 전체화면 뷰
+- 빠른 모드 전환
+- 목표 지정 및 제어 연동
+- 즉시 정지 버튼 제공
+
+### 3.7 SettingsWidget
+
+- 스크롤 가능한 설정 화면
+- 두 개의 섹션 페이지를 스택으로 관리
+- 저장 시 즉시 반영
+
+---
+
+## 4. 디렉터리 구조
 
 ```text
 FE/
@@ -99,6 +221,7 @@ FE/
 
   assets/
     fonts/
+    icons/
 
   style/
     theme_dark.qss
@@ -149,293 +272,267 @@ FE/
     jsonutils.*
 ```
 
-### 3.4 공용 유틸
-
-- [applicationinitializer.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Utils/applicationinitializer.cpp)
-  - GStreamer/OpenCV PATH 설정
-  - Pretendard 폰트 로드
-  - `env/server.crt` 등록
-- [configmanager.h](/d:/work/QT_prac/VEDA_QT_1/FE/Utils/configmanager.h)
-  - `settings.ini` 읽기/쓰기
-  - 기본값 보장
-  - 파생 URL 계산
-- [channelcatalog.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Utils/channelcatalog.cpp)
-  - 채널 번호 / 카테고리 / 녹화 채널 ID 매핑
-- [goaloverlaycontroller.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Utils/goaloverlaycontroller.cpp)
-  - Goal 오버레이 정규화 좌표 / 재투영 처리
-- [jsonutils.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Utils/jsonutils.cpp)
-  - odom / nav feedback / nav status 파싱 보조
-
 ---
 
-## 4. 화면 구성
-
-### 4.1 LoginDialog
-
-- 로그인 / 회원가입 / 비밀번호 재설정 UI를 하나의 다이얼로그 안에서 스택 페이지로 전환합니다.
-- 별도 `signupdialog.*` 파일은 현재 사용하지 않습니다.
-- 앱 이름은 `누비고`로 통일되어 있습니다.
-
-관련 파일:
-
-- [logindialog.h](/d:/work/QT_prac/VEDA_QT_1/FE/Components/logindialog.h)
-- [logindialog.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Components/logindialog.cpp)
-
-### 4.2 LiveView
-
-- CCTV 4분할 + RC Car + SLAM 뷰를 관리합니다.
-- 각 카드에서 전체화면, 녹화, Goal Overlay 조작을 연결합니다.
-
-관련 파일:
-
-- [liveview.h](/d:/work/QT_prac/VEDA_QT_1/FE/Views/liveview.h)
-- [liveview.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Views/liveview.cpp)
-- [videocard.h](/d:/work/QT_prac/VEDA_QT_1/FE/Components/videocard.h)
-- [videocard.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Components/videocard.cpp)
-
-### 4.3 FullScreenView
-
-- 라이브 / 녹화 재생 공용 전체화면 화면입니다.
-- 줌, 박스 줌, 리셋, 컨트롤 모드, Goal 드래그, 긴급 정지를 처리합니다.
-- 전체화면 우측 퀵 패널에서도 로봇 모드 전환과 즉시정지가 가능합니다.
-
-관련 파일:
-
-- [fullscreenview.h](/d:/work/QT_prac/VEDA_QT_1/FE/Views/fullscreenview.h)
-- [fullscreenview.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Views/fullscreenview.cpp)
-- [full_underbar.h](/d:/work/QT_prac/VEDA_QT_1/FE/Components/full_underbar.h)
-- [full_underbar.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Components/full_underbar.cpp)
-
-### 4.4 PlaybackView
-
-- 녹화 목록 표시
-- 카테고리 필터
-- 다운로드 진행률 반영
-- 더블 클릭 재생
-- 로컬 파일 추가
-
-관련 파일:
-
-- [playbackview.h](/d:/work/QT_prac/VEDA_QT_1/FE/Views/playbackview.h)
-- [playbackview.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Views/playbackview.cpp)
-
-### 4.5 SettingsWidget
-
-카메라와 로봇 설정을 2개 섹션으로 분리해서 관리합니다.
-
-- Camera Settings
-  - Camera IP
-  - RTSP Port
-  - Use Secure RTSPS
-  - Use Custom CCTV URL
-  - Custom CCTV ID / Password
-- Robot Car Settings
-  - ROS2 Bridge Host
-  - Enable Manual Control
-  - Linear X
-  - Angular Z
-  - Auto Speed
-
-관련 파일:
-
-- [settingswidget.h](/d:/work/QT_prac/VEDA_QT_1/FE/Components/settingswidget.h)
-- [settingswidget.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Components/settingswidget.cpp)
-
----
-
-## 5. 네트워크 / 스트림 규칙
+## 5. 네트워크 연동
 
 ### 5.1 로그인 서버
 
-`AuthManager`가 로그인/회원가입/비밀번호 재설정/세션 갱신을 담당합니다.
+`AuthManager`가 HTTP API를 사용합니다.
 
-정규화 규칙:
+- 기본 입력 예시: `192.168.0.110`
+- 실제 기본 요청 기준: `http://192.168.0.110:8080`
 
-- 스킴이 없으면 `http://`를 자동으로 붙입니다.
-- 포트가 없으면 기본 `8080`을 사용합니다.
-- 마지막 `/`는 제거합니다.
+주요 기능:
 
-예:
+- 로그인
+- 회원가입
+- 비밀번호 재설정
+- 현재 사용자 프로필 조회
+- 토큰 갱신
 
-- 입력: `192.168.0.110`
-- 실제 요청 기준: `http://192.168.0.110:8080`
+특징:
 
-관련 파일:
-
-- [authmanager.h](/d:/work/QT_prac/VEDA_QT_1/FE/Network/authmanager.h)
-- [authmanager.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/authmanager.cpp)
+- 서버 IP만 입력해도 됩니다.
+- 포트를 직접 넣지 않으면 기본 `8080`을 사용합니다.
+- `QNetworkAccessManager` 기반이며 타임아웃은 5초입니다.
 
 ### 5.2 Camera Control WebSocket
 
-카메라 제어 서버 주소:
+기본 주소:
 
 - `ws://<camera-ip>:9000`
 
-주요 요청:
+현재 전송하는 메시지:
 
-- `CALIBRATION_CLICK`
-- `RECORD_CONTROL`
-- `GET_RECORDINGS`
-- `DOWNLOAD_FILE`
+#### `CALIBRATION_CLICK`
 
-주요 응답:
+```json
+{
+  "type": "CALIBRATION_CLICK",
+  "payload": {
+    "x1": 0.1,
+    "y1": 0.2,
+    "x2": 0.3,
+    "y2": 0.4
+  }
+}
+```
 
-- 녹화 목록
-- 다운로드 바이너리
-- 다운로드 진행률
-- SLAM mapping error
+#### `RECORD_CONTROL`
 
-관련 파일:
+```json
+{
+  "type": "RECORD_CONTROL",
+  "payload": {
+    "action": "start",
+    "channel_id": 1
+  },
+  "timestamp": 1234567890.123
+}
+```
 
-- [cameracontrolclient.h](/d:/work/QT_prac/VEDA_QT_1/FE/Network/cameracontrolclient.h)
-- [cameracontrolclient.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/cameracontrolclient.cpp)
+#### `GET_RECORDINGS`
+
+```json
+{
+  "type": "GET_RECORDINGS",
+  "timestamp": 1234567890.123
+}
+```
+
+#### `DOWNLOAD_FILE`
+
+```json
+{
+  "type": "DOWNLOAD_FILE",
+  "payload": {
+    "filename": "example.mp4"
+  },
+  "timestamp": 1234567890.123
+}
+```
 
 ### 5.3 ROS2 rosbridge WebSocket
 
-로봇 제어 서버 주소:
+기본 주소:
 
 - `ws://<robot-host>:9090`
 
-주요 송신:
+현재 UI가 실제로 보내는 메시지:
 
-- `cmd_vel`
-- `mode_control`
-- `nav queue`
-- `goal pose`
-- `nav cancel`
-- `camera tilt`
+#### `cmd_vel`
 
-주요 수신:
+```json
+{
+  "type": "cmd_vel",
+  "timestamp": 1234567890.123,
+  "data": {
+    "linear_x": 0.2,
+    "linear_y": 0.0,
+    "angular_z": 0.1
+  }
+}
+```
 
-- map
-- odom
-- path
-- nav status
-- nav feedback
+#### `mode_control`
 
-관련 파일:
+```json
+{
+  "type": "mode_control",
+  "timestamp": 1234567890.123,
+  "data": {
+    "mode": "manual"
+  }
+}
+```
 
-- [rosbridgeclient.h](/d:/work/QT_prac/VEDA_QT_1/FE/Network/rosbridgeclient.h)
-- [rosbridgeclient.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/rosbridgeclient.cpp)
+또는
 
-### 5.4 CCTV 스트림 URL 규칙
+```json
+{
+  "type": "mode_control",
+  "timestamp": 1234567890.123,
+  "data": {
+    "mode": "auto"
+  }
+}
+```
 
-`StreamManager`가 CCTV 스트림 주소를 계산합니다.
+#### `tracking_enable`
 
-기본 모드:
+```json
+{
+  "type": "tracking_enable",
+  "data": {
+    "enable": true
+  }
+}
+```
+
+#### `nav_command / goto`
+
+```json
+{
+  "type": "nav_command",
+  "timestamp": 1234567890.123,
+  "data": {
+    "cmd": "goto",
+    "x": 1.0,
+    "y": 0.5,
+    "yaw": 1.57
+  }
+}
+```
+
+#### `nav_command / queue`
+
+```json
+{
+  "type": "nav_command",
+  "data": {
+    "cmd": "queue",
+    "waypoints": [
+      { "x": 1.0, "y": 0.5, "yaw": 0.0 },
+      { "x": 2.0, "y": 1.0, "yaw": 1.57 },
+      { "x": 3.0, "y": 0.5, "yaw": 3.14 }
+    ]
+  }
+}
+```
+
+#### `nav_command / set_speed`
+
+```json
+{
+  "type": "nav_command",
+  "data": {
+    "cmd": "set_speed",
+    "speed": 0.15
+  }
+}
+```
+
+#### `nav_command / cancel`
+
+```json
+{
+  "type": "nav_command",
+  "timestamp": 1234567890.123,
+  "data": {
+    "cmd": "cancel"
+  }
+}
+```
+
+#### `camera_tilt`
+
+```json
+{
+  "type": "camera_tilt",
+  "timestamp": 1234567890.123,
+  "data": {
+    "angle": 12.0
+  }
+}
+```
+
+현재 수신 처리하는 대표 메시지:
+
+- `map`
+- `odom`
+- `path`
+- `nav_status`
+- `nav_feedback`
+- `fall_alert`
+
+`fall_alert` 예시:
+
+```json
+{
+  "type": "fall_alert",
+  "timestamp": 1743000000.0,
+  "data": {
+    "detected": true,
+    "angle_deg": 72.3,
+    "timestamp": 1743000000.0
+  }
+}
+```
+
+수신 시 동작:
+
+- 상단 경고 버튼에 로그 추가
+- 경고 팝업에 누적 기록 표시
+- `detected: false`면 새 경고는 추가하지 않음
+
+### 5.4 RTSP / RTSPS 규칙
+
+`StreamManager`와 `ConfigManager`가 스트림 URL을 계산합니다.
+
+기본 CCTV:
 
 - Low: `rtsp://<ip>:<port>/ch1` ~ `ch4`
 - High: `rtsp://<ip>:<port>/ch1_fhd` ~ `ch4_fhd`
 
-RTSPS 모드:
+RTSPS:
 
-- 스킴을 `rtsps://`로 변경합니다.
-- 포트는 설정값과 관계없이 `8322`를 사용합니다.
+- `Use Secure RTSPS`가 켜지면 `rtsps://`를 사용합니다.
+- 이때 포트는 `8322`를 사용합니다.
 
-Custom CCTV 모드:
+Custom CCTV:
 
 - 형식: `rtsp(s)://<id>:<password>@<ip>:<port>/<index>/H.264/media.smp`
 - `<index>`는 `0 ~ 3`
-- ID / 비밀번호는 percent-encoding 후 삽입됩니다.
 
-관련 파일:
+RC Car:
 
-- [streammanager.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/streammanager.cpp)
-
-### 5.5 RC Car 스트림 URL
-
-`ConfigManager`에서 로봇 호스트를 기준으로 파생합니다.
-
-- 라이브: `rtsp://<robot-host>:9554/camera`
-- ISP/전체화면: `rtsp://<robot-host>:9554/camera_isp`
-
-### 5.6 Calibration Click 대상 서버
-
-캘리브레이션 클릭은 고정 IP를 사용하지 않습니다.  
-현재 설정된 `Camera IP`를 그대로 사용해서 다음 주소로 전송합니다.
-
-- `ws://<camera-ip>:9000`
+- 기본: `rtsp://<robot-host>:9554/camera`
+- ISP: `rtsp://<robot-host>:9554/camera_isp`
 
 ---
 
-## 6. 채널 / 녹화 매핑
-
-`ChannelCatalog` 기준 매핑입니다.
-
-### 6.1 라이브 / 전체화면 녹화 채널
-
-| View Index | 이름 | Live Record ID | FullScreen Record ID |
-|---|---|---:|---:|
-| 0 | Channel 01 - Camera | 1 | 5 |
-| 1 | Channel 02 - Camera | 2 | 6 |
-| 2 | Channel 03 - Camera | 3 | 7 |
-| 3 | Channel 04 - Camera | 4 | 8 |
-| 4 | RC Car - Front Cam | 9 | 9 |
-
-### 6.2 Playback 카테고리
-
-| Category ID | 이름 |
-|---|---|
-| 0 | All Recordings |
-| 1 | CCTV 1 (Low) |
-| 2 | CCTV 2 (Low) |
-| 3 | CCTV 3 (Low) |
-| 4 | CCTV 4 (Low) |
-| 5 | CCTV 1 (High) |
-| 6 | CCTV 2 (High) |
-| 7 | CCTV 3 (High) |
-| 8 | CCTV 4 (High) |
-| 9 | RC Car Camera |
-| 10 | Lidar Map |
-
----
-
-## 7. 녹화 / 다운로드 / 재생 / FRUC 흐름
-
-### 7.1 녹화
-
-1. 라이브 카드 또는 전체화면에서 녹화 시작
-2. `CameraControlClient::sendRecordCommand()`
-3. 녹화 완료 응답 수신
-4. 녹화 목록 새로고침
-
-### 7.2 다운로드
-
-1. 녹화 URL 또는 파일명 확보
-2. 로컬 Downloads 폴더 존재 여부 확인
-3. 없으면 `DOWNLOAD_FILE` 요청
-4. 바이너리 수신 후 파일 저장
-5. Playback 목록에 반영
-
-### 7.3 재생
-
-1. Playback 항목 더블 클릭
-2. 로컬 파일이 있으면 즉시 재생
-3. 없으면 다운로드 후 재생
-
-### 7.4 FRUC
-
-OpenCV가 활성화된 빌드에서만 동작합니다.
-
-출력 파일:
-
-- `*_FRUC_FAST.mp4`
-- `*_FRUC_HQ.mp4`
-
-조건:
-
-- 입력 파일이 MP4여야 함
-- 이미 FRUC 파생 파일이면 제외
-- 동일 결과 파일이 이미 존재하면 다시 만들지 않음
-
-종료 안정성:
-
-- FRUC는 백그라운드 `QThread`로 동작합니다.
-- 현재 코드는 앱 종료 시 실행 중인 FRUC 작업에 중단 요청을 보내고 정리하도록 되어 있습니다.
-
----
-
-## 8. settings.ini
+## 6. 설정 파일
 
 설정 파일 위치:
 
@@ -447,82 +544,80 @@ OpenCV가 활성화된 빌드에서만 동작합니다.
 |---|---|---|
 | `Network/CameraIP` | `192.168.0.39` | CCTV IP |
 | `Network/CameraPort` | `8554` | 기본 RTSP 포트 |
-| `Network/UseCustomCCTV` | `false` | Custom CCTV URL 사용 여부 |
+| `Network/UseCustomCCTV` | `false` | Custom CCTV 사용 여부 |
 | `Network/CustomCCTVUsername` | `admin` | Custom CCTV ID |
 | `Network/CustomCCTVPassword` | `5hanwha!` | Custom CCTV 비밀번호 |
 | `Network/UseRtsps` | `false` | RTSPS 사용 여부 |
-| `Network/RobotIP` | `192.168.0.237` | 로봇 호스트 또는 URL 입력값 |
-| `Auth/LoginServerUrl` | `192.168.0.110` | 로그인 서버 입력값 |
+| `Network/RobotIP` | `192.168.0.237` | 로봇 호스트/IP |
+| `Auth/LoginServerUrl` | `192.168.0.110` | 로그인 서버 호스트/IP |
 | `Auth/ActiveUserId` | empty | 현재 로그인 사용자 ID |
 | `Auth/ActiveUserEmail` | empty | 현재 로그인 사용자 이메일 |
 | `Auth/ActiveAuthMode` | empty | 현재 인증 모드 |
-| `Auth/RememberUser` | `false` | Remember device 여부 |
-| `Auth/RememberedUserId` | empty | 저장된 사용자 ID |
-| `UI/DarkTheme` | `true` | 다크 테마 사용 여부 |
+| `Auth/RememberUser` | `false` | 로그인 ID 기억 여부 |
+| `Auth/RememberedUserId` | empty | 기억된 로그인 ID |
+| `UI/DarkTheme` | `true` | 다크 테마 여부 |
 | `Control/ManualControl` | `false` | WASD 수동 제어 사용 여부 |
 | `Control/LinearX` | `0.30` | 수동 선속도 |
 | `Control/AngularZ` | `0.50` | 수동 각속도 |
-| `Navigation/AutoSpeed` | `0.15` | 자율주행 속도 |
+| `Navigation/AutoSpeed` | `0.15` | 자동/자율 주행 속도 |
 
 파생 규칙:
 
-- `Network/RobotIP`에 호스트만 넣어도 됩니다.
-- 내부에서 자동으로 다음 주소를 파생합니다.
+- `Network/RobotIP`에는 호스트/IP만 넣는 것을 권장합니다.
+- 앱이 내부적으로 다음 주소를 계산합니다.
   - `ws://<robot-host>:9090`
   - `rtsp://<robot-host>:9554/camera`
   - `rtsp://<robot-host>:9554/camera_isp`
 
 ---
 
-## 9. 빌드
+## 7. 빌드
 
-### 9.1 요구 사항
+### 7.1 요구 사항
 
 - Windows
-- CMake 3.16+
-- Qt 6 Widgets / WebSockets / Network
-- GStreamer 1.0
-- OpenCV 선택 사항
 - Visual Studio 2022 또는 호환 MSVC 툴체인
+- CMake 3.16+
+- Qt 6 Widgets / Network / WebSockets
+- GStreamer 1.0
+- OpenCV (선택, FRUC용)
 
-### 9.2 GStreamer 경로
+### 7.2 GStreamer 탐색 규칙
 
-현재 CMake는 다음 순서로 GStreamer를 찾습니다.
+`CMakeLists.txt`는 다음 순서로 GStreamer를 찾습니다.
 
-- `GST_ROOT` CMake cache 값
+- `GST_ROOT` CMake 캐시
 - `GSTREAMER_1_0_ROOT_MSVC_X86_64`
 - `GSTREAMER_ROOT_X86_64`
-- 기본 후보 경로
+- 기본 경로
   - `C:/Program Files/gstreamer/1.0/msvc_x86_64`
   - `C:/gstreamer/1.0/msvc_x86_64`
   - `D:/gstreamer/1.0/msvc_x86_64`
 
-GStreamer를 찾지 못하면 configure 단계에서 실패합니다.
+찾지 못하면 configure 단계에서 실패합니다.
 
-### 9.3 OpenCV 경로
+### 7.3 OpenCV
 
 OpenCV는 선택 사항입니다.
+
+- `VEDA_ENABLE_FRUC=ON`이고 OpenCV를 찾으면 FRUC 활성화
+- 찾지 못하면 앱은 빌드되지만 FRUC는 비활성화
+
+사용 가능한 변수:
 
 - `OPENCV_ROOT`
 - `OpenCV_DIR`
 
-를 지정할 수 있습니다.
+### 7.4 예시 빌드
 
-찾지 못하면:
-
-- 앱은 빌드 가능
-- FRUC만 비활성화
-
-### 9.4 예시 빌드
-
-Visual Studio 2022 기준:
+Qt 경로가 이미 잡혀 있다는 가정:
 
 ```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH="C:/Qt/6.10.2/msvc2022_64"
 cmake --build build --config Debug
 ```
 
-OpenCV 없이 FRUC만 끄고 빌드:
+FRUC 없이 빌드:
 
 ```powershell
 cmake -S . -B build -G "Visual Studio 17 2022" -DCMAKE_PREFIX_PATH="C:/Qt/6.10.2/msvc2022_64" -DVEDA_ENABLE_FRUC=OFF
@@ -535,158 +630,179 @@ cmake --build build --config Debug
 build/Debug/VEDA_QT_1.exe
 ```
 
+참고:
+
+- 개발 환경에 따라 `cmake`가 PATH에 없을 수 있습니다.
+- 이 경우 Visual Studio가 설치한 `cmake.exe`를 직접 사용하거나 `deploy/package_release.ps1`처럼 `vswhere`로 경로를 찾을 수 있습니다.
+
+### 7.5 링크 관련 참고
+
+MSVC `Debug` / `RelWithDebInfo`에서는 `/INCREMENTAL:NO`를 사용하도록 설정되어 있습니다.  
+증분 링크 산출물 꼬임으로 `LNK1163`가 보이면 다음을 먼저 확인하세요.
+
+- 최신 CMake 재구성 여부
+- `Clean` 또는 `Rebuild` 실행 여부
+
 ---
 
-## 10. 실행 / 배포
+## 8. 실행과 배포
 
-### 10.1 개발 PC에서 실행
+### 8.1 개발 PC에서 실행
 
-개발 PC에서는 Qt / GStreamer 런타임이 이미 PATH에 잡혀 있으면 `build/Debug/VEDA_QT_1.exe`를 바로 실행할 수 있습니다.
+개발 PC에서 Qt / GStreamer 런타임이 준비되어 있으면:
 
-### 10.2 다른 PC에서 실행
+```text
+build/Debug/VEDA_QT_1.exe
+```
 
-`build/Debug` 폴더의 exe만 복사하면 Qt DLL / plugin / GStreamer DLL 부족으로 실행이 실패할 수 있습니다.  
-다른 PC로 옮길 때는 릴리스 패키징 스크립트를 사용하는 것을 권장합니다.
+를 직접 실행할 수 있습니다.
 
-### 10.3 릴리스 패키징
+### 8.2 다른 PC로 전달할 때
 
-[package_release.ps1](/d:/work/QT_prac/VEDA_QT_1/FE/deploy/package_release.ps1)는 다음을 자동으로 수행합니다.
+단순히 `exe`만 복사하면 Qt DLL / 플러그인 / GStreamer 런타임이 없어 실행되지 않을 수 있습니다.  
+배포용 패키지를 만드는 것을 권장합니다.
+
+### 8.3 배포 스크립트
+
+`deploy/package_release.ps1`는 다음 작업을 자동 수행합니다.
 
 - Release 빌드
 - `windeployqt` 실행
-- GStreamer DLL 복사
-- `gstreamer/lib/gstreamer-1.0`
-- `gstreamer/libexec/gstreamer-1.0`
+- GStreamer 런타임 복사
 - `style/` 폴더 복사
-- zip 생성
+- `README_RUN.txt` 생성
+- ZIP 패키지 생성
 
-예:
+사용 예시:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\deploy\package_release.ps1 -BuildDir .\build -Config Release
 ```
 
-결과물:
+생성 결과:
 
 - `deploy/VEDA_QT_1_release_x64/`
 - `deploy/VEDA_QT_1_release_x64.zip`
 
 ---
 
-## 11. 리소스
+## 9. 자주 보는 파일
 
-`resources.qrc`에 포함된 항목:
+처음 읽기 좋은 순서:
 
-- `style/theme_dark.qss`
-- `style/theme_light.qss`
-- `style/icons/*.svg`
-- `assets/fonts/Pretendard-*.otf`
-- `env/server.crt`
-
-즉, 테마와 폰트의 핵심 리소스는 exe 내부 리소스로도 접근 가능합니다.
+1. `main.cpp`
+2. `mainwindow.h`
+3. `mainwindow_ui.cpp`
+4. `mainwindow.cpp`
+5. `mainwindow_session.cpp`
+6. `Components/logindialog.cpp`
+7. `Components/sidebar.cpp`
+8. `Components/settingswidget.cpp`
+9. `Components/topbar.cpp`
+10. `Views/liveview.cpp`
+11. `Views/fullscreenview.cpp`
+12. `Views/playbackview.cpp`
+13. `Network/authmanager.cpp`
+14. `Network/streammanager.cpp`
+15. `Network/rosbridgeclient.cpp`
+16. `Network/cameracontrolclient.cpp`
 
 ---
 
-## 12. 현재 코드에서 중요한 포인트
+## 10. 트러블슈팅
 
-- 앱 이름은 `누비고`로 통일되어 있습니다.
-- 회원가입은 `LoginDialog` 내부 페이지 전환 방식입니다.
-- Calibration 대상 서버는 고정 IP가 아니라 현재 `Camera IP` 설정값을 사용합니다.
-- 즉시정지 버튼은 현재 모든 로봇 모드에서 활성화됩니다.
-- FRUC 스레드는 종료 시 중단 요청 후 정리됩니다.
+### 10.1 `cmake` 명령을 찾지 못함
 
----
+증상:
 
-## 13. 트러블슈팅
+- PowerShell에서 `cmake`가 없다고 나옴
 
-### 13.1 GStreamer를 찾지 못함
+대응:
 
-확인할 것:
+- Visual Studio CMake 경로를 직접 사용
+- 또는 Visual Studio Developer PowerShell 사용
 
-- `GST_ROOT` 또는 `GSTREAMER_*` 환경변수
-- GStreamer 설치 경로
-- `bin`, `lib`, `libexec` 구조가 정상인지
+예:
 
-### 13.2 OpenCV를 찾지 못함
+```powershell
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build --config Debug
+```
 
-확인할 것:
+### 10.2 GStreamer를 찾지 못함
+
+확인 항목:
+
+- `GST_ROOT`
+- `GSTREAMER_1_0_ROOT_MSVC_X86_64`
+- 실제 설치 경로 존재 여부
+
+### 10.3 OpenCV를 찾지 못함
+
+확인 항목:
 
 - `OPENCV_ROOT`
 - `OpenCV_DIR`
 
-OpenCV가 없어도 앱은 빌드되지만 FRUC는 비활성화됩니다.
+영향:
 
-### 13.3 다른 PC에서 exe가 실행되지 않음
+- 앱 자체 빌드는 가능
+- FRUC만 비활성화
 
-가장 흔한 원인:
+### 10.4 다른 PC에서 실행되지 않음
+
+주요 원인:
 
 - Qt DLL 누락
-- Qt plugin 누락
-- GStreamer DLL / plugin 누락
+- Qt 플러그인 누락
+- GStreamer DLL / 플러그인 누락
 
 해결:
 
 - `deploy/package_release.ps1`로 패키징
-- 또는 `windeployqt` + GStreamer runtime 수동 복사
 
-### 13.4 RTSPS가 재생되지 않음
+### 10.5 ROS 연결은 되는데 쓰러짐 감지 로그가 안 쌓임
 
-확인할 것:
+확인 항목:
 
-- `Use Secure RTSPS` 활성화 여부
-- 실제 포트가 `8322`인지
-- `env/server.crt`와 서버 인증서 일치 여부
-- 로그인 세션이 유효한지
+- 실제 수신 WebSocket이 `fall_alert` 메시지를 받는지
+- 메시지에 `detected`, `angle_deg`, `timestamp`가 포함되는지
+- 상단 경고 버튼 로그에 기록이 추가되는지
 
-### 13.5 Custom CCTV가 연결되지 않음
+참고:
 
-확인할 것:
+- 현재 클라이언트는 텍스트 프레임 / 바이너리 프레임 / 중첩된 `data` / `payload` / `msg` 형태도 폭넓게 파싱합니다.
 
-- `Use Custom CCTV URL` 활성화 여부
-- ID / 비밀번호 오입력 여부
-- 장비가 `/<index>/H.264/media.smp` 규칙을 따르는지
-- 계정 정보에 특수문자가 포함된 경우 percent-encoding이 필요한지
+### 10.6 Patrol 경로가 안 보내짐
 
-### 13.6 종료 시 `QThread: Destroyed while thread is still running`
+확인 항목:
 
-최근 코드에서는 FRUC 작업 종료 경로를 정리했습니다.  
-그래도 같은 오류가 보이면:
+- `Patrol Mode`인지
+- `Add Point`로 최소 1개 이상 포인트를 찍었는지
+- `설정 완료`를 눌렀는지
 
-- 구버전 exe를 실행 중인지 확인
-- 종료 시 FRUC 작업이 오래 걸리는지 확인
-- 최신 빌드로 다시 확인
+### 10.7 즉시 정지 후 패트롤 점이나 경로가 남아 있음
 
----
+현재 의도된 동작:
 
-## 14. 빠른 파일 가이드
+- 예상 경로 삭제
+- 패트롤 점/선 삭제
+- `Add Point` 상태 해제
+- `nav cancel` 전송
+- `cmd_vel 0` 전송
 
-처음 읽기 좋은 순서:
-
-1. [main.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/main.cpp)
-2. [mainwindow.h](/d:/work/QT_prac/VEDA_QT_1/FE/mainwindow.h)
-3. [mainwindow_ui.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/mainwindow_ui.cpp)
-4. [mainwindow.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/mainwindow.cpp)
-5. [mainwindow_session.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/mainwindow_session.cpp)
-6. [authmanager.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/authmanager.cpp)
-7. [streammanager.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/streammanager.cpp)
-8. [rosbridgeclient.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/rosbridgeclient.cpp)
-9. [cameracontrolclient.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Network/cameracontrolclient.cpp)
-10. [liveview.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Views/liveview.cpp)
-11. [fullscreenview.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Views/fullscreenview.cpp)
-12. [playbackview.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Views/playbackview.cpp)
-13. [settingswidget.cpp](/d:/work/QT_prac/VEDA_QT_1/FE/Components/settingswidget.cpp)
+이와 다르게 보이면 최신 빌드인지 먼저 확인하세요.
 
 ---
 
-## 15. 요약
+## 11. 요약
 
-이 프론트엔드는 다음을 하나의 Qt 앱 안에 통합합니다.
+이 프론트엔드는 다음을 하나의 Qt 앱으로 묶습니다.
 
-- 로그인과 세션 관리
-- CCTV / RC Car 라이브 모니터링
-- 전체화면 조작과 Goal Overlay
-- ROS2 기반 로봇 제어
+- 인증과 세션 관리
+- CCTV / RC Car 실시간 모니터링
+- Tracking / Control / Patrol 포함 로봇 제어
 - 녹화 / 다운로드 / 재생 / FRUC
-- 설정과 테마 관리
+- 카메라 / 로봇 설정 관리
+- 쓰러짐 감지 로그 확인
 
-현재 구조는 `MainWindow + Views + Components + Video + Network + Utils` 형태로 정리되어 있으며, 문서와 코드가 최대한 같은 기준을 보도록 갱신해두었습니다.
+현재 구조는 `MainWindow + Views + Components + Network + Video + Utils`로 정리되어 있으며, README도 그 구조와 현재 동작을 기준으로 유지합니다.

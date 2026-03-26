@@ -8,6 +8,7 @@
 #include <QMouseEvent>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPixmap>
 #include <QScreen>
 #include <QSizePolicy>
 #include <QStackedWidget>
@@ -159,7 +160,23 @@ LoginDialog::LoginDialog(QWidget *parent)
     m_cardSubtitleLabel->setWordWrap(true);
     m_cardSubtitleLabel->setVisible(false);
 
-    cardLayout->addWidget(m_cardTitleLabel);
+    auto *titleRow = new QWidget(m_card);
+    titleRow->setObjectName("LoginTitleRow");
+    auto *titleRowLayout = new QHBoxLayout(titleRow);
+    titleRowLayout->setContentsMargins(24, 0, 0, 0);
+    titleRowLayout->setSpacing(10);
+
+    auto *brandIconLabel = new QLabel(titleRow);
+    brandIconLabel->setObjectName("LoginBrandIcon");
+    brandIconLabel->setFixedSize(42, 42);
+    brandIconLabel->setAlignment(Qt::AlignCenter);
+    const QPixmap brandIcon(QStringLiteral(":/icons/assets/icons/nubigo_robot.svg"));
+    brandIconLabel->setPixmap(brandIcon.scaled(38, 38, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+
+    titleRowLayout->addWidget(brandIconLabel, 0, Qt::AlignVCenter);
+    titleRowLayout->addWidget(m_cardTitleLabel, 1, Qt::AlignVCenter);
+
+    cardLayout->addWidget(titleRow);
     cardLayout->addWidget(m_cardSubtitleLabel);
 
     m_serverFieldContainer = new QWidget(m_card);
