@@ -31,8 +31,9 @@ ROSBridge::ROSBridge()
     cmd_vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
     mode_pub_    = this->create_publisher<std_msgs::msg::String>("/mode_control", 10);
     estop_pub_   = this->create_publisher<std_msgs::msg::Bool>("/emergency_stop", 10);
-    tracking_enable_pub_ = this->create_publisher<std_msgs::msg::Bool>("/tracking/enable", 10);
-    tilt_pub_    = this->create_publisher<std_msgs::msg::Float32>("/camera/tilt", 10);
+    tracking_enable_pub_       = this->create_publisher<std_msgs::msg::Bool>("/tracking/enable", 10);
+    tilt_pub_                  = this->create_publisher<std_msgs::msg::Float32>("/camera/tilt", 10);
+    fall_detection_enable_pub_ = this->create_publisher<std_msgs::msg::Bool>("/fall_detection/enable", 10);
 
     // ── Subscribers (ROS2 → Client) ───────────────────────────────────────
     // /odom: 항상 구독 (속도 캐시 + odom 소스 + topic 모드)
@@ -59,6 +60,14 @@ ROSBridge::ROSBridge()
     tracking_status_sub_ = this->create_subscription<std_msgs::msg::String>(
         "/tracking/status", 10,
         std::bind(&ROSBridge::trackingStatusCallback, this, std::placeholders::_1));
+
+    fall_alert_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/fall_detection/alert", 10,
+        std::bind(&ROSBridge::fallAlertCallback, this, std::placeholders::_1));
+
+    fall_status_sub_ = this->create_subscription<std_msgs::msg::String>(
+        "/fall_detection/status", 10,
+        std::bind(&ROSBridge::fallStatusCallback, this, std::placeholders::_1));
 
     // ── odom 타이머 (timer 모드) ──────────────────────────────────────────
     if (odom_publish_mode_ == "timer") {
@@ -203,6 +212,11 @@ void ROSBridge::processClientMessage(const Json::Value& message)
         msg.data = data.get("enable", false).asBool();
         tracking_enable_pub_->publish(msg);
         RCLCPP_INFO(this->get_logger(), "Tracking %s", msg.data ? "enabled" : "disabled");
+    } else if (type == "fall_detection_enable") {
+        auto msg = std_msgs::msg::Bool();
+        msg.data = data.get("enable", false).asBool();
+        fall_detection_enable_pub_->publish(msg);
+        RCLCPP_INFO(this->get_logger(), "Fall detection %s", msg.data ? "enabled" : "disabled");
     } else if (type == "camera_tilt") {
         auto msg = std_msgs::msg::Float32();
         msg.data = static_cast<float>(data.get("angle", 0.0).asDouble());
@@ -366,4 +380,41 @@ Json::Value ROSBridge::createTimestampedMessage(const std::string& type)
     msg["type"]      = type;
     msg["timestamp"] = this->now().seconds();
     return msg;
+}
+
+void ROSBridge::fallAlertCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    if (!broadcast_callback_) return;
+
+    Json::CharReaderBuilder reader;
+    Json::Value alert_data;
+    std::string errors;
+    std::istringstream stream(msg->data);
+
+    if (Json::parseFromStream(reader, stream, &alert_data, &errors)) {
+        Json::Value ws_msg = createTimestampedMessage("fall_alert");
+        ws_msg["data"] = alert_data;
+        broadcast_callback_(ws_msg);
+        RCLCPP_WARN(this->get_logger(), "Fall alert broadcasted to clients");
+    } else {
+        RCLCPP_WARN(this->get_logger(), "fall_alert JSON parse error: %s", errors.c_str());
+    }
+}
+
+void ROSBridge::fallStatusCallback(const std_msgs::msg::String::SharedPtr msg)
+{
+    if (!broadcast_callback_) return;
+
+    Json::CharReaderBuilder reader;
+    Json::Value status_data;
+    std::string errors;
+    std::istringstream stream(msg->data);
+
+    if (Json::parseFromStream(reader, stream, &status_data, &errors)) {
+        Json::Value ws_msg = createTimestampedMessage("fall_detection_status");
+        ws_msg["data"] = status_data;
+        broadcast_callback_(ws_msg);
+    } else {
+        RCLCPP_WARN(this->get_logger(), "fall_status JSON parse error: %s", errors.c_str());
+    }
 }

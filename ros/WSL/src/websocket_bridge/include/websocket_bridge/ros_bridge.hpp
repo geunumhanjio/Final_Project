@@ -42,6 +42,8 @@ private:
     void navStatusCallback(const std_msgs::msg::String::SharedPtr msg);
     void navFeedbackCallback(const std_msgs::msg::String::SharedPtr msg);
     void trackingStatusCallback(const std_msgs::msg::String::SharedPtr msg);
+    void fallAlertCallback(const std_msgs::msg::String::SharedPtr msg);
+    void fallStatusCallback(const std_msgs::msg::String::SharedPtr msg);
 
     // odom 타이머 콜백 (odom_publish_mode == "timer")
     void odomTimerCallback();
@@ -58,6 +60,7 @@ private:
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_pub_;
     rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr tracking_enable_pub_;
     rclcpp::Publisher<std_msgs::msg::Float32>::SharedPtr tilt_pub_;
+    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr fall_detection_enable_pub_;
 
     // Subscribers (ROS2 → Client)
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
@@ -66,6 +69,8 @@ private:
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_status_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr nav_feedback_sub_;
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr tracking_status_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr fall_alert_sub_;
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr fall_status_sub_;
 
     // WebSocket 브로드캐스트 콜백
     BroadcastCallback broadcast_callback_;
