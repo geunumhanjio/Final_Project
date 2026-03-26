@@ -1,6 +1,7 @@
 #include "full_underbar.h"
 
 #include <QDateTime>
+#include <QFont>
 #include <QFrame>
 #include <QPainter>
 #include <QStyleOption>
@@ -44,9 +45,15 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     pbLayout->setContentsMargins(0, 0, 0, 0);
     pbLayout->setSpacing(8);
 
-    btnPlayPause = new QPushButton("Play", playbackContainer);
+    btnPlayPause = new QPushButton(playbackContainer);
     btnPlayPause->setFixedSize(52, 36);
     btnPlayPause->setObjectName("playBtn");
+    btnPlayPause->setCursor(Qt::PointingHandCursor);
+    btnPlayPause->setToolTip(QStringLiteral("재생"));
+    QFont playPauseFont = btnPlayPause->font();
+    playPauseFont.setPointSize(16);
+    playPauseFont.setBold(true);
+    btnPlayPause->setFont(playPauseFont);
 
     btnRecord = new QPushButton("REC", this);
     btnRecord->setCheckable(true);
@@ -81,6 +88,7 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
 
     playbackContainer->setVisible(false);
     m_isFileMode = false;
+    setPlaying(false);
 
     btnZoomIn = new QPushButton("Zoom Center", this);
     btnZoomOut = new QPushButton("Zoom Out", this);
@@ -204,7 +212,10 @@ void FullUnderBar::updateTime(qint64 currentMs, qint64 totalMs)
 
 void FullUnderBar::setPlaying(bool isPlaying)
 {
-    btnPlayPause->setText(isPlaying ? "Pause" : "Play");
+    btnPlayPause->setText(isPlaying ? QStringLiteral("⏸")
+                                    : QStringLiteral("▶"));
+    btnPlayPause->setToolTip(isPlaying ? QStringLiteral("일시정지")
+                                       : QStringLiteral("재생"));
 }
 
 void FullUnderBar::setControlModeAvailable(bool available)

@@ -141,9 +141,9 @@ QLineEdit:focus {
 }
 
 #TopBarTitle {
-    font-weight: bold;
+    font-weight: 600;
     font-size: 16px;
-    letter-spacing: 1px;
+    letter-spacing: 0px;
     color: #1e293b;
     background-color: transparent;
 }

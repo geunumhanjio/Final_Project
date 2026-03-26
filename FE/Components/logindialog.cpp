@@ -102,7 +102,7 @@ LoginDialog::LoginDialog(QWidget *parent)
     ConfigManager::instance().loadDefaults();
     m_isDark = ConfigManager::instance().getDarkTheme();
 
-    setWindowTitle(QStringLiteral("Sentinel Login"));
+    setWindowTitle(QStringLiteral("누비고 로그인"));
     setModal(true);
     setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint | Qt::CustomizeWindowHint);
     setObjectName("LoginDialog");
@@ -163,6 +163,8 @@ LoginDialog::LoginDialog(QWidget *parent)
     cardLayout->addWidget(m_cardSubtitleLabel);
 
     m_serverFieldContainer = new QWidget(m_card);
+    m_serverFieldContainer->setObjectName("LoginServerFieldContainer");
+    m_serverFieldContainer->setAttribute(Qt::WA_StyledBackground, true);
     auto *serverFieldLayout = new QVBoxLayout(m_serverFieldContainer);
     serverFieldLayout->setContentsMargins(0, 0, 0, 0);
     serverFieldLayout->setSpacing(4);
@@ -182,12 +184,14 @@ LoginDialog::LoginDialog(QWidget *parent)
     m_formStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     m_loginPage = new QWidget(m_formStack);
+    m_loginPage->setObjectName("LoginPage");
+    m_loginPage->setAttribute(Qt::WA_StyledBackground, true);
     m_loginPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     auto *loginLayout = new QVBoxLayout(m_loginPage);
     loginLayout->setContentsMargins(0, 0, 0, 8);
     loginLayout->setSpacing(10);
 
-    auto *userLabel = new QLabel(QStringLiteral("Operator Identity"), m_loginPage);
+    auto *userLabel = new QLabel(QStringLiteral("ID"), m_loginPage);
     userLabel->setProperty("loginRole", "fieldLabel");
     loginLayout->addWidget(userLabel);
 
@@ -241,11 +245,13 @@ LoginDialog::LoginDialog(QWidget *parent)
     m_signUpButton->setObjectName("LoginSecondaryButton");
     m_signUpButton->setCursor(Qt::PointingHandCursor);
     m_signUpButton->setFixedHeight(42);
-    connect(m_signUpButton, &QPushButton::clicked, this, &LoginDialog::openSignUpDialog);
+    connect(m_signUpButton, &QPushButton::clicked, this, &LoginDialog::showSignUpPage);
     loginLayout->addWidget(m_signUpButton);
     m_formStack->addWidget(m_loginPage);
 
     m_signUpPage = new QWidget(m_formStack);
+    m_signUpPage->setObjectName("LoginSignUpPage");
+    m_signUpPage->setAttribute(Qt::WA_StyledBackground, true);
     auto *signUpLayout = new QVBoxLayout(m_signUpPage);
     signUpLayout->setContentsMargins(0, 0, 0, 0);
     signUpLayout->setSpacing(8);
@@ -255,6 +261,8 @@ LoginDialog::LoginDialog(QWidget *parent)
                                     QLineEdit **target,
                                     const QString &placeholder) {
         auto *group = new QWidget(m_signUpPage);
+        group->setProperty("loginRole", "panel");
+        group->setAttribute(Qt::WA_StyledBackground, true);
         group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         auto *groupLayout = new QVBoxLayout(group);
         groupLayout->setContentsMargins(0, 0, 0, 0);
@@ -273,9 +281,12 @@ LoginDialog::LoginDialog(QWidget *parent)
 
     m_signUpStepStack = new QStackedWidget(m_signUpPage);
     m_signUpStepStack->setObjectName("SignUpStepStack");
+    m_signUpStepStack->setAttribute(Qt::WA_StyledBackground, true);
     m_signUpStepStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 
     m_signUpStepOnePage = new QWidget(m_signUpStepStack);
+    m_signUpStepOnePage->setObjectName("LoginSignUpStepOnePage");
+    m_signUpStepOnePage->setAttribute(Qt::WA_StyledBackground, true);
     m_signUpStepOnePage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     auto *signUpStepOneLayout = new QVBoxLayout(m_signUpStepOnePage);
     signUpStepOneLayout->setContentsMargins(0, 0, 0, 0);
@@ -314,12 +325,14 @@ LoginDialog::LoginDialog(QWidget *parent)
     m_signUpStepStack->addWidget(m_signUpStepOnePage);
 
     m_signUpStepTwoPage = new QWidget(m_signUpStepStack);
+    m_signUpStepTwoPage->setObjectName("LoginSignUpStepTwoPage");
+    m_signUpStepTwoPage->setAttribute(Qt::WA_StyledBackground, true);
     m_signUpStepTwoPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     auto *signUpStepTwoLayout = new QVBoxLayout(m_signUpStepTwoPage);
     signUpStepTwoLayout->setContentsMargins(0, 0, 0, 0);
     signUpStepTwoLayout->setSpacing(8);
 
-    auto *identityGroup = createSignUpGroup(QStringLiteral("Operator Identity"),
+    auto *identityGroup = createSignUpGroup(QStringLiteral("ID"),
                                             QStringLiteral("ID"),
                                             &m_signUpUserIdEdit,
                                             QStringLiteral("admin"));
@@ -379,6 +392,8 @@ LoginDialog::LoginDialog(QWidget *parent)
     m_signUpPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 
     m_passwordResetPage = new QWidget(m_formStack);
+    m_passwordResetPage->setObjectName("LoginPasswordResetPage");
+    m_passwordResetPage->setAttribute(Qt::WA_StyledBackground, true);
     m_passwordResetPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     auto *passwordResetLayout = new QVBoxLayout(m_passwordResetPage);
     passwordResetLayout->setContentsMargins(0, 0, 0, 0);
@@ -389,6 +404,8 @@ LoginDialog::LoginDialog(QWidget *parent)
                                            QLineEdit **target,
                                            const QString &placeholder) {
         auto *group = new QWidget(m_passwordResetPage);
+        group->setProperty("loginRole", "panel");
+        group->setAttribute(Qt::WA_StyledBackground, true);
         group->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
         auto *groupLayout = new QVBoxLayout(group);
         groupLayout->setContentsMargins(0, 0, 0, 0);
@@ -405,7 +422,7 @@ LoginDialog::LoginDialog(QWidget *parent)
         return group;
     };
 
-    auto *resetUserIdGroup = createPasswordResetGroup(QStringLiteral("Operator Identity"),
+    auto *resetUserIdGroup = createPasswordResetGroup(QStringLiteral("ID"),
                                                       QStringLiteral("ID"),
                                                       &m_resetUserIdEdit,
                                                       QStringLiteral("admin"));
@@ -654,11 +671,6 @@ void LoginDialog::paintEvent(QPaintEvent *event)
             }
         }
 
-        painter.save();
-        painter.translate(width() - 100, 72);
-        painter.rotate(45.0);
-        painter.fillRect(QRect(-18, -18, 36, 36), QColor(255, 102, 0, 28));
-        painter.restore();
     }
 }
 
@@ -954,7 +966,7 @@ void LoginDialog::handlePasswordResetFailed(const QString &message)
     }
 }
 
-void LoginDialog::openSignUpDialog()
+void LoginDialog::showSignUpPage()
 {
     if (m_busy) {
         return;
@@ -1166,6 +1178,16 @@ QDialog#LoginDialog {
 QStackedWidget#LoginFormStack {
     background: transparent;
 }
+QWidget#LoginServerFieldContainer,
+QWidget#LoginPage,
+QWidget#LoginSignUpPage,
+QWidget#LoginSignUpStepOnePage,
+QWidget#LoginSignUpStepTwoPage,
+QWidget#LoginPasswordResetPage,
+QWidget[loginRole="panel"],
+QStackedWidget#SignUpStepStack {
+    background: transparent;
+}
 QLabel[loginRole="fieldLabel"] {
     color: #c6c6cd;
     font-size: 10px;
@@ -1356,6 +1378,16 @@ QDialog#LoginDialog {
 QStackedWidget#LoginFormStack {
     background: transparent;
 }
+QWidget#LoginServerFieldContainer,
+QWidget#LoginPage,
+QWidget#LoginSignUpPage,
+QWidget#LoginSignUpStepOnePage,
+QWidget#LoginSignUpStepTwoPage,
+QWidget#LoginPasswordResetPage,
+QWidget[loginRole="panel"],
+QStackedWidget#SignUpStepStack {
+    background: transparent;
+}
 QLabel[loginRole="fieldLabel"] {
     color: #5c5e6a;
     font-size: 10px;
@@ -1501,7 +1533,7 @@ QLabel[loginRole="telemetryValue"] {
 )");
 
     setStyleSheet(styleSheet);
-    m_cardAccent->setVisible(!m_isDark);
+    m_cardAccent->setVisible(false);
     m_cardAccent->setGeometry(m_card->width() - 54, -18, 44, 44);
     updateStatusMessage(m_statusLabel->text(), m_statusLabel->property("statusError").toBool());
 }
@@ -1514,8 +1546,8 @@ void LoginDialog::applyCurrentPageText()
     m_cardTitleLabel->setText(passwordResetPage
                                   ? (m_isDark ? QStringLiteral("Reset Operator Password") : QStringLiteral("Reset Password"))
                                   : (signUpPage
-                                         ? (m_isDark ? QStringLiteral("Create Secure Operator") : QStringLiteral("Register Operator"))
-                                         : (m_isDark ? QStringLiteral("Secure Operator Login") : QStringLiteral("System Access"))));
+                                         ? QStringLiteral("누비고 회원가입")
+                                         : QStringLiteral("누비고 로그인")));
     m_cardSubtitleLabel->clear();
     m_cardSubtitleLabel->setVisible(false);
     updateServerFieldVisibility();

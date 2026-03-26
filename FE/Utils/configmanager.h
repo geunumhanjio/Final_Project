@@ -19,23 +19,43 @@ public:
 
     // 기본값 설정
     void loadDefaults() {
-        if(getCameraIp().isEmpty()) setCameraIp("192.168.0.39");
-        if(getCameraPort().isEmpty()) setCameraPort("8554");
-        if(getRobotSettingValue().isEmpty()) setRobotIp("192.168.0.237");
-        const QString loginServerUrl = getLoginServerUrl();
-        if (loginServerUrl.isEmpty()
-            || loginServerUrl == "127.0.0.1") {
-            setLoginServerUrl("192.168.0.110");
+        bool changed = false;
+
+        const auto ensureString = [this, &changed](const QString &key, const QString &value) {
+            if (m_settings->value(key).toString().trimmed().isEmpty()) {
+                m_settings->setValue(key, value);
+                changed = true;
+            }
+        };
+
+        const auto ensureValue = [this, &changed](const QString &key, const QVariant &value) {
+            if (!m_settings->contains(key)) {
+                m_settings->setValue(key, value);
+                changed = true;
+            }
+        };
+
+        ensureString(QStringLiteral("Network/CameraIP"), QStringLiteral("192.168.0.39"));
+        ensureString(QStringLiteral("Network/CameraPort"), QStringLiteral("8554"));
+        ensureString(QStringLiteral("Network/RobotIP"), QStringLiteral("192.168.0.237"));
+
+        const QString loginServerUrl = normalizeLoginServerInput(m_settings->value(QStringLiteral("Auth/LoginServerUrl")).toString());
+        if (loginServerUrl.isEmpty() || loginServerUrl == QStringLiteral("127.0.0.1")) {
+            m_settings->setValue(QStringLiteral("Auth/LoginServerUrl"), QStringLiteral("192.168.0.110"));
+            changed = true;
         }
-        if (!m_settings->contains("Network/CustomCCTVUsername")) setCustomCctvUsername("admin");
-        if (!m_settings->contains("Network/CustomCCTVPassword")) setCustomCctvPassword("5hanwha!");
-        if (!m_settings->contains("Control/LinearX")) setManualLinearX(0.30);
-        if (!m_settings->contains("Control/AngularZ")) setManualAngularZ(0.50);
-        if (!m_settings->contains("Navigation/AutoSpeed")) setAutoNavSpeed(0.15);
-        if (!m_settings->contains("UI/DarkTheme")) setDarkTheme(true);
-        if (!m_settings->contains("Auth/RememberUser")) setRememberUser(false);
-        // getUseCustomCCTV defaults to false if not set
-        // getUseRtsps defaults to false if not set
+
+        ensureValue(QStringLiteral("Network/CustomCCTVUsername"), QStringLiteral("admin"));
+        ensureValue(QStringLiteral("Network/CustomCCTVPassword"), QStringLiteral("5hanwha!"));
+        ensureValue(QStringLiteral("Control/LinearX"), 0.30);
+        ensureValue(QStringLiteral("Control/AngularZ"), 0.50);
+        ensureValue(QStringLiteral("Navigation/AutoSpeed"), 0.15);
+        ensureValue(QStringLiteral("UI/DarkTheme"), true);
+        ensureValue(QStringLiteral("Auth/RememberUser"), false);
+
+        if (changed) {
+            emit configChanged();
+        }
     }
 
     // Getter

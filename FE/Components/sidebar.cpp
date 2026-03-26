@@ -294,7 +294,6 @@ void Sidebar::applyRobotModeSelection(RobotMode mode, bool emitModeSignal)
 
     const bool controlModeSelected = (mode == ControlMode);
     const bool patrolModeSelected = (mode == PatrolMode);
-    const bool stopAvailable = controlModeSelected || patrolModeSelected;
     if (activateControlButton) {
         activateControlButton->setEnabled(controlModeSelected);
         activateControlButton->setVisible(controlModeSelected);
@@ -311,7 +310,8 @@ void Sidebar::applyRobotModeSelection(RobotMode mode, bool emitModeSignal)
         finalizePatrolButton->setEnabled(patrolModeSelected && m_patrolPointCount > 0);
     }
     if (emergencyStopButton) {
-        emergencyStopButton->setEnabled(stopAvailable);
+        // Quick stop should always be available regardless of the selected robot mode.
+        emergencyStopButton->setEnabled(true);
     }
 
     if (emitModeSignal) {

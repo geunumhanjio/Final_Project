@@ -107,6 +107,7 @@ protected:
 // =============================================================
 // [내부 클래스] 조종 모드용 직접 그려지는 오버레이 (원, 화살표)
 // =============================================================
+#if 0
 class ControlOverlay : public QWidget {
 public:
     QPointF startPos;
@@ -248,6 +249,7 @@ private:
 // =============================================================
 
 
+#endif
 FullScreenView::FullScreenView(QWidget *parent) : QWidget(parent)
 {
     setAttribute(Qt::WA_StyledBackground, true);
@@ -663,7 +665,7 @@ void FullScreenView::setRobotModeSelection(int mode)
     }
 
     if (modeQuickStopButton) {
-        modeQuickStopButton->setEnabled(mode == 2 || mode == 3);
+        modeQuickStopButton->setEnabled(mode >= 0 && mode <= 3);
     }
 }
 
@@ -1276,12 +1278,16 @@ bool FullScreenView::eventFilter(QObject *obj, QEvent *event)
             emit goalCommitted();
 
             if (currentChannelId == 1) {
-                qDebug().noquote() << QStringLiteral("[FullScreen] Channel 2 CALIBRATION_CLICK x=%1 y=%2")
+                qDebug().noquote() << QStringLiteral("[FullScreen] Channel 2 CALIBRATION_CLICK x1=%1 y1=%2 x2=%3 y2=%4")
                                           .arg(commit->normalizedStart.x(), 0, 'f', 4)
-                                          .arg(commit->normalizedStart.y(), 0, 'f', 4);
+                                          .arg(commit->normalizedStart.y(), 0, 'f', 4)
+                                          .arg(commit->normalizedEnd.x(), 0, 'f', 4)
+                                          .arg(commit->normalizedEnd.y(), 0, 'f', 4);
                 emit calibrationClickRequested(currentChannelId,
                                                commit->normalizedStart.x(),
-                                               commit->normalizedStart.y());
+                                               commit->normalizedStart.y(),
+                                               commit->normalizedEnd.x(),
+                                               commit->normalizedEnd.y());
                 isSettingDirection = false;
                 return true;
             }

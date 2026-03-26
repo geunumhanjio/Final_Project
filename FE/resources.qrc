@@ -1,4 +1,8 @@
 <RCC>
+    <qresource prefix="/">
+        <file>style/theme_dark.qss</file>
+        <file>style/theme_light.qss</file>
+    </qresource>
     <qresource prefix="/crt">
         <file>env/server.crt</file>
     </qresource>

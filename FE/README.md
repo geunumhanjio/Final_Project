@@ -196,8 +196,7 @@ Qt Widgets, GStreamer 기반의 CCTV 통합 관제 및 로봇 제어 프론트�
 - RC Car 스트림은 로봇 호스트에서 파생됩니다.
   - 기본 라이브: `rtsp://<robot-host>:9554/camera`
   - RC 전체화면: `rtsp://<robot-host>:9554/camera_isp`
-- Channel 2의 calibration click은 현재 고정 IP `192.168.0.110:9000`으로 전송됩니다.
-- `Components/signupdialog.*`는 저장소에 남아 있지만, 현재 메인 가입 흐름은 `LoginDialog` 내부 stacked page가 담당합니다.
+- Channel 2의 calibration click은 현재 설정의 Camera IP를 사용해 `ws://<camera-ip>:9000`으로 전송됩니다.
 
 ---
 
@@ -226,7 +225,6 @@ FE/
 │  ├─ osdwidget.*
 │  ├─ settingswidget.*
 │  ├─ sidebar.*
-│  ├─ signupdialog.*
 │  ├─ slammapwidget.*
 │  ├─ topbar.*
 │  └─ videocard.*
@@ -637,8 +635,7 @@ build/Debug/VEDA_QT_1.exe
 
 ## 13. 알려진 구현 메모
 
-- Calibration click 서버 IP는 현재 코드상 `192.168.0.110`으로 고정되어 있습니다.
-- 회원가입 전용 `signupdialog.*`는 저장소에 남아 있지만, 실제 주 사용 흐름은 `LoginDialog` 내부 스택 페이지입니다.
+- Calibration click 서버 IP는 현재 설정의 Camera IP 값을 따라갑니다.
 - 일부 UI 스타일은 QSS와 코드 내 inline style이 혼합되어 있습니다.
 - `CMakeLists.txt`는 모든 소스 파일을 한 번에 나열하는 구조라서, 추후 폴더 기반 모듈화 시 `target_sources` 또는 `add_subdirectory` 방식으로 정리할 여지가 있습니다.
 

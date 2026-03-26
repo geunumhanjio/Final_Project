@@ -17,6 +17,7 @@
 
 VideoCard::VideoCard(QWidget *parent) : QWidget(parent)
 {
+    setFocusPolicy(Qt::StrongFocus);
     setupUi();
     m_isHovered = false;
     m_isRecording = false;
@@ -275,6 +276,10 @@ void VideoCard::enterEvent(QEvent *event)
 
 bool VideoCard::eventFilter(QObject *watched, QEvent *event)
 {
+    if (watched == m_videoWidget && event->type() == QEvent::MouseButtonPress) {
+        setFocus(Qt::MouseFocusReason);
+    }
+
     if (watched == m_videoWidget && m_goalTargetingEnabled && m_goalOverlay) {
         GoalArrowOverlayWidget *overlay = m_goalOverlay;
 
@@ -345,6 +350,12 @@ bool VideoCard::eventFilter(QObject *watched, QEvent *event)
     }
 
     return QWidget::eventFilter(watched, event);
+}
+
+void VideoCard::mousePressEvent(QMouseEvent *event)
+{
+    setFocus(Qt::MouseFocusReason);
+    QWidget::mousePressEvent(event);
 }
 
 void VideoCard::leaveEvent(QEvent *event)

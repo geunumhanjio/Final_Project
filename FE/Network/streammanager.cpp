@@ -22,7 +22,6 @@ void StreamManager::loadConfig()
     m_channels.clear();
 
     // ConfigManager에서 IP와 Port 가져오기
-    ConfigManager::instance().loadDefaults(); // 초기값이 없으면 설정
     QString ip = ConfigManager::instance().getCameraIp();
     QString port = ConfigManager::instance().getCameraPort();
     bool useCustomCCTV = ConfigManager::instance().getUseCustomCCTV();

@@ -15,6 +15,7 @@ class LiveView : public QWidget
     Q_OBJECT
 public:
     explicit LiveView(QWidget *parent = nullptr);
+    bool isRcCarCameraFocused() const;
     void setChannelVisible(int index, bool visible);
     void stopAll();
     void clearGoalOverlays();
@@ -28,7 +29,7 @@ signals:
     void requestFullScreen(int index, QString url);
     void recordCommandRequested(int channelId, bool start);
     void goalPoseRequested(double x, double y, double yaw);
-    void calibrationClickRequested(int channelIndex, double normalizedX, double normalizedY);
+    void calibrationClickRequested(int channelIndex, double x1, double y1, double x2, double y2);
     void goalInteractionStarted();
     void goalCommitted();
     void patrolPointsChanged(int count);

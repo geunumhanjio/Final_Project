@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(VEDA_ENABLE_FRUC "Enable OpenCV-based FRUC generation" ON)
+set(GST_ROOT "" CACHE PATH "Path to the GStreamer root directory")
 
 # 1. Qt 라이브러리 찾기
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets WebSockets Network)
@@ -46,6 +47,52 @@ else()
     set(GST_ROOT "C:/Program Files/gstreamer/1.0/mingw_x86_64")
     message(STATUS "Selected GStreamer Root (MinGW): ${GST_ROOT}")
 endif()
+
+set(_configured_gst_root "$CACHE{GST_ROOT}")
+set(_gst_root_candidates "")
+
+if(MSVC)
+    if(DEFINED ENV{GSTREAMER_1_0_ROOT_MSVC_X86_64} AND NOT "$ENV{GSTREAMER_1_0_ROOT_MSVC_X86_64}" STREQUAL "")
+        list(APPEND _gst_root_candidates "$ENV{GSTREAMER_1_0_ROOT_MSVC_X86_64}")
+    endif()
+    if(DEFINED ENV{GSTREAMER_ROOT_X86_64} AND NOT "$ENV{GSTREAMER_ROOT_X86_64}" STREQUAL "")
+        list(APPEND _gst_root_candidates "$ENV{GSTREAMER_ROOT_X86_64}")
+    endif()
+    list(APPEND _gst_root_candidates
+        "C:/Program Files/gstreamer/1.0/msvc_x86_64"
+        "C:/gstreamer/1.0/msvc_x86_64"
+        "D:/gstreamer/1.0/msvc_x86_64"
+    )
+else()
+    if(DEFINED ENV{GSTREAMER_1_0_ROOT_MINGW_X86_64} AND NOT "$ENV{GSTREAMER_1_0_ROOT_MINGW_X86_64}" STREQUAL "")
+        list(APPEND _gst_root_candidates "$ENV{GSTREAMER_1_0_ROOT_MINGW_X86_64}")
+    endif()
+    if(DEFINED ENV{GSTREAMER_ROOT_X86_64} AND NOT "$ENV{GSTREAMER_ROOT_X86_64}" STREQUAL "")
+        list(APPEND _gst_root_candidates "$ENV{GSTREAMER_ROOT_X86_64}")
+    endif()
+    list(APPEND _gst_root_candidates
+        "C:/Program Files/gstreamer/1.0/mingw_x86_64"
+        "C:/gstreamer/1.0/mingw_x86_64"
+        "D:/gstreamer/1.0/mingw_x86_64"
+    )
+endif()
+
+if(_configured_gst_root AND EXISTS "${_configured_gst_root}")
+    set(GST_ROOT "${_configured_gst_root}")
+else()
+    foreach(_gst_root_candidate IN LISTS _gst_root_candidates)
+        if(_gst_root_candidate AND EXISTS "${_gst_root_candidate}")
+            set(GST_ROOT "${_gst_root_candidate}")
+            break()
+        endif()
+    endforeach()
+endif()
+
+if(NOT GST_ROOT OR NOT EXISTS "${GST_ROOT}")
+    message(FATAL_ERROR "GStreamer root was not found. Set GST_ROOT or the appropriate GSTREAMER_* environment variable before configuring.")
+endif()
+
+message(STATUS "Using GStreamer Root: ${GST_ROOT}")
 
 set(OPENCV_ROOT "" CACHE PATH "Optional OpenCV root used for FRUC support")
 set(OPENCV_BIN_DIR "")
@@ -150,13 +197,14 @@ set(PROJECT_SOURCES
         Network/rosbridgeclient.h Network/rosbridgeclient.cpp
         Network/cameracontrolclient.h Network/cameracontrolclient.cpp
         Views/playbackview.h Views/playbackview.cpp
+        Utils/applicationinitializer.h Utils/applicationinitializer.cpp
         Utils/configmanager.h
         Utils/channelcatalog.h Utils/channelcatalog.cpp
         Utils/goaloverlaycontroller.h Utils/goaloverlaycontroller.cpp
         Utils/framelessconfirmdialog.h Utils/framelessconfirmdialog.cpp
+        Utils/jsonutils.h Utils/jsonutils.cpp
         Components/settingswidget.h Components/settingswidget.cpp
         Components/logindialog.h Components/logindialog.cpp
-        Components/signupdialog.h Components/signupdialog.cpp
         Components/osdwidget.h Components/osdwidget.cpp # [New]
 )
 

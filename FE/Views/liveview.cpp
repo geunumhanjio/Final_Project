@@ -2,6 +2,7 @@
 #include "channelcatalog.h"
 #include "streammanager.h"
 #include "configmanager.h"
+#include <QApplication>
 #include <QDebug>
 #include <QTimer>
 #include <QShowEvent>
@@ -44,14 +45,19 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
         connect(cctvWidgets[i], &VideoCard::goalInteractionStarted, this, &LiveView::goalInteractionStarted);
         connect(cctvWidgets[i], &VideoCard::goalCommitted, this, &LiveView::goalCommitted);
         connect(cctvWidgets[i], &VideoCard::goalOverlayCommitted, this, [this, i](const QPointF &normalizedStart, const QPointF &normalizedEnd) {
+            if (i == 1) {
+                qDebug().noquote() << QStringLiteral("[LiveView] Channel 2 CALIBRATION_CLICK x1=%1 y1=%2 x2=%3 y2=%4")
+                                          .arg(normalizedStart.x(), 0, 'f', 4)
+                                          .arg(normalizedStart.y(), 0, 'f', 4)
+                                          .arg(normalizedEnd.x(), 0, 'f', 4)
+                                          .arg(normalizedEnd.y(), 0, 'f', 4);
+                emit calibrationClickRequested(i, normalizedStart.x(), normalizedStart.y(),
+                                               normalizedEnd.x(), normalizedEnd.y());
+            }
             emit videoGoalOverlayCommitted(i, normalizedStart, normalizedEnd);
         });
         connect(cctvWidgets[i], &VideoCard::goalRequested, this, [this, i](const QPointF &normalizedStart, double yaw) {
             if (i == 1) {
-                qDebug().noquote() << QStringLiteral("[LiveView] Channel 2 CALIBRATION_CLICK x=%1 y=%2")
-                                          .arg(normalizedStart.x(), 0, 'f', 4)
-                                          .arg(normalizedStart.y(), 0, 'f', 4);
-                emit calibrationClickRequested(i, normalizedStart.x(), normalizedStart.y());
                 return;
             }
 
@@ -88,7 +94,6 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
 
     // Connect internal fullscreen button signal for RC Car
     connect(rcCarCamWidget, &VideoCard::fullScreenRequested, [=](){
-            ConfigManager::instance().loadDefaults();
             QString url = ConfigManager::instance().getRobotRtspIspUrl();
             emit requestFullScreen(4, url); // Index 4 for RC Car
     });
@@ -145,6 +150,24 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     connect(&StreamManager::instance(), &StreamManager::configLoaded, this, &LiveView::refreshStreams);
 }
 
+bool LiveView::isRcCarCameraFocused() const
+{
+    if (!rcCarCamWidget) {
+        return false;
+    }
+
+    QWidget *focusWidget = QApplication::focusWidget();
+    qDebug() << "[LiveView] isRcCarCameraFocused checking. Current focusWidget:" << focusWidget;
+    while (focusWidget) {
+        if (focusWidget == rcCarCamWidget) {
+            return true;
+        }
+        focusWidget = focusWidget->parentWidget();
+    }
+
+    return false;
+}
+
 void LiveView::refreshStreams()
 {
     qDebug() << "[LiveView] Refreshing streams due to config change...";
@@ -195,7 +218,6 @@ void LiveView::initCCTVStreams()
     }
 
     // Start RC Car Stream
-    ConfigManager::instance().loadDefaults();
     const QString rcUrl = ConfigManager::instance().getRobotRtspUrl();
     QTimer::singleShot(400, this, [this, rcUrl]() {
         if(rcCarCamWidget) {
@@ -448,4 +470,3 @@ QPointF LiveView::quadrantToWorld(int index, const QPointF &normalizedPoint, boo
     }
     return QPointF(worldX, worldY);
 }
-

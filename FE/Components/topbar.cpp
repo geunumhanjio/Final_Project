@@ -3,6 +3,7 @@
  * @brief Top navigation bar implementation
  */
 #include "topbar.h"
+#include <QFont>
 #include <QStyle>
 #include <QAbstractButton>
 #include <QMenu>
@@ -25,7 +26,6 @@ TopBar::TopBar(QWidget *parent) : QWidget(parent)
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &TopBar::updateTime);
     timer->start(1000);
-    timer->start(1000);
     updateTime();
 
 }
@@ -45,8 +45,17 @@ void TopBar::setupUi()
     btnToggle->setStyleSheet("QPushButton { color: #94a3b8; font-size: 20px; border: none; background: transparent; } QPushButton:hover { color: white; background: rgba(255,255,255,0.05); border-radius: 4px; }");
     // Note: btnToggle icon color might need manual update or QIcon theme, keeping simple for now.
 
-    titleLabel = new QLabel("Monitoring System", this);
+    titleLabel = new QLabel(QStringLiteral("누비고 프로그램"), this);
     titleLabel->setObjectName("TopBarTitle");
+    QFont titleFont = titleLabel->font();
+    titleFont.setFamilies({QStringLiteral("Arial Rounded MT Bold"),
+                           QStringLiteral("휴먼둥근헤드라인"),
+                           QStringLiteral("HYHeadLine M"),
+                           QStringLiteral("Malgun Gothic"),
+                           QStringLiteral("Segoe UI")});
+    titleFont.setPointSize(15);
+    titleFont.setWeight(QFont::DemiBold);
+    titleLabel->setFont(titleFont);
     // Initial Style set in updateTheme 
     // titleLabel->setStyleSheet("font-weight: bold; font-size: 16px; letter-spacing: 1px; color: #e2e8f0; background-color: transparent;");
 
@@ -219,8 +228,8 @@ void TopBar::setCurrentUserInfo(const QString &userId, const QString &email, con
 
 void TopBar::updateTime()
 {
-    // 3초 느리게 표시 (User Request)
-    QDateTime now = QDateTime::currentDateTime().addSecs(-3);
+    // Show the current local time.
+    QDateTime now = QDateTime::currentDateTime();
     dateLabel->setText(now.toString("yyyy-MM-dd"));
     timeLabel->setText(now.toString("HH:mm:ss"));
 }

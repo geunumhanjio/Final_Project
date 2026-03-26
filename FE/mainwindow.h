@@ -8,8 +8,9 @@
 #include "topbar.h"
 #include "sidebar.h"
 #include "liveview.h"
+#include "playbackview.h"
 #include "rosbridgeclient.h"
-#include "cameracontrolclient.h" // [New]
+#include "cameracontrolclient.h"
 #include <QSet>
 #include <QTimer>
 #include <QKeyEvent>
@@ -19,9 +20,7 @@
 QT_BEGIN_NAMESPACE
 QT_END_NAMESPACE
 
-#include "videowidget.h"
-#include "playbackview.h" // [New]
-
+class QJsonObject;
 class SettingsWidget;
 class FullScreenView;
 
@@ -35,12 +34,15 @@ public:
 
 protected:
     void closeEvent(QCloseEvent *event) override;
-    bool eventFilter(QObject *obj, QEvent *event) override; // [New]
-    void keyPressEvent(QKeyEvent *event) override;   // Kept for backup/other keys
-    void keyReleaseEvent(QKeyEvent *event) override; // Kept for backup/other keys
+    bool eventFilter(QObject *obj, QEvent *event) override; 
+    void keyPressEvent(QKeyEvent *event) override;   
+    void keyReleaseEvent(QKeyEvent *event) override; 
 
 private:
-    bool handleWasdKey(QKeyEvent *event, bool isPress); // [New] Shared logic
+    bool handleWasdKey(QKeyEvent *event, bool isPress);
+    bool handleCameraTiltKey(QKeyEvent *event, bool isPress);
+    void processCameraTiltInput();
+    void stopCameraTiltInput();
     void applyRobotMode(Sidebar::RobotMode mode);
     void syncRobotModeToBackend(bool sendIdleMotion = false);
     void stopManualMotion();
@@ -64,32 +66,32 @@ private:
 
 private slots:
     void processInput();
-    void onConfigChanged(); // [New]
+    void onConfigChanged();
 
 private:
     TopBar *m_topBar;
     Sidebar *m_sidebar;
-    QStackedWidget *m_centralStack; // 페이지 전환 컨테이너
+    QStackedWidget *m_centralStack;
     LiveView *m_livePage;
     FullScreenView *m_fullPage;
-    PlaybackView *m_playbackPage;   // [Modified] VideoWidget -> PlaybackView
-    SettingsWidget *m_settingsPage; // Settings Widget
+    PlaybackView *m_playbackPage;
+    SettingsWidget *m_settingsPage;
 
-    void initUI();          // UI 초기화
-    void initConnections(); // 시그널/슬롯 연결
-    void toggleTheme();     // Theme toggle method
-    void loadTheme(const QString &path); // Robust theme loader
-
-    
-private:
-    bool m_isDark; // Current theme state
-    
-    // ROS2 Control
     RosBridgeClient *m_rosClient;
     CameraControlClient *m_cameraClient;
-    
+
+    void initUI();
+    void initConnections();
+    void toggleTheme();
+    void loadTheme(const QString &path);
+
+private:
+    bool m_isDark;
+
     QTimer *m_inputTimer;
+    QTimer *m_cameraTiltTimer = nullptr;
     QSet<int> m_pressedKeys;
+    QSet<int> m_pressedTiltKeys;
     QString m_currentRobotWsUrl;
     Sidebar::RobotMode m_robotMode = Sidebar::ManualMode;
     bool m_sidebarVisibleBeforeFullScreen = true;
@@ -105,8 +107,8 @@ private:
     int m_goalArrivalStableCount = 0;
     bool m_skipCloseConfirmation = false;
     QSet<QString> m_pendingFrucJobs;
-    
-    // [New] Widget to return to after closing FullScreenView
-    QWidget* m_returnToWidget = nullptr; 
+    double m_cameraTiltAngle = 0.0;
+
+    QWidget *m_returnToWidget = nullptr;
 };
 #endif // MAINWINDOW_H

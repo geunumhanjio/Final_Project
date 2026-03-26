@@ -3,234 +3,23 @@
 #include "authmanager.h"
 #include "configmanager.h"
 #include "fullscreenview.h"
+#include "jsonutils.h"
+#include "constants.h"
 
 #include <QApplication>
+#include <QDebug>
 #include <QJsonDocument>
 #include <QLineEdit>
 #include <QPlainTextEdit>
 #include <QTextEdit>
 #include <cmath>
 
-namespace {
-
-QString ownedTrimmedString(const QJsonValue &value)
-{
-    return value.toString().trimmed();
-}
-
-QPointF extractPoint(const QJsonObject &data, bool *ok = nullptr)
-{
-    if (ok) {
-        *ok = false;
-    }
-
-    const QJsonObject position = data.value(QStringLiteral("position")).toObject();
-    if (!position.isEmpty()) {
-        if (ok) {
-            *ok = position.contains(QStringLiteral("x")) || position.contains(QStringLiteral("y"));
-        }
-        return QPointF(position.value(QStringLiteral("x")).toDouble(),
-                       position.value(QStringLiteral("y")).toDouble());
-    }
-
-    const QJsonObject translation = data.value(QStringLiteral("translation")).toObject();
-    if (!translation.isEmpty()) {
-        if (ok) {
-            *ok = translation.contains(QStringLiteral("x")) || translation.contains(QStringLiteral("y"));
-        }
-        return QPointF(translation.value(QStringLiteral("x")).toDouble(),
-                       translation.value(QStringLiteral("y")).toDouble());
-    }
-
-    const QJsonObject pose = data.value(QStringLiteral("pose")).toObject();
-    if (!pose.isEmpty()) {
-        return extractPoint(pose, ok);
-    }
-
-    const QJsonObject transform = data.value(QStringLiteral("transform")).toObject();
-    if (!transform.isEmpty()) {
-        return extractPoint(transform, ok);
-    }
-
-    const QJsonObject wrapperMsg = data.value(QStringLiteral("msg")).toObject();
-    if (!wrapperMsg.isEmpty()) {
-        return extractPoint(wrapperMsg, ok);
-    }
-
-    const QJsonObject wrapperData = data.value(QStringLiteral("data")).toObject();
-    if (!wrapperData.isEmpty()) {
-        return extractPoint(wrapperData, ok);
-    }
-
-    const QJsonObject wrapperPayload = data.value(QStringLiteral("payload")).toObject();
-    if (!wrapperPayload.isEmpty()) {
-        return extractPoint(wrapperPayload, ok);
-    }
-
-    if (data.contains(QStringLiteral("x")) || data.contains(QStringLiteral("y"))) {
-        if (ok) {
-            *ok = true;
-        }
-        return QPointF(data.value(QStringLiteral("x")).toDouble(),
-                       data.value(QStringLiteral("y")).toDouble());
-    }
-
-    return QPointF();
-}
-
-double extractLinearSpeed(const QJsonObject &data)
-{
-    const QJsonObject velocity = data.value(QStringLiteral("velocity")).toObject();
-    if (!velocity.isEmpty()) {
-        if (velocity.contains(QStringLiteral("linear_x"))) {
-            return std::abs(velocity.value(QStringLiteral("linear_x")).toDouble());
-        }
-        if (velocity.contains(QStringLiteral("linear"))) {
-            return std::abs(velocity.value(QStringLiteral("linear")).toDouble());
-        }
-        if (velocity.contains(QStringLiteral("x"))) {
-            return std::abs(velocity.value(QStringLiteral("x")).toDouble());
-        }
-    }
-
-    const QJsonObject twist = data.value(QStringLiteral("twist")).toObject();
-    if (!twist.isEmpty()) {
-        return extractLinearSpeed(twist);
-    }
-
-    const QJsonObject linear = data.value(QStringLiteral("linear")).toObject();
-    if (!linear.isEmpty() && linear.contains(QStringLiteral("x"))) {
-        return std::abs(linear.value(QStringLiteral("x")).toDouble());
-    }
-
-    const QJsonObject wrapperMsg = data.value(QStringLiteral("msg")).toObject();
-    if (!wrapperMsg.isEmpty()) {
-        return extractLinearSpeed(wrapperMsg);
-    }
-
-    const QJsonObject wrapperData = data.value(QStringLiteral("data")).toObject();
-    if (!wrapperData.isEmpty()) {
-        return extractLinearSpeed(wrapperData);
-    }
-
-    const QJsonObject wrapperPayload = data.value(QStringLiteral("payload")).toObject();
-    if (!wrapperPayload.isEmpty()) {
-        return extractLinearSpeed(wrapperPayload);
-    }
-
-    if (data.contains(QStringLiteral("speed"))) {
-        return std::abs(data.value(QStringLiteral("speed")).toDouble());
-    }
-
-    return 0.0;
-}
-
-double extractAngularSpeed(const QJsonObject &data)
-{
-    const QJsonObject velocity = data.value(QStringLiteral("velocity")).toObject();
-    if (!velocity.isEmpty()) {
-        if (velocity.contains(QStringLiteral("angular_z"))) {
-            return std::abs(velocity.value(QStringLiteral("angular_z")).toDouble());
-        }
-        if (velocity.contains(QStringLiteral("angular"))) {
-            return std::abs(velocity.value(QStringLiteral("angular")).toDouble());
-        }
-        if (velocity.contains(QStringLiteral("z"))) {
-            return std::abs(velocity.value(QStringLiteral("z")).toDouble());
-        }
-    }
-
-    const QJsonObject twist = data.value(QStringLiteral("twist")).toObject();
-    if (!twist.isEmpty()) {
-        return extractAngularSpeed(twist);
-    }
-
-    const QJsonObject angular = data.value(QStringLiteral("angular")).toObject();
-    if (!angular.isEmpty() && angular.contains(QStringLiteral("z"))) {
-        return std::abs(angular.value(QStringLiteral("z")).toDouble());
-    }
-
-    const QJsonObject wrapperMsg = data.value(QStringLiteral("msg")).toObject();
-    if (!wrapperMsg.isEmpty()) {
-        return extractAngularSpeed(wrapperMsg);
-    }
-
-    const QJsonObject wrapperData = data.value(QStringLiteral("data")).toObject();
-    if (!wrapperData.isEmpty()) {
-        return extractAngularSpeed(wrapperData);
-    }
-
-    const QJsonObject wrapperPayload = data.value(QStringLiteral("payload")).toObject();
-    if (!wrapperPayload.isEmpty()) {
-        return extractAngularSpeed(wrapperPayload);
-    }
-
-    return 0.0;
-}
-
-bool hasSuccessStatus(const QJsonObject &data)
-{
-    const QStringList stringKeys = {
-        QStringLiteral("status"),
-        QStringLiteral("state"),
-        QStringLiteral("result"),
-        QStringLiteral("outcome"),
-        QStringLiteral("goal_status"),
-        QStringLiteral("event"),
-        QStringLiteral("message")
-    };
-
-    for (const QString &key : stringKeys) {
-        const QString value = ownedTrimmedString(data.value(key)).toLower();
-        if (value.isEmpty()) {
-            continue;
-        }
-        if (value.contains(QStringLiteral("succeed"))
-            || value.contains(QStringLiteral("success"))
-            || value.contains(QStringLiteral("arriv"))
-            || value.contains(QStringLiteral("reach"))
-            || value.contains(QStringLiteral("complete"))
-            || value.contains(QStringLiteral("done"))) {
-            return true;
-        }
-    }
-
-    const QStringList numericKeys = {
-        QStringLiteral("status"),
-        QStringLiteral("status_code"),
-        QStringLiteral("code"),
-        QStringLiteral("result_code")
-    };
-
-    for (const QString &key : numericKeys) {
-        const QJsonValue value = data.value(key);
-        if (!value.isDouble()) {
-            continue;
-        }
-        const int numeric = value.toInt();
-        if (numeric == 3 || numeric == 4) {
-            return true;
-        }
-    }
-
-    for (const QString &wrapperKey : {QStringLiteral("msg"), QStringLiteral("data"), QStringLiteral("payload")}) {
-        const QJsonObject wrapper = data.value(wrapperKey).toObject();
-        if (!wrapper.isEmpty() && hasSuccessStatus(wrapper)) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-} // namespace
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowFlag(Qt::FramelessWindowHint, true);
-    setWindowTitle(QStringLiteral("CCTV Control Center"));
-    resize(1280, 720);
+    setWindowTitle(QString(Constants::App::WINDOW_TITLE));
+    resize(Constants::App::DEFAULT_WIDTH, Constants::App::DEFAULT_HEIGHT);
 
     qApp->installEventFilter(this);
 
@@ -253,6 +42,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_inputTimer = new QTimer(this);
     connect(m_inputTimer, &QTimer::timeout, this, &MainWindow::processInput);
+
+    m_cameraTiltTimer = new QTimer(this);
+    m_cameraTiltTimer->setInterval(100);
+    connect(m_cameraTiltTimer, &QTimer::timeout, this, &MainWindow::processCameraTiltInput);
 
     connect(&ConfigManager::instance(), &ConfigManager::configChanged, this, &MainWindow::onConfigChanged);
     connect(&AuthManager::instance(), &AuthManager::userProfileResolved, this,
@@ -282,17 +75,21 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
         auto *keyEvent = static_cast<QKeyEvent *>(event);
         const int key = keyEvent->key();
 
-        if (key == Qt::Key_W || key == Qt::Key_S || key == Qt::Key_A || key == Qt::Key_D) {
-            QWidget *focusWidget = QApplication::focusWidget();
-            if (focusWidget) {
-                if (qobject_cast<QLineEdit *>(focusWidget)
-                    || qobject_cast<QTextEdit *>(focusWidget)
-                    || qobject_cast<QPlainTextEdit *>(focusWidget)) {
-                    return false;
-                }
+        QWidget *focusWidget = QApplication::focusWidget();
+        if (focusWidget) {
+            if (qobject_cast<QLineEdit *>(focusWidget)
+                || qobject_cast<QTextEdit *>(focusWidget)
+                || qobject_cast<QPlainTextEdit *>(focusWidget)) {
+                return false;
             }
+        }
 
+        if (key == Qt::Key_W || key == Qt::Key_S || key == Qt::Key_A || key == Qt::Key_D) {
             return handleWasdKey(keyEvent, event->type() == QEvent::KeyPress);
+        }
+
+        if (key == Qt::Key_Up || key == Qt::Key_Down) {
+            return handleCameraTiltKey(keyEvent, event->type() == QEvent::KeyPress);
         }
     }
 
@@ -334,6 +131,75 @@ bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress)
     }
 
     return true;
+}
+
+bool MainWindow::handleCameraTiltKey(QKeyEvent *event, bool isPress)
+{
+    if (!m_rosClient) {
+        return false;
+    }
+    if (event->isAutoRepeat()) {
+        return true;
+    }
+
+    const int key = event->key();
+    if (isPress) {
+        if (!m_pressedTiltKeys.contains(key)) {
+            m_pressedTiltKeys.insert(key);
+            if (!m_cameraTiltTimer->isActive()) {
+                m_cameraTiltTimer->start();
+                processCameraTiltInput();
+            }
+        }
+    } else if (m_pressedTiltKeys.contains(key)) {
+        m_pressedTiltKeys.remove(key);
+        if (m_pressedTiltKeys.isEmpty()) {
+            stopCameraTiltInput();
+        } else {
+            processCameraTiltInput();
+        }
+    }
+
+    return true;
+}
+
+void MainWindow::processCameraTiltInput()
+{
+    if (!m_rosClient || !m_cameraTiltTimer) {
+        return;
+    }
+
+    int direction = 0;
+    if (m_pressedTiltKeys.contains(Qt::Key_Up)) {
+        direction -= 1;
+    }
+    if (m_pressedTiltKeys.contains(Qt::Key_Down)) {
+        direction += 1;
+    }
+
+    if (direction == 0) {
+        return;
+    }
+
+    constexpr double tiltStep = 5.0;
+    m_cameraTiltAngle += tiltStep * static_cast<double>(direction);
+
+    if (m_cameraTiltAngle < 0.0) {
+        m_cameraTiltAngle = 0.0;
+    } else if (m_cameraTiltAngle > 180.0) {
+        m_cameraTiltAngle = 180.0;
+    }
+
+    m_rosClient->sendCameraTilt(m_cameraTiltAngle);
+    qDebug() << "[CameraTilt] angle:" << m_cameraTiltAngle;
+}
+
+void MainWindow::stopCameraTiltInput()
+{
+    m_pressedTiltKeys.clear();
+    if (m_cameraTiltTimer) {
+        m_cameraTiltTimer->stop();
+    }
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event)
@@ -457,15 +323,15 @@ void MainWindow::handleGoalOdomUpdate(const QJsonObject &data)
     }
 
     bool ok = false;
-    const QPointF robotPosition = extractPoint(data, &ok);
+    const QPointF robotPosition = JsonUtils::extractPoint(data, &ok);
     if (!ok) {
         return;
     }
 
     const double distance = std::hypot(robotPosition.x() - m_activeGoalPosition.x(),
                                        robotPosition.y() - m_activeGoalPosition.y());
-    const double linearSpeed = extractLinearSpeed(data);
-    const double angularSpeed = extractAngularSpeed(data);
+    const double linearSpeed = JsonUtils::extractLinearSpeed(data);
+    const double angularSpeed = JsonUtils::extractAngularSpeed(data);
     constexpr double kGoalDistanceToleranceMeters = 0.20;
     constexpr double kGoalLinearSpeedTolerance = 0.05;
     constexpr double kGoalAngularSpeedTolerance = 0.10;
@@ -491,7 +357,7 @@ void MainWindow::handleGoalOdomUpdate(const QJsonObject &data)
 
 void MainWindow::handleGoalNavStatus(const QJsonObject &data)
 {
-    if (!m_hasActiveGoal || !hasSuccessStatus(data)) {
+    if (!m_hasActiveGoal || !JsonUtils::hasSuccessStatus(data)) {
         return;
     }
 
@@ -503,7 +369,7 @@ void MainWindow::handleGoalNavStatus(const QJsonObject &data)
 
 void MainWindow::handleGoalNavFeedback(const QJsonObject &data)
 {
-    if (!m_hasActiveGoal || !hasSuccessStatus(data)) {
+    if (!m_hasActiveGoal || !JsonUtils::hasSuccessStatus(data)) {
         return;
     }
 

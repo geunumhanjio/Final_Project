@@ -17,6 +17,7 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QStandardPaths>
+#include <QStringList>
 #include <QTimer>
 #include <QUrl>
 
@@ -24,7 +25,6 @@ namespace {
 
 QString currentCameraIp()
 {
-    ConfigManager::instance().loadDefaults();
     return ConfigManager::instance().getCameraIp();
 }
 
@@ -48,21 +48,37 @@ QString downloadPathFor(const QString &fileName)
 
 QString calibrationControlServerIp()
 {
-    return QStringLiteral("192.168.0.110");
+    return currentCameraIp();
 }
 
 } // namespace
 
 void MainWindow::loadTheme(const QString &relativePath)
 {
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString fullPath = QDir(appDir).filePath(relativePath);
+    const QString resourcePath = QStringLiteral(":/") + relativePath;
+    QString fullPath = resourcePath;
 
     if (!QFile::exists(fullPath)) {
-        fullPath = QDir(appDir).filePath(QStringLiteral("../") + relativePath);
-        if (!QFile::exists(fullPath)) {
-            fullPath = QStringLiteral("D:/work/QT_prac/VEDA_QT_1/FE/") + relativePath;
+        const QString appDir = QCoreApplication::applicationDirPath();
+        const QStringList candidates = {
+            QDir(appDir).filePath(relativePath),
+            QDir(appDir).filePath(QStringLiteral("../") + relativePath),
+            QDir(appDir).filePath(QStringLiteral("../../") + relativePath),
+            QDir(appDir).filePath(QStringLiteral("../../../") + relativePath),
+            QDir::current().filePath(relativePath)
+        };
+
+        for (const QString &candidate : candidates) {
+            if (QFile::exists(candidate)) {
+                fullPath = candidate;
+                break;
+            }
         }
+    }
+
+    if (!QFile::exists(fullPath)) {
+        qWarning() << "Theme file does not exist:" << relativePath;
+        return;
     }
 
     QFile file(fullPath);
@@ -222,30 +238,34 @@ void MainWindow::initConnections()
     connect(m_fullPage, &FullScreenView::videoGoalOverlayClearRequested, this, &MainWindow::clearSharedVideoGoalOverlay);
     connect(m_fullPage, &FullScreenView::goalCommitted, this, &MainWindow::deactivateControlSession);
     connect(m_livePage, &LiveView::calibrationClickRequested, this,
-            [this](int channelIndex, double normalizedX, double normalizedY) {
+            [this](int channelIndex, double x1, double y1, double x2, double y2) {
                 if (!m_cameraClient || channelIndex != 1) {
                     return;
                 }
 
                 const QString serverIp = calibrationControlServerIp();
-                m_cameraClient->sendCalibrationClick(serverIp, normalizedX, normalizedY);
-                qDebug().noquote() << QStringLiteral("[MainWindow] Sent CALIBRATION_CLICK to ws://%1:9000 x=%2 y=%3")
+                m_cameraClient->sendCalibrationClick(serverIp, x1, y1, x2, y2);
+                qDebug().noquote() << QStringLiteral("[MainWindow] Sent CALIBRATION_CLICK to ws://%1:9000 x1=%2 y1=%3 x2=%4 y2=%5")
                                           .arg(serverIp)
-                                          .arg(normalizedX, 0, 'f', 4)
-                                          .arg(normalizedY, 0, 'f', 4);
+                                          .arg(x1, 0, 'f', 4)
+                                          .arg(y1, 0, 'f', 4)
+                                          .arg(x2, 0, 'f', 4)
+                                          .arg(y2, 0, 'f', 4);
             });
     connect(m_fullPage, &FullScreenView::calibrationClickRequested, this,
-            [this](int channelIndex, double normalizedX, double normalizedY) {
+            [this](int channelIndex, double x1, double y1, double x2, double y2) {
                 if (!m_cameraClient || channelIndex != 1) {
                     return;
                 }
 
                 const QString serverIp = calibrationControlServerIp();
-                m_cameraClient->sendCalibrationClick(serverIp, normalizedX, normalizedY);
-                qDebug().noquote() << QStringLiteral("[MainWindow] Sent CALIBRATION_CLICK to ws://%1:9000 x=%2 y=%3")
+                m_cameraClient->sendCalibrationClick(serverIp, x1, y1, x2, y2);
+                qDebug().noquote() << QStringLiteral("[MainWindow] Sent CALIBRATION_CLICK to ws://%1:9000 x1=%2 y1=%3 x2=%4 y2=%5")
                                           .arg(serverIp)
-                                          .arg(normalizedX, 0, 'f', 4)
-                                          .arg(normalizedY, 0, 'f', 4);
+                                          .arg(x1, 0, 'f', 4)
+                                          .arg(y1, 0, 'f', 4)
+                                          .arg(x2, 0, 'f', 4)
+                                          .arg(y2, 0, 'f', 4);
             });
 
     connect(m_rosClient, &RosBridgeClient::mapReceived, m_livePage, &LiveView::updateMap);

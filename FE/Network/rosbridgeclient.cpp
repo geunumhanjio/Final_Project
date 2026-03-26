@@ -195,6 +195,23 @@ void RosBridgeClient::sendCmdVel(double linear, double angular) {
     m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
 }
 
+void RosBridgeClient::sendCameraTilt(double angle)
+{
+    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
+
+    QJsonObject data;
+    data["angle"] = angle;
+
+    QJsonObject msg;
+    msg["type"] = "camera_tilt";
+    msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+    msg["data"] = data;
+
+    QString payload = QJsonDocument(msg).toJson(QJsonDocument::Compact);
+    qDebug().noquote() << "[RosBridge] Sending camera_tilt:" << payload;
+    m_webSocket.sendTextMessage(payload);
+}
+
 void RosBridgeClient::sendModeControl(const QString &mode) {
     if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
 

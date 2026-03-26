@@ -41,7 +41,7 @@ private slots:
     void attemptPasswordReset();
     void handlePasswordResetSucceeded(const QString &userId);
     void handlePasswordResetFailed(const QString &message);
-    void openSignUpDialog();
+    void showSignUpPage();
     void showLoginPage();
     void toggleTheme();
     void togglePasswordVisibility();
