@@ -31,12 +31,14 @@ ros/
         ├── wsl_bringup/        ← WSL 전체 시스템 런처
         ├── camera_bridge/      ← MJPEG → ROS2 토픽 변환
         ├── rtsp_bridge/        ← ROS2 이미지 → RTSP 스트리밍
-        ├── websocket_bridge/   ← ROS2 ↔ WebSocket (Qt 클라이언트용)
+        ├── websocket_bridge/   ← ROS2 ↔ WebSocket (클라이언트용)
         ├── robot_description/  ← URDF 로봇 모델
         ├── robot_localization_config/ ← EKF 센서 융합 설정
         ├── robot_navigation/   ← SLAM / Navigation2 설정
         ├── hector_mapping/     ← HectorSLAM (scan-only SLAM)
-        └── navigation_manager/ ← 자율주행 미션 컨트롤러 (웨이포인트 / 순찰 / 큐)
+        ├── navigation_manager/ ← 자율주행 미션 컨트롤러 (웨이포인트 / 순찰 / 큐)
+        ├── person_tracker/     ← MediaPipe Pose 기반 사람 추종 노드
+        └── fall_detection/     ← MediaPipe Pose 기반 낙상(누워있는 상태) 감지 노드
 ```
 
 ---
@@ -52,7 +54,7 @@ ros/
 | 구분 | 라즈베리파이 (`rsvp/`) | WSL / PC (`WSL/`) |
 |------|----------------------|-------------------|
 | 역할 | **실시간 하드웨어 I/O** | **고연산 소프트웨어 처리** |
-| 담당 노드 | 시리얼 브릿지, 라이다 드라이버, 카메라 드라이버 | SLAM, Nav2, EKF, RTSP 서버, WebSocket 서버 |
+| 담당 노드 | 시리얼 브릿지, 라이다 드라이버, 카메라 드라이버 | SLAM, Nav2, EKF, RTSP 서버, WebSocket 서버, 사람 추종, 낙상 감지 |
 | 특성 | 지연 시간 민감 (엔코더, IMU) | 연산량 큼, 지연 허용 가능 |
 | 아키텍처 | ARM64 (aarch64) | x86_64 |
 | 전용 하드웨어 의존성 | libcamera, YDLiDAR SDK, /dev/serial0 | RViz2 (X11), Nav2, SLAM Toolbox |
@@ -241,7 +243,10 @@ ros2 topic list
 [/nav/command] ──────────────► [navigation_manager] ──► /navigate_to_pose (Nav2 Action)
 [/cmd_vel] ───────────────────────────────────────► [rpi_serial_bridge] ──UART──► [STM32]
 [/camera/image_raw/compressed] ──► [rtsp_bridge] ──► RTSP stream
-[map→base_footprint TF] ─────────► [websocket_bridge] ──► WebSocket (Qt 클라이언트)
+[/camera/image_raw/compressed] ──► [person_tracker] ──► /cmd_vel, /camera/tilt (추종 시)
+[/camera/image_raw/compressed] ──► [fall_detection] ──► /fall_detection/alert (낙상 시)
+[map→base_footprint TF] ─────────► [websocket_bridge] ──► WebSocket (클라이언트)
+[/fall_detection/alert] ─────────► [websocket_bridge] ──► WebSocket "fall_alert"
 ```
 
 ### HectorSLAM 모드 (`nav_mode:=hector`)
@@ -273,3 +278,5 @@ ros2 topic list
 | `robot_navigation` | `WSL/src/robot_navigation/README.md` | SLAM / Nav2 |
 | `hector_mapping` | `WSL/src/hector_mapping/README.md` | HectorSLAM (scan-only SLAM) |
 | `navigation_manager` | `WSL/src/navigation_manager/README.md` | 자율주행 미션 컨트롤러 |
+| `person_tracker` | `WSL/src/person_tracker/` | MediaPipe 사람 추종 노드 |
+| `fall_detection` | `WSL/src/fall_detection/README.md` | 낙상(누워있는 상태) 감지 노드 |
