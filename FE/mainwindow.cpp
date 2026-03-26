@@ -67,7 +67,10 @@ MainWindow::MainWindow(QWidget *parent)
     }
 }
 
-MainWindow::~MainWindow() = default;
+MainWindow::~MainWindow()
+{
+    stopBackgroundWorkers();
+}
 
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {

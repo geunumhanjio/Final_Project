@@ -92,10 +92,13 @@ void MainWindow::startFrucProcessing(const QString &filePath)
 
         m_pendingFrucJobs.insert(outputPath);
         auto *processor = new FrucVideoProcessor(normalizedPath, variant, this);
+        processor->setObjectName(QFileInfo(outputPath).fileName());
+        m_activeFrucProcessors.insert(processor);
 
         connect(processor, &FrucVideoProcessor::processingFinished, this,
-                [this, outputPath](const QString &, const QString &generatedPath) {
+                [this, processor, outputPath](const QString &, const QString &generatedPath) {
                     m_pendingFrucJobs.remove(outputPath);
+                    m_activeFrucProcessors.remove(processor);
                     qDebug() << "[MainWindow] FRUC recording generated:" << generatedPath;
                     if (m_playbackPage) {
                         m_playbackPage->addLocalItem(generatedPath);
@@ -103,17 +106,57 @@ void MainWindow::startFrucProcessing(const QString &filePath)
                 });
 
         connect(processor, &FrucVideoProcessor::processingFailed, this,
-                [this, outputPath](const QString &, const QString &message) {
+                [this, processor, outputPath](const QString &, const QString &message) {
                     m_pendingFrucJobs.remove(outputPath);
+                    m_activeFrucProcessors.remove(processor);
                     qWarning() << "[MainWindow] FRUC processing failed for" << outputPath << ":" << message;
                 });
 
+        connect(processor, &QObject::destroyed, this, [this, processor]() {
+            m_activeFrucProcessors.remove(processor);
+        });
         connect(processor, &QThread::finished, processor, &QObject::deleteLater);
         processor->start(QThread::LowPriority);
     };
 
     startVariant(FrucVideoProcessor::Variant::Fast);
     startVariant(FrucVideoProcessor::Variant::HighQuality);
+#endif
+}
+
+void MainWindow::stopBackgroundWorkers()
+{
+#ifdef VEDA_HAS_OPENCV
+    if (m_activeFrucProcessors.isEmpty()) {
+        return;
+    }
+
+    const auto processors = m_activeFrucProcessors;
+    for (FrucVideoProcessor *processor : processors) {
+        if (!processor) {
+            continue;
+        }
+
+        processor->requestInterruption();
+    }
+
+    for (FrucVideoProcessor *processor : processors) {
+        if (!processor || !processor->isRunning()) {
+            continue;
+        }
+
+        if (processor->wait(5000)) {
+            continue;
+        }
+
+        qWarning() << "[MainWindow] FRUC worker did not stop before shutdown:"
+                   << processor->objectName()
+                   << "- detaching from MainWindow destruction.";
+        QObject::disconnect(processor, nullptr, this, nullptr);
+        processor->setParent(nullptr);
+    }
+
+    m_activeFrucProcessors.clear();
 #endif
 }
 

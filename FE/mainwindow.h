@@ -21,6 +21,7 @@ QT_BEGIN_NAMESPACE
 QT_END_NAMESPACE
 
 class QJsonObject;
+class FrucVideoProcessor;
 class SettingsWidget;
 class FullScreenView;
 
@@ -56,6 +57,7 @@ private:
     void finalizePatrolPath();
     bool reopenLoginDialog(const QString &message = QString());
     void startFrucProcessing(const QString &filePath);
+    void stopBackgroundWorkers();
     void updateTopBarUserInfo();
     void promptLogout();
     void deactivateControlSession();
@@ -107,6 +109,7 @@ private:
     int m_goalArrivalStableCount = 0;
     bool m_skipCloseConfirmation = false;
     QSet<QString> m_pendingFrucJobs;
+    QSet<FrucVideoProcessor *> m_activeFrucProcessors;
     double m_cameraTiltAngle = 0.0;
 
     QWidget *m_returnToWidget = nullptr;

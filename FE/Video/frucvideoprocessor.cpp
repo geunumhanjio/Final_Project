@@ -18,6 +18,18 @@ constexpr double kFastFlowScale = 0.25;
 const char *kFastSuffix = "_FRUC_FAST";
 const char *kHighQualitySuffix = "_FRUC_HQ";
 
+bool shouldAbortProcessing(QString *errorMessage)
+{
+    if (!QThread::currentThread()->isInterruptionRequested()) {
+        return false;
+    }
+
+    if (errorMessage) {
+        *errorMessage = QStringLiteral("FRUC processing was canceled during shutdown.");
+    }
+    return true;
+}
+
 QString suffixForVariant(FrucVideoProcessor::Variant variant)
 {
     return (variant == FrucVideoProcessor::Variant::Fast)
@@ -77,6 +89,10 @@ bool validateVideoCapture(cv::VideoCapture &capture, int *width, int *height, do
 
 bool processFastFrucVideo(const QString &inputFilePath, const QString &outputFilePath, QString *errorMessage)
 {
+    if (shouldAbortProcessing(errorMessage)) {
+        return false;
+    }
+
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);
     cv::ocl::setUseOpenCL(true);
 
@@ -112,6 +128,9 @@ bool processFastFrucVideo(const QString &inputFilePath, const QString &outputFil
     cv::Mat baseXMat(height, width, CV_32FC1);
     cv::Mat baseYMat(height, width, CV_32FC1);
     for (int y = 0; y < height; ++y) {
+        if (shouldAbortProcessing(errorMessage)) {
+            return false;
+        }
         for (int x = 0; x < width; ++x) {
             baseXMat.at<float>(y, x) = static_cast<float>(x);
             baseYMat.at<float>(y, x) = static_cast<float>(y);
@@ -134,6 +153,10 @@ bool processFastFrucVideo(const QString &inputFilePath, const QString &outputFil
     cv::UMat flowBw;
 
     while (true) {
+        if (shouldAbortProcessing(errorMessage)) {
+            return false;
+        }
+
         capture >> frame2;
         if (frame2.empty()) {
             break;
@@ -161,6 +184,10 @@ bool processFastFrucVideo(const QString &inputFilePath, const QString &outputFil
         cv::split(flowBw, bwParts);
 
         for (int i = 1; i < kFrucMultiplier; ++i) {
+            if (shouldAbortProcessing(errorMessage)) {
+                return false;
+            }
+
             const float t = static_cast<float>(i) / static_cast<float>(kFrucMultiplier);
 
             cv::UMat mapX1;
@@ -201,6 +228,10 @@ bool processFastFrucVideo(const QString &inputFilePath, const QString &outputFil
 
 bool processHighQualityFrucVideo(const QString &inputFilePath, const QString &outputFilePath, QString *errorMessage)
 {
+    if (shouldAbortProcessing(errorMessage)) {
+        return false;
+    }
+
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_ERROR);
 
     cv::VideoCapture capture(inputFilePath.toStdString());
@@ -246,6 +277,10 @@ bool processHighQualityFrucVideo(const QString &inputFilePath, const QString &ou
     cv::Ptr<cv::DISOpticalFlow> dis = cv::DISOpticalFlow::create(cv::DISOpticalFlow::PRESET_MEDIUM);
 
     while (true) {
+        if (shouldAbortProcessing(errorMessage)) {
+            return false;
+        }
+
         capture >> frame2;
         if (frame2.empty()) {
             break;
@@ -262,9 +297,17 @@ bool processHighQualityFrucVideo(const QString &inputFilePath, const QString &ou
         writer.write(frame1);
 
         for (int i = 1; i < kFrucMultiplier; ++i) {
+            if (shouldAbortProcessing(errorMessage)) {
+                return false;
+            }
+
             const float t = static_cast<float>(i) / static_cast<float>(kFrucMultiplier);
 
             for (int y = 0; y < height; ++y) {
+                if (shouldAbortProcessing(errorMessage)) {
+                    return false;
+                }
+
                 for (int x = 0; x < width; ++x) {
                     const cv::Point2f fw = flowFw.at<cv::Point2f>(y, x);
                     const cv::Point2f bw = flowBw.at<cv::Point2f>(y, x);
@@ -327,6 +370,11 @@ QString FrucVideoProcessor::outputPathFor(const QString &inputFilePath, Variant 
 
 void FrucVideoProcessor::run()
 {
+    if (isInterruptionRequested()) {
+        emit processingFailed(m_inputFilePath, QStringLiteral("FRUC processing was canceled during shutdown."));
+        return;
+    }
+
     if (!shouldProcessSourceFile(m_inputFilePath)) {
         emit processingFailed(m_inputFilePath, QStringLiteral("FRUC processing skipped for this file."));
         return;

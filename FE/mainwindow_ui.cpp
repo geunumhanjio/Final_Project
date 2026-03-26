@@ -472,5 +472,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
         m_fullPage->stop();
     }
 
+    stopBackgroundWorkers();
+
     event->accept();
 }
