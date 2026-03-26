@@ -46,12 +46,14 @@ except ImportError:
 PAN_DEAD_ZONE          = 0.08   # 수평 오프셋 데드존 (화면 폭 비율)
 TILT_DEAD_ZONE         = 0.08   # 수직 오프셋 데드존 (화면 높이 비율)
 DIST_DEAD_ZONE         = 0.04   # 거리 데드존 (어깨 너비 비율)
-PAN_GAIN               = 0.6    # 수평 오프셋 → angular_z 게인
+PAN_GAIN               = 0.4    # 수평 오프셋 → angular_z 게인
 TILT_GAIN              = 25.0   # 수직 오프셋 → 틸트 각도 게인 (deg)
 LINEAR_GAIN            = 0.4    # 거리 오차 → linear_x 게인
 MAX_ANGULAR_Z          = 0.35   # rad/s
 MAX_LINEAR_X           = 0.15   # m/s
 TARGET_SHOULDER_WIDTH  = 0.25   # 목표 어깨 너비 (정규화, 약 1m 거리 기준)
+ANGULAR_SMOOTH         = 0.3    # angular_z 스무딩 계수 (0=고정, 1=스무딩 없음)
+LINEAR_SMOOTH          = 0.3    # linear_x 스무딩 계수
 TILT_MIN         =  15.0   # deg (절대각, 서보 범위와 동일)
 TILT_MAX         =  90.0   # deg (절대각, 서보 범위와 동일)
 TILT_CENTER      =  32.5   # deg (중립 위치)
@@ -107,6 +109,8 @@ class PersonTrackerNode(Node):
         self._enabled      = False
         self._last_infer_t = 0.0
         self._cur_tilt     = TILT_CENTER
+        self._smooth_angular_z = 0.0   # 스무딩된 angular_z
+        self._smooth_linear_x  = 0.0   # 스무딩된 linear_x
 
         # ── Publishers ────────────────────────────────────────────────────
         self._tilt_pub    = self.create_publisher(Float32, '/camera/tilt',       10)
@@ -209,8 +213,14 @@ class PersonTrackerNode(Node):
             self._cur_tilt = float(np.clip(
                 self._cur_tilt + tilt_delta, TILT_MIN, TILT_MAX))
 
+        # 지수 이동 평균 스무딩 (오실레이션 억제)
+        self._smooth_angular_z = (ANGULAR_SMOOTH * angular_z
+                                  + (1.0 - ANGULAR_SMOOTH) * self._smooth_angular_z)
+        self._smooth_linear_x  = (LINEAR_SMOOTH  * linear_x
+                                  + (1.0 - LINEAR_SMOOTH)  * self._smooth_linear_x)
+
         self._send_tilt(self._cur_tilt)
-        self._send_cmdvel(linear_x, angular_z)
+        self._send_cmdvel(self._smooth_linear_x, self._smooth_angular_z)
 
     # ── 발행 헬퍼 ────────────────────────────────────────────────────────────
 
@@ -226,6 +236,8 @@ class PersonTrackerNode(Node):
         self._cmdvel_pub.publish(msg)
 
     def _stop_robot(self):
+        self._smooth_angular_z = 0.0
+        self._smooth_linear_x  = 0.0
         self._send_cmdvel(0.0, 0.0)
 
     def _reset_tilt(self):
