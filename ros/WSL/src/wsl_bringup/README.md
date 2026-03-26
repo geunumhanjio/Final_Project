@@ -22,6 +22,13 @@ wsl_bringup/
         └── navigation.rviz         ← Navigation 모드용 RViz2 설정
 ```
 
+### 연동 패키지 (외부 launch 포함)
+
+| 인자 | 패키지 | 설명 |
+|------|--------|------|
+| `use_tracker:=true` | `person_tracker` | MediaPipe 사람 추종 노드 |
+| `use_fall_detection:=true` | `fall_detection` | 낙상(누워있는 상태) 감지 노드 |
+
 ---
 
 ## 설치
@@ -83,6 +90,15 @@ ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=localization use_rviz:=t
 ros2 launch wsl_bringup wsl_bringup.launch.py use_rviz:=true use_rqt:=true
 ```
 
+### 낙상 감지 활성화
+```bash
+# 낙상 감지만 추가
+ros2 launch wsl_bringup wsl_bringup.launch.py use_fall_detection:=true
+
+# 사람 추종 + 낙상 감지 동시에
+ros2 launch wsl_bringup wsl_bringup.launch.py use_tracker:=true use_fall_detection:=true
+```
+
 ### 자주 쓰는 조합
 ```bash
 # 통신 레이어만 (디버깅)
@@ -116,7 +132,8 @@ ros2 launch wsl_bringup rviz2.launch.py use_rviz:=true rviz_mode:=slam
 | `nav_mode` | `slam` | `slam` / `hector` / `localization` / `none` |
 | `use_rviz` | `false` | RViz2 실행 |
 | `use_rqt` | `false` | rqt 실행 |
-| `use_tracker` | `false` | YOLO 사람 추적 노드 활성화 |
+| `use_tracker` | `false` | MediaPipe 사람 추종 노드 활성화 |
+| `use_fall_detection` | `false` | 낙상(누워있는 상태) 감지 노드 활성화 |
 | `hector_odom_frame` | `odom` | HectorSLAM odom 프레임 (`odom` = map→odom TF 발행, `base_footprint` = scan-only) |
 
 ---

@@ -29,6 +29,9 @@ WSL 전체 시스템 메인 런처
   # RTSP/웹소켓 없이 네비만
   ros2 launch wsl_bringup wsl_bringup.launch.py use_rtsp:=false use_websocket:=false nav_mode:=localization use_rviz:=true
 
+  # 낙상 감지 활성화
+  ros2 launch wsl_bringup wsl_bringup.launch.py use_fall_detection:=true
+
 새 패키지 추가 시:
   1. DeclareLaunchArgument('use_xxx', ...) 추가
   2. IncludeLaunchDescription(..., condition=IfCondition('use_xxx')) 추가
@@ -87,6 +90,11 @@ def generate_launch_description():
             'use_tracker',
             default_value='false',
             description='Enable YOLO person tracker node'
+        ),
+        DeclareLaunchArgument(
+            'use_fall_detection',
+            default_value='false',
+            description='Enable fall detection node (lying-down detection)'
         ),
         DeclareLaunchArgument(
             'hector_odom_frame',
@@ -303,10 +311,21 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration('use_tracker')),
     )
 
+    fall_detection_node = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([
+                FindPackageShare('fall_detection'),
+                'launch',
+                'fall_detection.launch.py',
+            ])
+        ]),
+        condition=IfCondition(LaunchConfiguration('use_fall_detection')),
+    )
+
     scan_relay_nodes = [
         scan_relay_hector,
         scan_relay_other,
         scan_relay_localization,
         scan_relay_none,
     ]
-    return LaunchDescription(args + scan_relay_nodes + includes + [tracker_node])
+    return LaunchDescription(args + scan_relay_nodes + includes + [tracker_node, fall_detection_node])
