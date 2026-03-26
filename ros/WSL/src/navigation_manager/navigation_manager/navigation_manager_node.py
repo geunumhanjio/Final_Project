@@ -262,6 +262,20 @@ class NavigationManagerNode(Node):
             self._queue         = []
             self._navigate_to(x, y, yaw, label=f'({x:.2f}, {y:.2f})')
 
+        elif action == 'goto_dir':
+            x1 = float(cmd.get('x1', 0.0))
+            y1 = float(cmd.get('y1', 0.0))
+            x2 = float(cmd.get('x2', 0.0))
+            y2 = float(cmd.get('y2', 0.0))
+            yaw = math.atan2(y2 - y1, x2 - x1)
+            self._patrol_active = False
+            self._queue_active  = False
+            self._queue         = []
+            self.get_logger().info(
+                f'goto_dir: ({x1:.2f}, {y1:.2f}) facing ({x2:.2f}, {y2:.2f}) '
+                f'→ yaw={math.degrees(yaw):.1f}°')
+            self._navigate_to(x1, y1, yaw, label=f'({x1:.2f}, {y1:.2f})')
+
         elif action == 'goto_wp':
             name = cmd.get('name', '')
             if name not in self._waypoints:
