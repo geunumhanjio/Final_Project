@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QJsonArray>
 #include <QDateTime>
+#include <QStringList>
 
 namespace {
 
@@ -40,15 +41,63 @@ QString normalizedTopicType(const QString &topic)
     return {};
 }
 
+QString canonicalMessageType(QString value)
+{
+    value = value.trimmed().toLower();
+    if (value.isEmpty()) {
+        return {};
+    }
+
+    if (value.contains(QStringLiteral("nav_feedback"))) {
+        return QStringLiteral("nav_feedback");
+    }
+    if (value.contains(QStringLiteral("nav_status"))) {
+        return QStringLiteral("nav_status");
+    }
+    if (value.contains(QStringLiteral("fall")) || value.contains(QStringLiteral("alert"))) {
+        return QStringLiteral("fall_alert");
+    }
+    if (value.contains(QStringLiteral("occupancygrid"))
+        || value.contains(QStringLiteral("occupancy_grid"))
+        || value == QStringLiteral("map")
+        || value.endsWith(QStringLiteral("/map"))
+        || value.contains(QStringLiteral("grid"))) {
+        return QStringLiteral("map");
+    }
+    if (value.contains(QStringLiteral("odometry"))
+        || value.contains(QStringLiteral("robot_pose"))
+        || value.contains(QStringLiteral("amcl_pose"))
+        || value.contains(QStringLiteral("posewithcovariance"))
+        || value == QStringLiteral("odom")
+        || value.endsWith(QStringLiteral("/odom"))
+        || value.endsWith(QStringLiteral("/pose"))) {
+        return QStringLiteral("odom");
+    }
+    if (value.contains(QStringLiteral("path")) || value.contains(QStringLiteral("plan"))) {
+        return QStringLiteral("path");
+    }
+
+    return value;
+}
+
 QString normalizedType(const QJsonObject &object, int depth = 0)
 {
     if (depth >= 4 || object.isEmpty()) {
         return {};
     }
 
-    const QString directType = object.value("type").toString().trimmed().toLower();
+    const QString directType = canonicalMessageType(object.value("type").toString());
     if (!directType.isEmpty()) {
         return directType;
+    }
+
+    for (const QString &key : {QStringLiteral("msg_type"),
+                               QStringLiteral("message_type"),
+                               QStringLiteral("datatype")}) {
+        const QString alternateType = canonicalMessageType(object.value(key).toString());
+        if (!alternateType.isEmpty()) {
+            return alternateType;
+        }
     }
 
     const QString op = object.value("op").toString().trimmed().toLower();
@@ -273,6 +322,9 @@ QString inferredType(const QJsonObject &object, const QJsonObject &body)
 
 RosBridgeClient::RosBridgeClient(QObject *parent) : QObject(parent)
 {
+    m_reconnectTimer.setInterval(2000);
+    m_reconnectTimer.setSingleShot(true);
+
     connect(&m_webSocket, &QWebSocket::connected, this, &RosBridgeClient::onConnected);
     connect(&m_webSocket, &QWebSocket::disconnected, this, &RosBridgeClient::onDisconnected);
     connect(&m_webSocket, &QWebSocket::textMessageReceived, this, &RosBridgeClient::onTextMessageReceived);
@@ -282,25 +334,55 @@ RosBridgeClient::RosBridgeClient(QObject *parent) : QObject(parent)
     connect(&m_webSocket, &QWebSocket::errorOccurred, this, [this](QAbstractSocket::SocketError) {
         qWarning() << "[RosBridge] Socket error:" << m_webSocket.errorString();
         emit errorOccurred(m_webSocket.errorString());
+        scheduleReconnect();
+    });
+    connect(&m_reconnectTimer, &QTimer::timeout, this, [this]() {
+        if (m_manualDisconnect || m_currentUrl.trimmed().isEmpty()) {
+            return;
+        }
+
+        if (m_webSocket.state() == QAbstractSocket::ConnectedState
+            || m_webSocket.state() == QAbstractSocket::ConnectingState) {
+            return;
+        }
+
+        qDebug() << "[RosBridge] Reconnecting to" << m_currentUrl;
+        m_webSocket.open(QUrl(m_currentUrl));
     });
 }
 
 RosBridgeClient::~RosBridgeClient() {
+    m_manualDisconnect = true;
+    m_reconnectTimer.stop();
     m_webSocket.close();
 }
 
 void RosBridgeClient::connectToHost(const QString &url) {
-    qDebug() << "[RosBridge] Connecting to" << url;
-    m_webSocket.open(QUrl(url));
+    const QString trimmedUrl = url.trimmed();
+    if (trimmedUrl.isEmpty()) {
+        qWarning() << "[RosBridge] Refusing to connect to an empty URL.";
+        return;
+    }
+
+    m_currentUrl = trimmedUrl;
+    m_manualDisconnect = false;
+    m_reconnectTimer.stop();
+
+    if (m_webSocket.state() != QAbstractSocket::UnconnectedState) {
+        m_webSocket.abort();
+    }
+
+    qDebug() << "[RosBridge] Connecting to" << m_currentUrl;
+    m_webSocket.open(QUrl(m_currentUrl));
 }
 
 void RosBridgeClient::disconnect() {
+    m_manualDisconnect = true;
+    m_reconnectTimer.stop();
     m_webSocket.close();
 }
 
 void RosBridgeClient::sendCmdVel(double linear, double angular) {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["linear_x"] = linear;
     data["linear_y"] = 0.0;
@@ -311,13 +393,11 @@ void RosBridgeClient::sendCmdVel(double linear, double angular) {
     msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendCameraTilt(double angle)
 {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["angle"] = angle;
 
@@ -328,12 +408,10 @@ void RosBridgeClient::sendCameraTilt(double angle)
 
     QString payload = QJsonDocument(msg).toJson(QJsonDocument::Compact);
     qDebug().noquote() << "[RosBridge] Sending camera_tilt:" << payload;
-    m_webSocket.sendTextMessage(payload);
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendModeControl(const QString &mode) {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["mode"] = mode;
 
@@ -342,13 +420,11 @@ void RosBridgeClient::sendModeControl(const QString &mode) {
     msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendTrackingEnable(bool enabled)
 {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["enable"] = enabled;
 
@@ -356,12 +432,10 @@ void RosBridgeClient::sendTrackingEnable(bool enabled)
     msg["type"] = "tracking_enable";
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendNavGoto(double x, double y, double yaw) {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["cmd"] = "goto";
     data["x"] = x;
@@ -373,12 +447,10 @@ void RosBridgeClient::sendNavGoto(double x, double y, double yaw) {
     msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendNavPatrol(const QString &route) {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["cmd"] = "patrol";
     data["route"] = route;
@@ -387,12 +459,12 @@ void RosBridgeClient::sendNavPatrol(const QString &route) {
     msg["type"] = "nav_command";
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendNavQueue(const QVector<QPointF> &waypoints)
 {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState || waypoints.isEmpty()) {
+    if (waypoints.isEmpty()) {
         return;
     }
 
@@ -427,13 +499,11 @@ void RosBridgeClient::sendNavQueue(const QVector<QPointF> &waypoints)
     msg["type"] = "nav_command";
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendNavSetSpeed(double speed)
 {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["cmd"] = "set_speed";
     data["speed"] = speed;
@@ -442,12 +512,10 @@ void RosBridgeClient::sendNavSetSpeed(double speed)
     msg["type"] = "nav_command";
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 
 void RosBridgeClient::sendNavCancel() {
-    if (m_webSocket.state() != QAbstractSocket::ConnectedState) return;
-
     QJsonObject data;
     data["cmd"] = "cancel";
 
@@ -456,7 +524,7 @@ void RosBridgeClient::sendNavCancel() {
     msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
     msg["data"] = data;
 
-    m_webSocket.sendTextMessage(QJsonDocument(msg).toJson(QJsonDocument::Compact));
+    sendJsonMessage(msg);
 }
 void RosBridgeClient::sendGoalPose(double x, double y, double theta, const QString &frame_id) {
     Q_UNUSED(frame_id);
@@ -465,12 +533,15 @@ void RosBridgeClient::sendGoalPose(double x, double y, double theta, const QStri
 
 void RosBridgeClient::onConnected() {
     qDebug() << "[RosBridge] Connected!";
+    m_reconnectTimer.stop();
+    subscribeToDefaultTopics();
     emit connected();
 }
 
 void RosBridgeClient::onDisconnected() {
     qDebug() << "[RosBridge] Disconnected!";
     emit disconnected();
+    scheduleReconnect();
 }
 
 void RosBridgeClient::onTextMessageReceived(const QString &message) {
@@ -521,7 +592,67 @@ void RosBridgeClient::onTextMessageReceived(const QString &message) {
         emit navStatusReceived(body);
     } else if (type == "nav_feedback") {
         emit navFeedbackReceived(body);
-    } else if (type == "fall_alert" && !fallAlertHandled) {
+    } else if (type == "fall_alert" && !fallAlertHandled && looksLikeFallAlertPayload(body)) {
         emit fallAlertReceived(body);
+    }
+}
+
+void RosBridgeClient::sendJsonMessage(const QJsonObject &message)
+{
+    if (m_webSocket.state() != QAbstractSocket::ConnectedState) {
+        qWarning() << "[RosBridge] Dropping outbound message while disconnected:"
+                   << compactPreview(message);
+        return;
+    }
+
+    m_webSocket.sendTextMessage(QJsonDocument(message).toJson(QJsonDocument::Compact));
+}
+
+void RosBridgeClient::scheduleReconnect()
+{
+    if (m_manualDisconnect || m_currentUrl.trimmed().isEmpty()) {
+        return;
+    }
+
+    if (m_webSocket.state() == QAbstractSocket::ConnectedState
+        || m_webSocket.state() == QAbstractSocket::ConnectingState
+        || m_reconnectTimer.isActive()) {
+        return;
+    }
+
+    qDebug() << "[RosBridge] Scheduling reconnect in" << m_reconnectTimer.interval() << "ms";
+    m_reconnectTimer.start();
+}
+
+void RosBridgeClient::subscribeToDefaultTopics()
+{
+    static const QStringList topics = {
+        QStringLiteral("/map"),
+        QStringLiteral("map"),
+        QStringLiteral("/odom"),
+        QStringLiteral("odom"),
+        QStringLiteral("/robot_pose"),
+        QStringLiteral("robot_pose"),
+        QStringLiteral("/amcl_pose"),
+        QStringLiteral("amcl_pose"),
+        QStringLiteral("/path"),
+        QStringLiteral("path"),
+        QStringLiteral("/plan"),
+        QStringLiteral("plan"),
+        QStringLiteral("/global_plan"),
+        QStringLiteral("global_plan"),
+        QStringLiteral("/nav_status"),
+        QStringLiteral("nav_status"),
+        QStringLiteral("/nav_feedback"),
+        QStringLiteral("nav_feedback"),
+        QStringLiteral("/fall_alert"),
+        QStringLiteral("fall_alert")
+    };
+
+    for (const QString &topic : topics) {
+        QJsonObject subscribeMessage;
+        subscribeMessage[QStringLiteral("op")] = QStringLiteral("subscribe");
+        subscribeMessage[QStringLiteral("topic")] = topic;
+        sendJsonMessage(subscribeMessage);
     }
 }

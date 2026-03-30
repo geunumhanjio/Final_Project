@@ -6,8 +6,10 @@
 #include <QFontMetrics>
 #include <QGuiApplication>
 #include <QFont>
+#include <QPainterPath>
 #include <QStyle>
 #include <QAbstractButton>
+#include <QFrame>
 #include <QListWidget>
 #include <QMenu>
 #include <QPixmap>
@@ -53,11 +55,11 @@ void TopBar::setupUi()
 
     auto *brandIconLabel = new QLabel(this);
     brandIconLabel->setObjectName("TopBarBrandIcon");
-    brandIconLabel->setFixedSize(32, 32);
-    brandIconLabel->setAlignment(Qt::AlignCenter);
+    brandIconLabel->setFixedHeight(40);
+    brandIconLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
     brandIconLabel->setStyleSheet(QStringLiteral("background: transparent;"));
-    const QPixmap brandIcon(QStringLiteral(":/icons/assets/icons/nubigo_robot.svg"));
-    brandIconLabel->setPixmap(brandIcon.scaled(30, 30, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    const QPixmap brandIcon(QStringLiteral(":/icons/assets/icons/noobigo_wordmark.png"));
+    brandIconLabel->setPixmap(brandIcon.scaledToHeight(40, Qt::SmoothTransformation));
 
     titleLabel = new QLabel(QStringLiteral("누비고 프로그램"), this);
     titleLabel->setObjectName("TopBarTitle");
@@ -70,6 +72,8 @@ void TopBar::setupUi()
     titleFont.setPointSize(15);
     titleFont.setWeight(QFont::DemiBold);
     titleLabel->setFont(titleFont);
+    titleLabel->clear();
+    titleLabel->setVisible(false);
     // Initial Style set in updateTheme 
     // titleLabel->setStyleSheet("font-weight: bold; font-size: 16px; letter-spacing: 1px; color: #e2e8f0; background-color: transparent;");
 
@@ -125,15 +129,16 @@ void TopBar::setupUi()
     btnAlert->setToolTip(QStringLiteral("Fall alert log"));
     btnAlert->setProperty("hasUnread", false);
 
-    btnClose = new QPushButton("X", this);
-    btnClose->setFixedSize(36, 36);
+    btnClose = new QPushButton(QStringLiteral("×"), this);
+    btnClose->setFixedSize(32, 32);
     btnClose->setCursor(Qt::PointingHandCursor);
     btnClose->setObjectName("TopBarCloseBtn");
+    btnClose->setText(QStringLiteral("\u00D7"));
     btnClose->setStyleSheet(
-        "QPushButton { color: #f8fafc; font-size: 14px; font-weight: bold; border: none; "
-        "background: rgba(239, 68, 68, 0.88); border-radius: 10px; padding-bottom: 1px; }"
-        "QPushButton:hover { background: rgba(220, 38, 38, 0.96); }"
-        "QPushButton:pressed { background: rgba(185, 28, 28, 1.0); }");
+        "QPushButton { color: #cbd5e1; font-size: 17px; font-weight: 500; border: none; "
+        "background: transparent; border-radius: 8px; padding-bottom: 2px; }"
+        "QPushButton:hover { color: #f8fafc; background: rgba(255, 255, 255, 0.08); }"
+        "QPushButton:pressed { background: rgba(255, 255, 255, 0.14); }");
 
     btnTheme = new QPushButton("☀", this); 
     btnTheme->setFixedSize(32, 32);
@@ -283,6 +288,7 @@ void TopBar::showFallAlertHistoryPopup()
     QWidget *popup = new QWidget(this);
     popup->setWindowFlags(Qt::Popup | Qt::FramelessWindowHint);
     popup->setAttribute(Qt::WA_DeleteOnClose);
+    popup->setAttribute(Qt::WA_StyledBackground, true);
     popup->setObjectName("TopBarAlertPopup");
 
     auto *popupLayout = new QVBoxLayout(popup);
@@ -303,8 +309,10 @@ void TopBar::showFallAlertHistoryPopup()
         listWidget->setObjectName("TopBarAlertPopupList");
         listWidget->setSelectionMode(QAbstractItemView::NoSelection);
         listWidget->setFocusPolicy(Qt::NoFocus);
+        listWidget->setFrameShape(QFrame::NoFrame);
         listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
         listWidget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+        listWidget->viewport()->setAutoFillBackground(false);
 
         for (int i = m_fallAlertLogs.size() - 1; i >= 0; --i) {
             listWidget->addItem(m_fallAlertLogs.at(i));
@@ -318,6 +326,9 @@ void TopBar::showFallAlertHistoryPopup()
     }
 
     popup->adjustSize();
+    QPainterPath popupPath;
+    popupPath.addRoundedRect(QRectF(popup->rect()), 14.0, 14.0);
+    popup->setMask(QRegion(popupPath.toFillPolygon().toPolygon()));
 
     QPoint globalPos = btnAlert->mapToGlobal(QPoint(btnAlert->width() - popup->width(), btnAlert->height() + 8));
     if (QScreen *screen = QGuiApplication::screenAt(globalPos)) {

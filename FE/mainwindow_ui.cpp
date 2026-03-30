@@ -105,6 +105,7 @@ void MainWindow::initUI()
 
     qDebug() << "[MainWindow] Creating Central Stack...";
     m_centralStack = new QStackedWidget(this);
+    m_centralStack->setObjectName(QStringLiteral("CentralStack"));
     m_centralStack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Ignored);
     setCentralWidget(m_centralStack);
 
@@ -203,6 +204,18 @@ void MainWindow::initConnections()
         if (m_rosClient) {
             m_rosClient->sendNavSetSpeed(speed);
         }
+    });
+
+    connect(m_rosClient, &RosBridgeClient::connected, this, [this]() {
+        qDebug() << "[MainWindow] RosBridge connected. Resyncing current robot mode.";
+        syncRobotModeToBackend(m_robotMode == Sidebar::ManualMode);
+    });
+    connect(m_rosClient, &RosBridgeClient::disconnected, this, [this]() {
+        qWarning() << "[MainWindow] RosBridge disconnected. Manual motion output paused until reconnect.";
+        stopManualMotion();
+    });
+    connect(m_rosClient, &RosBridgeClient::errorOccurred, this, [](const QString &msg) {
+        qWarning() << "[MainWindow] RosBridge error:" << msg;
     });
 
     connect(m_sidebar, &Sidebar::settingsSectionSelected, this, [this](int sectionId) {

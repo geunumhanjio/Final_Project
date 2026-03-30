@@ -99,12 +99,63 @@ set(OPENCV_BIN_DIR "")
 set(VEDA_HAS_OPENCV OFF)
 
 if(VEDA_ENABLE_FRUC)
+    set(_opencv_dir_hints "")
+
+    if(OPENCV_ROOT AND EXISTS "${OPENCV_ROOT}")
+        list(APPEND _opencv_dir_hints
+            "${OPENCV_ROOT}"
+            "${OPENCV_ROOT}/build"
+        )
+    endif()
+
+    if(DEFINED ENV{OPENCV_ROOT} AND NOT "$ENV{OPENCV_ROOT}" STREQUAL "")
+        list(APPEND _opencv_dir_hints
+            "$ENV{OPENCV_ROOT}"
+            "$ENV{OPENCV_ROOT}/build"
+        )
+    endif()
+
+    if(DEFINED ENV{OpenCV_DIR} AND NOT "$ENV{OpenCV_DIR}" STREQUAL "")
+        list(APPEND _opencv_dir_hints
+            "$ENV{OpenCV_DIR}"
+            "$ENV{OpenCV_DIR}/build"
+        )
+    endif()
+
+    list(APPEND _opencv_dir_hints
+        "C:/opencv/build"
+        "C:/OpenCV/build"
+        "D:/opencv/build"
+        "D:/OpenCV/build"
+        "C:/tools/opencv/build"
+        "D:/tools/opencv/build"
+    )
+
+    if(NOT OpenCV_DIR OR NOT EXISTS "${OpenCV_DIR}/OpenCVConfig.cmake")
+        foreach(_opencv_dir_hint IN LISTS _opencv_dir_hints)
+            if(_opencv_dir_hint AND EXISTS "${_opencv_dir_hint}/OpenCVConfig.cmake")
+                set(OpenCV_DIR "${_opencv_dir_hint}" CACHE PATH "Directory containing OpenCVConfig.cmake" FORCE)
+
+                if((NOT OPENCV_ROOT OR NOT EXISTS "${OPENCV_ROOT}") AND EXISTS "${_opencv_dir_hint}/x64")
+                    set(OPENCV_ROOT "${_opencv_dir_hint}" CACHE PATH "Optional OpenCV root used for FRUC support" FORCE)
+                endif()
+
+                message(STATUS "Detected OpenCV configuration at: ${OpenCV_DIR}")
+                break()
+            endif()
+        endforeach()
+    endif()
+
     if(OPENCV_ROOT AND EXISTS "${OPENCV_ROOT}")
         list(PREPEND CMAKE_PREFIX_PATH "${OPENCV_ROOT}")
     endif()
 
     if(DEFINED ENV{OpenCV_DIR} AND NOT "$ENV{OpenCV_DIR}" STREQUAL "")
         list(PREPEND CMAKE_PREFIX_PATH "$ENV{OpenCV_DIR}")
+    endif()
+
+    if(OpenCV_DIR AND EXISTS "${OpenCV_DIR}")
+        list(PREPEND CMAKE_PREFIX_PATH "${OpenCV_DIR}")
     endif()
 
     find_package(OpenCV QUIET COMPONENTS core imgproc video videoio)
@@ -211,6 +262,12 @@ set(PROJECT_SOURCES
 if(VEDA_HAS_OPENCV)
     list(APPEND PROJECT_SOURCES
         Video/frucvideoprocessor.h Video/frucvideoprocessor.cpp
+    )
+endif()
+
+if(WIN32)
+    list(APPEND PROJECT_SOURCES
+        app_icon.rc
     )
 endif()
 

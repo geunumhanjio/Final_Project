@@ -49,6 +49,7 @@ public:
         ensureValue(QStringLiteral("Network/CustomCCTVPassword"), QStringLiteral("5hanwha!"));
         ensureValue(QStringLiteral("Control/LinearX"), 0.30);
         ensureValue(QStringLiteral("Control/AngularZ"), 0.50);
+        ensureValue(QStringLiteral("Control/ManualControl"), true);
         ensureValue(QStringLiteral("Navigation/AutoSpeed"), 0.15);
         ensureValue(QStringLiteral("UI/DarkTheme"), true);
         ensureValue(QStringLiteral("Auth/RememberUser"), false);
@@ -102,7 +103,7 @@ public:
     bool getDarkTheme() const { return m_settings->value("UI/DarkTheme", true).toBool(); }
     bool getUseCustomCCTV() const { return m_settings->value("Network/UseCustomCCTV", false).toBool(); }
     bool getUseRtsps() const { return m_settings->value("Network/UseRtsps", false).toBool(); } // [New]
-    bool getManualControl() const { return m_settings->value("Control/ManualControl", false).toBool(); }
+    bool getManualControl() const { return m_settings->value("Control/ManualControl", true).toBool(); }
     double getManualLinearX() const { return clampManualValue(m_settings->value("Control/LinearX", 0.30).toDouble(), 0.30); }
     double getManualAngularZ() const { return clampManualValue(m_settings->value("Control/AngularZ", 0.50).toDouble(), 0.50); }
     double getAutoNavSpeed() const { return clampManualValue(m_settings->value("Navigation/AutoSpeed", 0.15).toDouble(), 0.15); }

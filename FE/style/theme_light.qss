@@ -735,3 +735,18 @@ QPushButton#SettingsSidebarButton:checked {
     font-family: monospace; 
     font-weight: bold;
 }
+
+/* Added for Frameless Window Rounded Corners */
+QMainWindow { background: transparent; }
+#MainWindow { background: transparent; }
+#TopBar { border-top-left-radius: 14px; border-top-right-radius: 14px; }
+#SidebarContainer { border-bottom-left-radius: 14px; }
+QDockWidget { background: transparent; }
+#CentralStack > QWidget { border-bottom-right-radius: 14px; background-color: #f8fafc; }
+
+QMainWindow::separator {
+    width: 0px;
+    height: 0px;
+    border: none;
+}
+

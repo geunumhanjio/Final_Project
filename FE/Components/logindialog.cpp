@@ -4,10 +4,12 @@
 #include "configmanager.h"
 
 #include <QGuiApplication>
+#include <QLinearGradient>
 #include <QHBoxLayout>
 #include <QMouseEvent>
 #include <QMessageBox>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPixmap>
 #include <QScreen>
 #include <QSizePolicy>
@@ -18,6 +20,82 @@
 #include <QWindow>
 
 namespace {
+
+class BrandTitleLabel : public QLabel
+{
+public:
+    explicit BrandTitleLabel(QWidget *parent = nullptr)
+        : QLabel(parent)
+    {
+        setAttribute(Qt::WA_TranslucentBackground, true);
+    }
+
+protected:
+    void paintEvent(QPaintEvent *event) override
+    {
+        Q_UNUSED(event);
+
+        if (text().trimmed().isEmpty()) {
+            return;
+        }
+
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        painter.setRenderHint(QPainter::TextAntialiasing, true);
+
+        QFont drawFont = font();
+        drawFont.setHintingPreference(QFont::PreferFullHinting);
+
+        const QRectF contentRect = rect().adjusted(2.0, 2.0, -2.0, -2.0);
+        const QFontMetricsF metrics(drawFont);
+
+        QPainterPath textPath;
+        textPath.addText(0.0, metrics.ascent(), drawFont, text());
+
+        QRectF pathBounds = textPath.boundingRect();
+        qreal offsetX = contentRect.left();
+        qreal offsetY = contentRect.top();
+
+        if (alignment() & Qt::AlignHCenter) {
+            offsetX += (contentRect.width() - pathBounds.width()) / 2.0 - pathBounds.left();
+        } else if (alignment() & Qt::AlignRight) {
+            offsetX += contentRect.width() - pathBounds.width() - pathBounds.left();
+        } else {
+            offsetX -= pathBounds.left();
+        }
+
+        if (alignment() & Qt::AlignBottom) {
+            offsetY += contentRect.height() - pathBounds.height() - pathBounds.top();
+        } else if (alignment() & Qt::AlignVCenter) {
+            offsetY += (contentRect.height() - pathBounds.height()) / 2.0 - pathBounds.top();
+        } else {
+            offsetY -= pathBounds.top();
+        }
+
+        textPath.translate(offsetX, offsetY);
+        pathBounds = textPath.boundingRect();
+
+        painter.fillPath(textPath.translated(0.0, 2.6), QColor(6, 45, 78, 95));
+
+        QPen outlinePen(QColor(11, 63, 120), 2.2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+        painter.strokePath(textPath, outlinePen);
+
+        QLinearGradient fillGradient(pathBounds.topLeft(), pathBounds.bottomLeft());
+        fillGradient.setColorAt(0.0, QColor(155, 220, 255));
+        fillGradient.setColorAt(0.42, QColor(88, 171, 245));
+        fillGradient.setColorAt(1.0, QColor(69, 120, 219));
+        painter.fillPath(textPath, fillGradient);
+
+        painter.save();
+        painter.setClipPath(textPath);
+        QRectF glossRect = pathBounds.adjusted(0.0, 0.0, 0.0, -(pathBounds.height() * 0.42));
+        QLinearGradient gloss(glossRect.topLeft(), glossRect.bottomLeft());
+        gloss.setColorAt(0.0, QColor(255, 255, 255, 150));
+        gloss.setColorAt(1.0, QColor(255, 255, 255, 0));
+        painter.fillRect(glossRect, gloss);
+        painter.restore();
+    }
+};
 
 QString upperTag(QString value)
 {
@@ -95,6 +173,31 @@ QString extractServerHost(QString value)
     return fallback.trimmed();
 }
 
+QRect dialogAvailableGeometry(const QWidget *widget)
+{
+    if (widget) {
+        if (QWindow *window = widget->windowHandle()) {
+            if (QScreen *screen = window->screen()) {
+                return screen->availableGeometry();
+            }
+        }
+
+        if (const QWidget *parent = widget->parentWidget()) {
+            if (QWindow *window = parent->windowHandle()) {
+                if (QScreen *screen = window->screen()) {
+                    return screen->availableGeometry();
+                }
+            }
+        }
+    }
+
+    if (QScreen *screen = QGuiApplication::primaryScreen()) {
+        return screen->availableGeometry();
+    }
+
+    return QRect(0, 0, 1280, 720);
+}
+
 } // namespace
 
 LoginDialog::LoginDialog(QWidget *parent)
@@ -105,9 +208,10 @@ LoginDialog::LoginDialog(QWidget *parent)
 
     setWindowTitle(QStringLiteral("누비고 로그인"));
     setModal(true);
-    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint | Qt::CustomizeWindowHint);
+    setWindowFlags(Qt::Dialog | Qt::FramelessWindowHint | Qt::CustomizeWindowHint | Qt::NoDropShadowWindowHint);
     setObjectName("LoginDialog");
     setAttribute(Qt::WA_StyledBackground, true);
+    setAttribute(Qt::WA_TranslucentBackground, true);
 
     auto *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(16, 14, 16, 16);
@@ -135,12 +239,15 @@ LoginDialog::LoginDialog(QWidget *parent)
     mainLayout->addLayout(topBarLayout);
 
     m_root = new QWidget(this);
+    m_root->setObjectName("LoginRoot");
+    m_root->setAttribute(Qt::WA_StyledBackground, true);
     auto *rootLayout = new QVBoxLayout(m_root);
     rootLayout->setContentsMargins(0, 0, 0, 0);
     rootLayout->setSpacing(8);
 
     m_card = new QFrame(m_root);
     m_card->setObjectName("LoginCard");
+    m_card->setAttribute(Qt::WA_StyledBackground, true);
     m_card->setFixedWidth(432);
 
     auto *cardLayout = new QVBoxLayout(m_card);
@@ -152,8 +259,17 @@ LoginDialog::LoginDialog(QWidget *parent)
     m_cardAccent->setGeometry(QRect(0, 0, 44, 44));
     m_cardAccent->raise();
 
-    m_cardTitleLabel = new QLabel(m_card);
+    m_cardTitleLabel = new BrandTitleLabel(m_card);
     m_cardTitleLabel->setObjectName("LoginCardTitle");
+    m_cardTitleLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+    QFont brandTitleFont = m_cardTitleLabel->font();
+    brandTitleFont.setFamilies({QStringLiteral("Arial Rounded MT Bold"),
+                                QStringLiteral("Segoe UI"),
+                                QStringLiteral("Malgun Gothic")});
+    brandTitleFont.setPointSize(22);
+    brandTitleFont.setWeight(QFont::Black);
+    brandTitleFont.setLetterSpacing(QFont::AbsoluteSpacing, 0.4);
+    m_cardTitleLabel->setFont(brandTitleFont);
 
     m_cardSubtitleLabel = new QLabel(m_card);
     m_cardSubtitleLabel->setObjectName("LoginCardSubtitle");
@@ -162,16 +278,17 @@ LoginDialog::LoginDialog(QWidget *parent)
 
     auto *titleRow = new QWidget(m_card);
     titleRow->setObjectName("LoginTitleRow");
+    titleRow->setAttribute(Qt::WA_StyledBackground, true);
     auto *titleRowLayout = new QHBoxLayout(titleRow);
     titleRowLayout->setContentsMargins(24, 0, 0, 0);
     titleRowLayout->setSpacing(10);
 
     auto *brandIconLabel = new QLabel(titleRow);
     brandIconLabel->setObjectName("LoginBrandIcon");
-    brandIconLabel->setFixedSize(42, 42);
-    brandIconLabel->setAlignment(Qt::AlignCenter);
-    const QPixmap brandIcon(QStringLiteral(":/icons/assets/icons/nubigo_robot.svg"));
-    brandIconLabel->setPixmap(brandIcon.scaled(38, 38, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    brandIconLabel->setFixedHeight(44);
+    brandIconLabel->setAlignment(Qt::AlignVCenter | Qt::AlignLeft);
+    const QPixmap brandIcon(QStringLiteral(":/icons/assets/icons/noobigo_wordmark.png"));
+    brandIconLabel->setPixmap(brandIcon.scaledToHeight(44, Qt::SmoothTransformation));
 
     titleRowLayout->addWidget(brandIconLabel, 0, Qt::AlignVCenter);
     titleRowLayout->addWidget(m_cardTitleLabel, 1, Qt::AlignVCenter);
@@ -656,38 +773,24 @@ void LoginDialog::paintEvent(QPaintEvent *event)
     Q_UNUSED(event);
 
     QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHint(QPainter::Antialiasing, true);
 
+    const QRectF frameRect = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+    QPainterPath framePath;
+    framePath.addRoundedRect(frameRect, 14.0, 14.0);
+
+    QLinearGradient background(frameRect.topLeft(), frameRect.bottomRight());
     if (m_isDark) {
-        QLinearGradient background(0, 0, width(), height());
         background.setColorAt(0.0, QColor("#08111f"));
         background.setColorAt(0.55, QColor("#0b1326"));
         background.setColorAt(1.0, QColor("#102140"));
-        painter.fillRect(rect(), background);
-
-        painter.setPen(QPen(QColor(173, 198, 255, 48), 1.2));
-        painter.drawLine(36, 36, 160, 36);
-        painter.drawLine(36, 36, 36, 160);
-        painter.drawLine(width() - 36, height() - 36, width() - 160, height() - 36);
-        painter.drawLine(width() - 36, height() - 36, width() - 36, height() - 160);
-
-        painter.setPen(QPen(QColor(53, 125, 241, 35), 1.0));
-        painter.drawLine(48, height() / 2, 180, height() / 2);
-        painter.drawLine(width() - 48, height() / 2, width() - 180, height() / 2);
+        painter.fillPath(framePath, background);
+        painter.strokePath(framePath, QPen(QColor(173, 198, 255, 36), 1.0));
     } else {
-        QLinearGradient background(0, 0, width(), height());
         background.setColorAt(0.0, QColor("#fffdf8"));
         background.setColorAt(1.0, QColor("#eef6ff"));
-        painter.fillRect(rect(), background);
-
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QColor(196, 198, 209, 95));
-        for (int y = 20; y < height(); y += 38) {
-            for (int x = 20; x < width(); x += 38) {
-                painter.drawEllipse(QPointF(x, y), 1.25, 1.25);
-            }
-        }
-
+        painter.fillPath(framePath, background);
+        painter.strokePath(framePath, QPen(QColor(196, 198, 209, 110), 1.0));
     }
 }
 
@@ -1049,10 +1152,15 @@ void LoginDialog::showLoginPage()
         return;
     }
 
+    if (m_signUpStepStack && m_signUpStepOnePage) {
+        m_signUpStepStack->setCurrentWidget(m_signUpStepOnePage);
+    }
+    resetSignUpStepTwoInputs();
+
     m_formStack->setCurrentWidget(m_loginPage);
     applyCurrentPageText();
     updateStatusMessage(QString(), false);
-    recalculateDialogSize();
+    recalculateDialogSize(true);
     if (m_userIdEdit->text().trimmed().isEmpty()) {
         m_userIdEdit->setFocus();
     } else {
@@ -1152,6 +1260,11 @@ void LoginDialog::applyTheme()
         ? QStringLiteral(R"(
 QDialog#LoginDialog {
     color: #dae2fd;
+    background: transparent;
+}
+QWidget#LoginRoot,
+QWidget#LoginTitleRow {
+    background: transparent;
 }
 #LoginTopButton, #LoginCloseButton {
     background: rgba(23, 31, 51, 0.88);
@@ -1351,6 +1464,11 @@ QLabel[loginRole="telemetryValue"] {
         : QStringLiteral(R"(
 QDialog#LoginDialog {
     color: #283044;
+    background: transparent;
+}
+QWidget#LoginRoot,
+QWidget#LoginTitleRow {
+    background: transparent;
 }
 #LoginTopButton, #LoginCloseButton {
     background: rgba(255, 255, 255, 0.92);
@@ -1550,6 +1668,17 @@ QLabel[loginRole="telemetryValue"] {
 )");
 
     setStyleSheet(styleSheet);
+    if (m_cardTitleLabel) {
+        QFont brandTitleFont = m_cardTitleLabel->font();
+        brandTitleFont.setFamilies({QStringLiteral("Arial Rounded MT Bold"),
+                                    QStringLiteral("Segoe UI"),
+                                    QStringLiteral("Malgun Gothic")});
+        brandTitleFont.setPointSize(22);
+        brandTitleFont.setWeight(QFont::Black);
+        brandTitleFont.setLetterSpacing(QFont::AbsoluteSpacing, 0.4);
+        m_cardTitleLabel->setFont(brandTitleFont);
+        m_cardTitleLabel->setMinimumHeight(38);
+    }
     m_cardAccent->setVisible(false);
     m_cardAccent->setGeometry(m_card->width() - 54, -18, 44, 44);
     updateStatusMessage(m_statusLabel->text(), m_statusLabel->property("statusError").toBool());
@@ -1565,6 +1694,11 @@ void LoginDialog::applyCurrentPageText()
                                   : (signUpPage
                                          ? QStringLiteral("누비고 회원가입")
                                          : QStringLiteral("누비고 로그인")));
+    if (!passwordResetPage) {
+        m_cardTitleLabel->setText(signUpPage
+                                      ? QStringLiteral("Sign Up")
+                                      : QStringLiteral("Login"));
+    }
     m_cardSubtitleLabel->clear();
     m_cardSubtitleLabel->setVisible(false);
     updateServerFieldVisibility();
@@ -1643,15 +1777,25 @@ void LoginDialog::recalculateDialogSize(bool preserveCurrentHeight)
         m_formStack->setFixedHeight(targetFormStackHeight);
     }
 
+    // Clear any stale fixed-size constraints before recalculating the dialog bounds.
+    setMinimumSize(0, 0);
+    setMaximumSize(QWIDGETSIZE_MAX, QWIDGETSIZE_MAX);
+
     layout()->activate();
     adjustSize();
     const int preferredHeight = (currentPage == m_passwordResetPage) ? 760 : 620;
     const QSize preferredSize(560, preferredHeight);
     QSize targetSize = boundedDialogSize(sizeHint().expandedTo(preferredSize));
+    const QRect availableGeometry = dialogAvailableGeometry(this);
+    const QSize availableSize(qMax(440, availableGeometry.width() - 48),
+                              qMax(500, availableGeometry.height() - 48));
+    targetSize = targetSize.boundedTo(availableSize);
     if (preserveCurrentHeight && height() > 0) {
         targetSize.setHeight(qMax(targetSize.height(), height()));
     }
-    setFixedSize(targetSize);
+    setMinimumSize(targetSize.width(), 0);
+    setMaximumSize(targetSize.width(), QWIDGETSIZE_MAX);
+    resize(targetSize);
     syncFormWidths();
     positionDialog();
 }

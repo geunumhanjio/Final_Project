@@ -19,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
     setWindowFlag(Qt::FramelessWindowHint, true);
+    setAttribute(Qt::WA_TranslucentBackground, true);
     setWindowTitle(QString(Constants::App::WINDOW_TITLE));
     resize(Constants::App::DEFAULT_WIDTH, Constants::App::DEFAULT_HEIGHT);
 
@@ -106,7 +107,8 @@ bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress)
         return false;
     }
     if (!ConfigManager::instance().getManualControl()) {
-        return false;
+        qWarning() << "[Control] Manual control was disabled in settings. Re-enabling WASD input.";
+        ConfigManager::instance().setManualControl(true);
     }
     if (event->isAutoRepeat()) {
         return false;
@@ -463,17 +465,21 @@ void MainWindow::showFallAlert(const QJsonObject &data)
         ? data.value(QStringLiteral("data")).toObject()
         : data;
 
+    if (!alertData.contains(QStringLiteral("detected"))) {
+        return;
+    }
+
     const QJsonValue detectedValue = alertData.value(QStringLiteral("detected"));
     const bool detected = detectedValue.isBool()
         ? detectedValue.toBool()
         : (detectedValue.toString().trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0);
 
-    qDebug() << "[MainWindow] fall_alert received:" << QJsonDocument(alertData).toJson(QJsonDocument::Compact);
-
     if (!detected) {
         hideFallAlert();
         return;
     }
+
+    qDebug() << "[MainWindow] fall_alert detected:" << QJsonDocument(alertData).toJson(QJsonDocument::Compact);
 
     const double angleDeg = alertData.value(QStringLiteral("angle_deg")).toDouble();
     const double timestampSeconds = alertData.value(QStringLiteral("timestamp")).toDouble();

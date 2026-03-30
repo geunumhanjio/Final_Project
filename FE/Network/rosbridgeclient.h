@@ -6,6 +6,8 @@
 #include <QPointF>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QString>
+#include <QTimer>
 #include <QVector>
 
 class RosBridgeClient : public QObject
@@ -45,7 +47,14 @@ private slots:
     void onTextMessageReceived(const QString &message);
 
 private:
+    void sendJsonMessage(const QJsonObject &message);
+    void scheduleReconnect();
+    void subscribeToDefaultTopics();
+
     QWebSocket m_webSocket;
+    QTimer m_reconnectTimer;
+    QString m_currentUrl;
+    bool m_manualDisconnect = false;
 };
 
 #endif // ROSBRIDGECLIENT_H
