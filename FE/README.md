@@ -289,7 +289,7 @@ $env:PATH += ";C:\Program Files\gstreamer\1.0\msvc_x86_64\bin"
 
 ## 🏫 프로젝트 정보
 
-본 프로젝트는 **VEDA (Vehicle & Embedded Development Academy)** 교육 과정의 최종 프로젝트로 개발되었습니다.
+본 프로젝트는 **VEDA** 교육 과정의 최종 프로젝트로 개발되었습니다.
 
 ---
 
