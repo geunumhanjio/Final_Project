@@ -90,6 +90,15 @@ void LiveVideoWidget::playUrl(const QString &url, int latency)
     qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << url
              << "| transport:" << transport
              << "| latency:" << latency;
+    // RTSP Pipeline
+    QString pipelineStr = QString(
+        "rtspsrc location=%1 protocols=tcp latency=%2 %3 ! "
+        "rtph264depay ! h264parse ! avdec_h264 ! "
+        "videoconvert ! videocrop name=crop ! videoconvert ! "
+        "autovideosink name=sink %4"
+    ).arg(url).arg(latency).arg(options).arg(sinkOptions);
+
+    qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << url;
 
     GError *error = nullptr;
     GstElement *pipeline = gst_parse_launch(pipelineStr.toUtf8().constData(), &error);

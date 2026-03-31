@@ -7,39 +7,7 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
-#include <QSslCertificate>
-#include <QSslConfiguration>
-#include <gst/gst.h>
-#include "Video/Gst/GstQualityMonitor.hpp"
-
-/**
- * @brief Register the embedded RTSPS server certificate in the default Qt CA store.
- */
-static void setupSslContext()
-{
-    const QString certResourcePath = ":/crt/env/server.crt";
-    qDebug() << "[SSL] Loading certificate from Qt resource:" << certResourcePath;
-
-    QFile certFile(certResourcePath);
-    if (!certFile.open(QIODevice::ReadOnly)) {
-        qWarning() << "[SSL] Failed to open embedded server.crt from resource.";
-        return;
-    }
-
-    const QByteArray certData = certFile.readAll();
-    certFile.close();
-
-    const QList<QSslCertificate> certs = QSslCertificate::fromData(certData);
-    if (certs.isEmpty()) {
-        qWarning() << "[SSL] Failed to parse embedded server.crt! RTSPS might fail unless tls-validation-flags=0 is used.";
-        return;
-    }
-
-    QSslConfiguration config = QSslConfiguration::defaultConfiguration();
-    config.addCaCertificates(certs);
-    QSslConfiguration::setDefaultConfiguration(config);
-    qDebug() << "[SSL] Embedded RTSPS server certificate (server.crt) registered successfully.";
-}
+#include <gst/gst.h> // [New] Needed for gst_init
 
 int main(int argc, char *argv[])
 {
@@ -66,8 +34,21 @@ int main(int argc, char *argv[])
     qputenv("GST_DEBUG", "1");
     qDebug() << "[main] GST_DEBUG level set to: 1";
 
+    // Initialize GStreamer Environment
+    // gst_init must be called before any GStreamer usage.
+    // Passing nullptr allowing GStreamer to parse standard command line args if needed (none passed)
+    qDebug() << "[main] Initializing GStreamer...";
+    gst_init(&argc, &argv); 
+    qDebug() << "[main] GStreamer Initialized.";
+
+    // GStreamer 초기화 전에 환경 확인
     QApplication a(argc, argv);
     qDebug() << "[main] Qt application created";
+
+    // Main window will load the theme
+    // qApp->setStyleSheet(...) moved to MainWindow
+
+    qDebug() << "[main] Opening main window...";
 
     qDebug() << "[main] Initializing GStreamer...";
     gst_init(&argc, &argv);

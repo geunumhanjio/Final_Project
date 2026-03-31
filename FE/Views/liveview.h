@@ -15,10 +15,12 @@ public:
     explicit LiveView(QWidget *parent = nullptr);
     void setChannelVisible(int index, bool visible);
     void stopAll();
+    void updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs); // [New]
 
 signals:
     void requestFullScreen(int index, QString url);
     void recordCommandRequested(int channelId, bool start);
+    void streamStatsRequested(int channelId, bool start); // [New]
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;

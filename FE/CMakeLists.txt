@@ -55,7 +55,6 @@ include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/Views"
     "${CMAKE_CURRENT_SOURCE_DIR}/Components"
     "${CMAKE_CURRENT_SOURCE_DIR}/Video"
-    "${CMAKE_CURRENT_SOURCE_DIR}/Video/Gst"
     "${CMAKE_CURRENT_SOURCE_DIR}/Network"
     "${CMAKE_CURRENT_SOURCE_DIR}/Utils"
 )
@@ -94,6 +93,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(VEDA_QT_1 MANUAL_FINALIZATION ${PROJECT_SOURCES}
         Components/full_underbar.h Components/full_underbar.cpp
         resources.qrc)
+        Components/full_underbar.h Components/full_underbar.cpp)
 else()
     if(ANDROID)
         add_library(VEDA_QT_1 SHARED ${PROJECT_SOURCES})

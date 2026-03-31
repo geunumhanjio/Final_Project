@@ -321,6 +321,8 @@ void VideoCard::showSettingsMenu()
             cbAll->blockSignals(false);
             
             Q_UNUSED(anyChecked);
+            // Emit signal to dynamically connect to camera server WebSocket
+            emit streamStatsRequested(m_channelId, anyChecked);
         });
     }
 
@@ -341,3 +343,19 @@ void VideoCard::showSettingsMenu()
     popup->show();
 }
 
+void VideoCard::updateStreamStats(double fps, double bitrateKbps, double proxyLatencyMs)
+{
+    if (m_videoWidget && m_videoWidget->getOsdWidget()) {
+        OsdWidget *osd = m_videoWidget->getOsdWidget();
+        
+        if (osd->isMetricVisible(OsdWidget::FPS)) {
+            osd->setMetricValue(OsdWidget::FPS, QString::number(qRound(fps)));
+        }
+        if (osd->isMetricVisible(OsdWidget::Bitrate)) {
+            osd->setMetricValue(OsdWidget::Bitrate, QString::number(bitrateKbps / 1024.0, 'f', 2) + " Mbps");
+        }
+        if (osd->isMetricVisible(OsdWidget::Latency)) {
+            osd->setMetricValue(OsdWidget::Latency, QString::number(proxyLatencyMs, 'f', 3) + " ms");
+        }
+    }
+}

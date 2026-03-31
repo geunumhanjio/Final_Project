@@ -22,6 +22,7 @@ public:
         if(getRobotIp().isEmpty()) setRobotIp("ws://192.168.0.237:9090");
         // getUseCustomCCTV defaults to false if not set
         // getUseRtsps defaults to false if not set
+        // getUseCustomCCTV defaults to false if not set, handled by QSettings default value
     }
 
     // Getter

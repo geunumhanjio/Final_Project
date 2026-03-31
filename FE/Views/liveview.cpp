@@ -39,6 +39,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
 
         // Connect record signal
         connect(cctvWidgets[i], &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
+        connect(cctvWidgets[i], &VideoCard::streamStatsRequested, this, &LiveView::streamStatsRequested); // [New]
         
         gridLayout->addWidget(cctvWidgets[i], i / 2, i % 2);
     }
@@ -71,6 +72,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     
     // Connect record signal
     connect(rcCarCamWidget, &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
+    connect(rcCarCamWidget, &VideoCard::streamStatsRequested, this, &LiveView::streamStatsRequested); // [New]
 
     rightLayout->addWidget(rcCarCamWidget);
 
@@ -278,3 +280,22 @@ void LiveView::stopAll() {
     streamStarted = false; // [Fix] Reset flag so showEvent restarts streams
 }
 
+void LiveView::updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs)
+{
+    // Check CCTV Widgets (Channels 1-4)
+    for (int i = 0; i < 4; i++) {
+        if (channelId == i + 1) {
+            if (cctvWidgets[i]) {
+                cctvWidgets[i]->updateStreamStats(fps, bitrateKbps, proxyLatencyMs);
+            }
+            return;
+        }
+    }
+
+    // Check RC Car Widget (Channel 9)
+    if (channelId == 9) {
+        if (rcCarCamWidget) {
+            rcCarCamWidget->updateStreamStats(fps, bitrateKbps, proxyLatencyMs);
+        }
+    }
+}

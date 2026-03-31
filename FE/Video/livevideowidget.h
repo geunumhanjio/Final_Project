@@ -24,6 +24,8 @@ protected:
 private:
     QTimer *retryTimer;
     QTimer *watchdogTimer;
+    QString currentUrl;
+    int currentLatency;
 
 public:
     QString getUrl() const { return currentUrl; }
