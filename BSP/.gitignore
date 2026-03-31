@@ -1,0 +1,36 @@
+# Build outputs
+build/
+
+# IDE settings
+.vscode/
+.idea/
+*.sublime-*
+
+# STM32CubeIDE / CubeMX
+.settings/
+.project
+.cproject
+Debug/
+Release/
+Core/Src/STM32CubeMX/
+
+# Backup files
+*~
+*.bak
+*.swp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Personal notes
+CLAUDE.md
+GEMINI.md
+.claude/
+.gemini/
+notes/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
