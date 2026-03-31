@@ -3,8 +3,12 @@
 
 #include <QObject>
 #include <QWebSocket>
+#include <QPointF>
 #include <QJsonObject>
 #include <QJsonDocument>
+#include <QString>
+#include <QTimer>
+#include <QVector>
 
 class RosBridgeClient : public QObject
 {
@@ -23,6 +27,12 @@ signals:
     void connected();
     void disconnected();
     void errorOccurred(const QString &msg);
+    void mapReceived(const QJsonObject &data);
+    void odomReceived(const QJsonObject &data);
+    void pathReceived(const QJsonObject &data);
+    void navStatusReceived(const QJsonObject &data);
+    void navFeedbackReceived(const QJsonObject &data);
+    void fallAlertReceived(const QJsonObject &data);
 
 private slots:
     void onConnected();
@@ -30,7 +40,14 @@ private slots:
     void onTextMessageReceived(const QString &message);
 
 private:
+    void sendJsonMessage(const QJsonObject &message);
+    void scheduleReconnect();
+    void subscribeToDefaultTopics();
+
     QWebSocket m_webSocket;
+    QTimer m_reconnectTimer;
+    QString m_currentUrl;
+    bool m_manualDisconnect = false;
 };
 
 #endif // ROSBRIDGECLIENT_H

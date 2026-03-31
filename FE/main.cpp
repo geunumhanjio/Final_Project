@@ -3,11 +3,14 @@
  * @brief Program entry point. Initializes Qt, GStreamer, SSL, and opens the main window.
  */
 #include "mainwindow.h"
+#include "logindialog.h"
+#include "applicationinitializer.h"
+#include "configmanager.h"
+
 #include <QApplication>
 #include <QDebug>
-#include <QDir>
-#include <QFile>
-#include <gst/gst.h> // [New] Needed for gst_init
+#include <QIcon>
+#include <QTimer>
 
 int main(int argc, char *argv[])
 {
@@ -34,21 +37,27 @@ int main(int argc, char *argv[])
     qputenv("GST_DEBUG", "1");
     qDebug() << "[main] GST_DEBUG level set to: 1";
 
-    // Initialize GStreamer Environment
-    // gst_init must be called before any GStreamer usage.
-    // Passing nullptr allowing GStreamer to parse standard command line args if needed (none passed)
-    qDebug() << "[main] Initializing GStreamer...";
-    gst_init(&argc, &argv); 
-    qDebug() << "[main] GStreamer Initialized.";
+void applyNativeWindowIcon(QWidget *widget)
+{
+    if (!widget) {
+        return;
+    }
 
     // GStreamer 초기화 전에 환경 확인
     QApplication a(argc, argv);
     qDebug() << "[main] Qt application created";
 
-    // Main window will load the theme
-    // qApp->setStyleSheet(...) moved to MainWindow
+    QIcon appIcon;
+    appIcon.addFile(QStringLiteral(":/icons/assets/icons/noobigo_app.png"));
+    appIcon.addFile(QStringLiteral(":/icons/assets/icons/noobigo_app.ico"));
+    if (!appIcon.isNull()) {
+        a.setWindowIcon(appIcon);
+    }
 
-    qDebug() << "[main] Opening main window...";
+    // Initialize all system components
+    if (!ApplicationInitializer::initializeEnvironment()) {
+        qWarning() << "[main] Failed to initialize some system components";
+    }
 
     qDebug() << "[main] Initializing GStreamer...";
     gst_init(&argc, &argv);
@@ -59,7 +68,15 @@ int main(int argc, char *argv[])
 
     qDebug() << "[main] Opening main window...";
     MainWindow w;
+    if (!appIcon.isNull()) {
+        w.setWindowIcon(appIcon);
+    }
     w.show();
+#ifdef Q_OS_WIN
+    QTimer::singleShot(0, &w, [&w]() {
+        applyNativeWindowIcon(&w);
+    });
+#endif
 
     qDebug() << "[main] Main window shown";
     qDebug() << "=================================";

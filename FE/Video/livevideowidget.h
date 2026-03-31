@@ -20,12 +20,11 @@ public:
 protected:
     // Override to handle RTSP specific bus messages if needed
     // void onBusMessage(GstMessage *msg) override; 
+    void onGstError(const QString &errorText, const QString &debugText) override;
 
 private:
     QTimer *retryTimer;
     QTimer *watchdogTimer;
-    QString currentUrl;
-    int currentLatency;
 
 public:
     QString getUrl() const { return currentUrl; }

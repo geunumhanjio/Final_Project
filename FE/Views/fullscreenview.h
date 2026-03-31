@@ -15,6 +15,12 @@
 #include "recordedvideowidget.h"
 #include "full_underbar.h"
 
+class QButtonGroup;
+class GoalArrowOverlayWidget;
+class QRadioButton;
+class QResizeEvent;
+class QWheelEvent;
+
 class FullScreenView : public QWidget
 {
     Q_OBJECT
@@ -33,6 +39,7 @@ signals:
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
 
 private slots:
     void onZoomIn();
@@ -42,6 +49,8 @@ private slots:
     void onControlModeToggled(bool checked);
 
 private:
+    void requestCloseView();
+    void updateModeQuickPanelGeometry();
     QStackedWidget *videoStack; // [New]
     LiveVideoWidget *liveWidget; // [New]
     RecordedVideoWidget *recordedWidget; // [New]
@@ -55,6 +64,14 @@ private:
     QLabel *liveBadge;
     QPushButton *btnSettings; // [New]
     QPushButton *btnClose;
+    QWidget *modeQuickPanel;
+    QLabel *modeQuickTitle;
+    QButtonGroup *modeQuickGroup;
+    QRadioButton *modeQuickManualButton;
+    QRadioButton *modeQuickAutoButton;
+    QRadioButton *modeQuickControlButton;
+    QRadioButton *modeQuickPatrolButton;
+    QPushButton *modeQuickStopButton;
 
     // [수정] QRubberBand* -> QWidget* 으로 변경
     QWidget *rubberBand;
@@ -77,9 +94,31 @@ private:
     Mode currentMode;
 
     QString getChannelName(int index);
+    bool canControlCurrentVideo() const;
+    bool hasActiveZoom() const;
+    void applyWheelZoom(const QPointF &widgetPoint, double steps);
     void setMode(Mode mode);
+    QPointF quadrantToWorld(const QPointF &normalizedPoint, bool *ok = nullptr) const;
+    void updateCommittedGoalOverlay();
+    QPointF widgetPointToVideoNormalized(const QPointF &widgetPoint) const;
+    QPointF videoNormalizedToWidgetPoint(const QPointF &normalizedPoint) const;
     
     int currentChannelId = -1; // [New] Track current channel
+    bool m_controlModeAvailable = false;
+    QPointF m_mapOrigin;
+    int m_mapWidthCells = 0;
+    int m_mapHeightCells = 0;
+    double m_mapResolution = 0.0;
+    bool m_hasVideoGoalOverlay = false;
+    int m_videoGoalOverlayChannelIndex = -1;
+    QPointF m_videoGoalStartNormalized;
+    QPointF m_videoGoalEndNormalized;
+    bool m_hasVideoGoalLocalCache = false;
+    QPointF m_videoGoalStartLocal;
+    QPointF m_videoGoalEndLocal;
+    QRectF m_videoGoalDisplayRect;
+    QRectF m_videoGoalCropRect;
+    bool m_preserveVideoGoalLocalCacheOnNextSet = false;
 };
 
 #endif // FULLSCREENVIEW_H

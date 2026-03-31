@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QDir>
+#include <QQueue>
 
 class CameraControlClient : public QObject
 {
@@ -24,6 +25,7 @@ public:
     void connectToServer(const QString &cameraIp); // [New]
 
     // Connects to ws://[cameraIp]:9000 and sends the command
+    void sendCalibrationClick(const QString &cameraIp, double x1, double y1, double x2, double y2);
     void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
     void requestStreamStats(const QString &cameraIp, int channelId, bool start); // [New]
     void requestRecordings(const QString &cameraIp);
@@ -52,6 +54,11 @@ private slots:
     void onBinaryMessageReceived(const QByteArray &message); // [New]
 
 private:
+    struct PendingCommand {
+        QString cameraIp;
+        QString payload;
+    };
+
     QWebSocket m_webSocket;
     QString m_pendingCommand;
     QString m_currentIp; // [New]
@@ -65,6 +72,8 @@ private:
     
     // Helper to ensure command delivery
     void safeSend(const QString &jsonString, const QString &ip);
+    void processPendingCommands();
+    void openSocketForHost(const QString &ip);
 };
 
 #endif // CAMERACONTROLCLIENT_H

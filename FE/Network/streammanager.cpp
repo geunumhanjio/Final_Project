@@ -1,6 +1,16 @@
 #include "streammanager.h"
 #include "configmanager.h"
 #include <QDebug>
+#include <QUrl>
+
+namespace {
+
+QString encodeUserInfo(const QString &value)
+{
+    return QString::fromUtf8(QUrl::toPercentEncoding(value));
+}
+
+} // namespace
 
 StreamManager::StreamManager(QObject *parent) : QObject(parent)
 {
@@ -12,7 +22,6 @@ void StreamManager::loadConfig()
     m_channels.clear();
 
     // ConfigManager에서 IP와 Port 가져오기
-    ConfigManager::instance().loadDefaults(); // 초기값이 없으면 설정
     QString ip = ConfigManager::instance().getCameraIp();
     QString port = ConfigManager::instance().getCameraPort();
     bool useCustomCCTV = ConfigManager::instance().getUseCustomCCTV();
@@ -24,7 +33,7 @@ void StreamManager::loadConfig()
 
     qDebug() << "[StreamManager] Loading config | Mode:" << scheme << "IP:" << ip << "Port:" << port << "UseCustomCCTV:" << useCustomCCTV;
 
-    qDebug() << "[StreamManager] Loading config with IP:" << ip << "Port:" << port << "UseCustomCCTV:" << useCustomCCTV;
+    qDebug() << "[StreamManager] Loading config | Mode:" << scheme << "IP:" << ip << "Port:" << port << "UseCustomCCTV:" << useCustomCCTV;
 
     // 4 CCTV Channels
     for(int i = 0; i < 4; i++) {
@@ -50,9 +59,9 @@ void StreamManager::loadConfig()
             config.urlLow = url;
             config.urlHigh = url; 
         } else {
-            // Unchecked: rtsp://IP:PORT/ch<ID+1>
-            config.urlLow = QString("rtsp://%1:%2/ch%3").arg(ip, port).arg(i+1);
-            config.urlHigh = QString("rtsp://%1:%2/ch%3_fhd").arg(ip, port).arg(i+1);
+            // Unchecked: rtsps?://IP:PORT/ch<ID+1>
+            config.urlLow = QString("%1://%2:%3/ch%4").arg(scheme, ip, port).arg(i+1);
+            config.urlHigh = QString("%1://%2:%3/ch%4_fhd").arg(scheme, ip, port).arg(i+1);
         }
         
         config.isActive = true;

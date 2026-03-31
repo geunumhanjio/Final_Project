@@ -76,7 +76,7 @@ cd Final_Project/FE
 
 ---
 
-## 📂 프로젝트 구조
+## 🏛️ 시스템 아키텍처
 
 ```text
 FE/

@@ -1,7 +1,42 @@
 #include "livevideowidget.h"
+#include "authmanager.h"
 #include <QDebug>
 #include <QFile>
 #include <QApplication>
+#include <QUrl>
+
+namespace {
+
+QString sanitizedUrlForLog(const QString &url)
+{
+    QUrl parsed(url);
+    if (!parsed.isValid()) {
+        return url;
+    }
+
+    if (!parsed.userName().isEmpty()) {
+        parsed.setUserName(QStringLiteral("***"));
+    }
+    if (!parsed.password().isEmpty()) {
+        parsed.setPassword(QStringLiteral("***"));
+    }
+    if (parsed.hasQuery()) {
+        parsed.setQuery(QStringLiteral("token=***"));
+    }
+
+    return parsed.toString();
+}
+
+bool looksUnauthorized(const QString &text)
+{
+    const QString lowered = text.toLower();
+    return lowered.contains(QStringLiteral("401"))
+           || lowered.contains(QStringLiteral("unauthorized"))
+           || lowered.contains(QStringLiteral("not authorized"))
+           || lowered.contains(QStringLiteral("authentication"));
+}
+
+} // namespace
 
 LiveVideoWidget::LiveVideoWidget(QWidget *parent)
     : VideoWidget(parent)
@@ -51,6 +86,10 @@ void LiveVideoWidget::playUrl(const QString &url, int latency)
     currentUrl = url;
     currentLatency = latency;
 
+    if (AuthManager::instance().isAccessTokenExpiringSoon()) {
+        AuthManager::instance().refreshAccessToken();
+    }
+
     // Call base placeholder logic if needed, or handle here
     // But Base VideoWidget might manage placeholderLabel. 
     // We should expose placeholderLabel or a protected method.
@@ -92,13 +131,20 @@ void LiveVideoWidget::playUrl(const QString &url, int latency)
              << "| latency:" << latency;
     // RTSP Pipeline
     QString pipelineStr = QString(
-        "rtspsrc location=%1 protocols=tcp latency=%2 %3 ! "
-        "rtph264depay ! h264parse ! avdec_h264 ! "
+        "rtspsrc name=src location=%1 protocols=%2 latency=%3 %4 ! "
+        "qualitymonitor name=qmon ! "
+        "queue ! "
+        "rtph264depay ! h264parse ! "
+        "queue ! "
+        "avdec_h264 ! "
+        "queue ! "
         "videoconvert ! videocrop name=crop ! videoconvert ! "
-        "autovideosink name=sink %4"
-    ).arg(url).arg(latency).arg(options).arg(sinkOptions);
+        "autovideosink name=sink %5"
+    ).arg(url).arg(transport).arg(latency).arg(options).arg(sinkOptions);
 
-    qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << url;
+    qDebug() << "[LiveVideoWidget] Playing Rtsp Stream:" << sanitizedUrlForLog(url)
+             << "| transport:" << transport
+             << "| latency:" << latency;
 
     GError *error = nullptr;
     GstElement *pipeline = gst_parse_launch(pipelineStr.toUtf8().constData(), &error);
@@ -108,6 +154,19 @@ void LiveVideoWidget::playUrl(const QString &url, int latency)
         if (error) g_error_free(error);
         startRetryTimer(); 
         return;
+    }
+
+    GstElement *source = gst_bin_get_by_name(GST_BIN(pipeline), "src");
+    if (source) {
+        const bool headerConfigured = isRtsps && AuthManager::instance().configureRtspSource(source);
+        if (isRtsps && !headerConfigured) {
+            const QString fallbackUrl = AuthManager::instance().authorizedRtspUrl(currentUrl);
+            if (fallbackUrl != currentUrl) {
+                g_object_set(source, "location", fallbackUrl.toUtf8().constData(), nullptr);
+                qDebug() << "[LiveVideoWidget] Using query-token fallback for RTSPS:" << sanitizedUrlForLog(fallbackUrl);
+            }
+        }
+        gst_object_unref(source);
     }
 
     // Set pipeline in base class
@@ -133,4 +192,13 @@ void LiveVideoWidget::startRetryTimer()
     if (isPlaying() || retryTimer->isActive() || currentUrl.isEmpty()) return;
     showPlaceholder("Retrying...");
     retryTimer->start(3000);
+}
+
+void LiveVideoWidget::onGstError(const QString &errorText, const QString &debugText)
+{
+    if (currentUrl.startsWith("rtsps://", Qt::CaseInsensitive)
+        && (looksUnauthorized(errorText) || looksUnauthorized(debugText))) {
+        qWarning() << "[LiveVideoWidget] Unauthorized stream response detected. Triggering token refresh.";
+        AuthManager::instance().refreshAccessToken();
+    }
 }

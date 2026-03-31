@@ -1,19 +1,19 @@
 #ifndef SETTINGSWIDGET_H
 #define SETTINGSWIDGET_H
 
-#include <QWidget>
-#include <QLineEdit>
-#include <QPushButton>
 #include <QCheckBox>
-#include <QFormLayout>
+#include <QDoubleSpinBox>
 #include <QLabel>
-#include <QMessageBox>
-#include <QVBoxLayout>
-#include "configmanager.h"
-#include "streammanager.h"
+#include <QLineEdit>
+#include <QStackedWidget>
+#include <QWidget>
 
-class SettingsWidget : public QWidget {
+class QFormLayout;
+
+class SettingsWidget : public QWidget
+{
     Q_OBJECT
+
 public:
     SettingsWidget(QWidget *parent = nullptr) : QWidget(parent) {
         QVBoxLayout *mainLayout = new QVBoxLayout(this);
