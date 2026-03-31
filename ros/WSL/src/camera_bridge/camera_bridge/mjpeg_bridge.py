@@ -36,8 +36,9 @@ class MJPEGBridge(Node):
     
     def timer_callback(self):
         try:
-            # 더 많이 읽기
-            self.bytes_data += self.stream.read(16384)
+            # 타협안 최적화: 타이머(100Hz)는 유지하여 라이다/ROS 시스템의 CPU를 보장하되,
+            # 한 번에 읽어오는 용량을 16KB -> 64KB로 늘려 병목 해소 (최대 6.5MB/s 대역폭 확보)
+            self.bytes_data += self.stream.read(65536)
             
             a = self.bytes_data.find(b'\xff\xd8')
             b = self.bytes_data.find(b'\xff\xd9')

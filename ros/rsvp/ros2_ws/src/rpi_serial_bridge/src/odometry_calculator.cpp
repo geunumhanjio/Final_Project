@@ -57,14 +57,16 @@ int32_t OdometryCalculator::calculateTickDelta(int16_t current, int16_t previous
 
 void OdometryCalculator::updateFromTicks(int16_t left_ticks, int16_t right_ticks, double dt)
 {
-  // 틱 차분 계산 (오버플로우 고려)
-  int32_t delta_left = calculateTickDelta(left_ticks, prev_left_ticks_);
-  int32_t delta_right = calculateTickDelta(right_ticks, prev_right_ticks_);
-  
-  // 이전 값 저장
-  prev_left_ticks_ = left_ticks;
-  prev_right_ticks_ = right_ticks;
-  
+  // STM32가 누적 틱이 아닌 주기별 delta 틱을 전송
+  int32_t delta_left  = static_cast<int32_t>(left_ticks);
+  int32_t delta_right = static_cast<int32_t>(right_ticks);
+
+  // 실속(stall) 노이즈 필터: PWM 인가된 모터가 실속 시 진동으로 소량 틱 발생
+  // 1920 ticks/rev → 1tick ≈ 0.1mm, 2틱 이하는 노이즈로 간주
+  constexpr int32_t TICK_DEADZONE = 2;
+  if (std::abs(delta_left)  <= TICK_DEADZONE) delta_left  = 0;
+  if (std::abs(delta_right) <= TICK_DEADZONE) delta_right = 0;
+
   // 거리 계산
   double distance_left = delta_left * meters_per_tick_;
   double distance_right = delta_right * meters_per_tick_;
@@ -172,13 +174,14 @@ nav_msgs::msg::Odometry OdometryCalculator::createOdometryMsg(
   // Twist
   odom.twist.twist = getTwist();
   
-  // Covariance (임시 값, 나중에 튜닝 필요)
-  odom.pose.covariance[0] = 0.001;   // x
-  odom.pose.covariance[7] = 0.001;   // y
-  odom.pose.covariance[35] = 0.01;   // yaw
-  
-  odom.twist.covariance[0] = 0.001;  // vx
-  odom.twist.covariance[35] = 0.01;  // vyaw
+  // Covariance: 실제 휠 오도메트리 정확도 반영
+  // 너무 작으면 EKF가 오도메트리를 과신해 IMU 보정을 무시함
+  odom.pose.covariance[0] = 0.05;    // x      (~22cm 1σ)
+  odom.pose.covariance[7] = 0.05;    // y
+  odom.pose.covariance[35] = 0.1;    // yaw    (~18° 1σ)
+
+  odom.twist.covariance[0] = 0.01;   // vx
+  odom.twist.covariance[35] = 0.05;  // vyaw
   
   return odom;
 }

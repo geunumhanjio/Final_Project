@@ -7,6 +7,7 @@
 #include <chrono>
 #include <sstream>
 #include <iomanip>
+#include <filesystem>
 
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -20,7 +21,8 @@ SerialBridgeNode::SerialBridgeNode(const rclcpp::NodeOptions& options)
   running_(false),
   emergency_stopped_(false),
   last_odom_time_(this->now()),
-  last_cmd_vel_time_(this->now())
+  last_cmd_vel_time_(this->now()),
+  csv_log_enabled_(false)
 {
   RCLCPP_INFO(this->get_logger(), "Initializing Serial Bridge Node...");
 
@@ -92,6 +94,12 @@ SerialBridgeNode::~SerialBridgeNode()
 
   // 시리얼 포트 닫기
   closeSerialPort();
+
+  // CSV 파일 닫기
+  if (csv_file_.is_open()) {
+    csv_file_.close();
+    RCLCPP_INFO(this->get_logger(), "CSV log file closed");
+  }
 }
 
 void SerialBridgeNode::declareParameters()
@@ -123,6 +131,13 @@ void SerialBridgeNode::declareParameters()
   // 오도메트리 타입
   this->declare_parameter("odom_data_type", "ticks");  // "ticks" or "velocity"
 
+  // TF 발행 (EKF가 있는 경우 false로 설정해 TF 충돌 방지)
+  this->declare_parameter("publish_tf", true);
+
+  // CSV 로깅
+  this->declare_parameter("csv_log_enabled", false);
+  this->declare_parameter("csv_log_path", "/root/ros2_ws/log/serial_bridge_log.csv");
+
   // 파라미터 읽기
   serial_port_ = this->get_parameter("serial_port").as_string();
   baud_rate_ = this->get_parameter("baud_rate").as_int();
@@ -137,6 +152,29 @@ void SerialBridgeNode::declareParameters()
   imu_frame_id_ = this->get_parameter("imu_frame_id").as_string();
   cmd_vel_repeat_rate_ = this->get_parameter("cmd_vel_repeat_rate").as_double();
   odom_data_type_ = this->get_parameter("odom_data_type").as_string();
+  publish_tf_ = this->get_parameter("publish_tf").as_bool();
+  csv_log_enabled_ = this->get_parameter("csv_log_enabled").as_bool();
+  csv_log_path_ = this->get_parameter("csv_log_path").as_string();
+
+  // CSV 파일 열기
+  if (csv_log_enabled_) {
+    // 디렉토리 없으면 생성
+    std::filesystem::path csv_path(csv_log_path_);
+    if (csv_path.has_parent_path()) {
+      std::filesystem::create_directories(csv_path.parent_path());
+    }
+    csv_file_.open(csv_log_path_, std::ios::out | std::ios::app);
+    if (csv_file_.is_open()) {
+      // 헤더가 없는 새 파일이면 헤더 작성
+      if (csv_file_.tellp() == 0) {
+        csv_file_ << "timestamp_sec,direction,type,val1,val2,val3,val4,val5,val6\n";
+      }
+      RCLCPP_INFO(this->get_logger(), "CSV logging enabled: %s", csv_log_path_.c_str());
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Failed to open CSV log file: %s", csv_log_path_.c_str());
+      csv_log_enabled_ = false;
+    }
+  }
 
   RCLCPP_INFO(this->get_logger(), "Parameters loaded:");
   RCLCPP_INFO(this->get_logger(), "  serial_port: %s", serial_port_.c_str());
@@ -271,12 +309,14 @@ void SerialBridgeNode::emergencyStopCallback(const std_msgs::msg::Bool::SharedPt
     auto packet = protocol_.createEmergencyStopPacket();
     if (serial_fd_ != -1) {
       write(serial_fd_, packet.data(), packet.size());
+      logToCsv("TX", "EMERGENCY_STOP", {});
     }
   } else {
     RCLCPP_INFO(this->get_logger(), "Emergency stop released");
     auto packet = protocol_.createEmergencyReleasePacket();
     if (serial_fd_ != -1) {
       write(serial_fd_, packet.data(), packet.size());
+      logToCsv("TX", "EMERGENCY_RELEASE", {});
     }
   }
 }
@@ -307,7 +347,7 @@ void SerialBridgeNode::sendVelocityCommand(double linear_x, double angular_z)
 
   // Twist → 좌/우 바퀴 속도 (m/s)
   
-  const double ANGULAR_GAIN = 4.8;  // 조정 가능
+  const double ANGULAR_GAIN = (std::abs(linear_x) < 1e-3) ? 3.8 : 3.0;
   double angular_scaled = angular_z * ANGULAR_GAIN;
   
   auto [v_left, v_right] = odom_calc_->twistToWheelVelocities(linear_x, angular_scaled);
@@ -335,6 +375,13 @@ void SerialBridgeNode::sendVelocityCommand(double linear_x, double angular_z)
   RCLCPP_DEBUG(this->get_logger(), "%s", ss.str().c_str());
   
   ssize_t written = write(serial_fd_, packet.data(), packet.size());
+
+  if (written > 0) {
+    logToCsv("TX", "VELOCITY", {
+      std::to_string(left_mm_s),
+      std::to_string(right_mm_s)
+    });
+  }
 
   if (written < 0) {
     RCLCPP_ERROR_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
@@ -366,12 +413,18 @@ void SerialBridgeNode::handleOdomData(int16_t left, int16_t right)
     odom_calc_->updateFromVelocities(left, right, dt);
   }
 
+  logToCsv("RX", "ODOM", {std::to_string(left), std::to_string(right)});
+
   // Publish
   publishWheelOdom();
 }
 
 void SerialBridgeNode::handleImuData(const int16_t imu_raw[6])
 {
+  logToCsv("RX", "IMU", {
+    std::to_string(imu_raw[0]), std::to_string(imu_raw[1]), std::to_string(imu_raw[2]),
+    std::to_string(imu_raw[3]), std::to_string(imu_raw[4]), std::to_string(imu_raw[5])
+  });
   publishImu(imu_raw);
 }
 
@@ -426,9 +479,10 @@ void SerialBridgeNode::publishWheelOdom()
   );
 
   wheel_odom_pub_->publish(odom_msg);
-  
-  // TF 발행
-  publishTransform(odom_msg);
+
+  if (publish_tf_) {
+    publishTransform(odom_msg);
+  }
 }
 
 void SerialBridgeNode::publishTransform(const nav_msgs::msg::Odometry& odom)
@@ -445,6 +499,31 @@ void SerialBridgeNode::publishTransform(const nav_msgs::msg::Odometry& odom)
   transform.transform.rotation = odom.pose.pose.orientation;
   
   tf_broadcaster_->sendTransform(transform);
+}
+
+void SerialBridgeNode::logToCsv(const std::string& direction, const std::string& type,
+                                 const std::vector<std::string>& values)
+{
+  if (!csv_log_enabled_ || !csv_file_.is_open()) {
+    return;
+  }
+
+  double timestamp = this->now().seconds();
+
+  std::lock_guard<std::mutex> lock(csv_mutex_);
+  csv_file_ << std::fixed << std::setprecision(6) << timestamp
+            << "," << direction
+            << "," << type;
+
+  // 최대 6개 값, 빈 칸은 공백
+  for (int i = 0; i < 6; ++i) {
+    csv_file_ << ",";
+    if (i < static_cast<int>(values.size())) {
+      csv_file_ << values[i];
+    }
+  }
+  csv_file_ << "\n";
+  csv_file_.flush();
 }
 
 void SerialBridgeNode::transformImuData(int16_t imu_raw[6]) const

@@ -15,11 +15,13 @@ services:
       - ROS_DOMAIN_ID=0
       - ROS_LOCALHOST_ONLY=0
       - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - CYCLONEDDS_URI=/root/cyclonedds.xml
       - PYTHONUNBUFFERED=1
       - RCUTILS_COLORIZED_OUTPUT=1
 
     volumes:
       - ../src:/root/ros2_ws/src
+      - ./cyclonedds.xml:/root/cyclonedds.xml:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - /dev/shm:/dev/shm
 

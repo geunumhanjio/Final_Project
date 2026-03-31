@@ -38,6 +38,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     pkg_share = FindPackageShare('rpi_bringup')
     params_file = PathJoinSubstitution([pkg_share, 'config', 'rpi_params.yaml'])
+    serial_bridge_params = PathJoinSubstitution([pkg_share, 'config', 'serial_bridge_params.yaml'])
 
     # ── Launch Arguments ───────────────────────────────────────────────────────
     use_camera_arg = DeclareLaunchArgument(
@@ -60,6 +61,16 @@ def generate_launch_description():
         default_value='/dev/ttyUSB0',
         description='YDLiDAR USB port (e.g. /dev/ttyUSB0, /dev/ttyUSB1, /dev/ydlidar)'
     )
+    use_servo_arg = DeclareLaunchArgument(
+        'use_servo',
+        default_value='true',
+        description='Enable camera tilt servo node'
+    )
+    use_ekf_arg = DeclareLaunchArgument(
+        'use_ekf',
+        default_value='true',
+        description='Enable EKF on RPi (WSL EKF must be disabled)'
+    )
 
     # ── Node: Camera ───────────────────────────────────────────────────────────
     camera_node = Node(
@@ -76,9 +87,26 @@ def generate_launch_description():
         package='rpi_serial_bridge',
         executable='serial_bridge_node',
         name='serial_bridge_node',
-        parameters=[params_file],
+        parameters=[params_file, serial_bridge_params],
         condition=IfCondition(LaunchConfiguration('use_serial')),
         output='screen',
+    )
+
+    # ── Node: Camera Tilt Servo ───────────────────────────────────────────────
+    servo_node = Node(
+        package='rpi_servo',
+        executable='servo_tilt_node',
+        name='servo_tilt_node',
+        condition=IfCondition(LaunchConfiguration('use_servo')),
+        output='screen',
+    )
+
+    # ── Include: EKF ──────────────────────────────────────────────────────────
+    ekf_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([
+            PathJoinSubstitution([pkg_share, 'launch', 'ekf.launch.py'])
+        ]),
+        condition=IfCondition(LaunchConfiguration('use_ekf')),
     )
 
     # ── Include: LiDAR ────────────────────────────────────────────────────────
@@ -98,6 +126,8 @@ def generate_launch_description():
         use_serial_arg,
         use_lidar_arg,
         lidar_port_arg,
+        use_servo_arg,
+        use_ekf_arg,
 
         # Log
         LogInfo(msg=['[rpi_bringup] Starting Raspberry Pi system...']),
@@ -106,5 +136,7 @@ def generate_launch_description():
         # Nodes / Includes
         camera_node,
         serial_bridge_node,
+        ekf_launch,
         lidar_launch,
+        servo_node,
     ])

@@ -5,6 +5,8 @@
 #include <string>
 #include <thread>
 #include <atomic>
+#include <fstream>
+#include <mutex>
 
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/imu.hpp"
@@ -65,11 +67,18 @@ private:
   std::string imu_frame_id_;
   double cmd_vel_repeat_rate_;
   std::string odom_data_type_;
+  bool publish_tf_;
 
   // === State ===
   geometry_msgs::msg::Twist last_cmd_vel_;
   bool emergency_stopped_;
   rclcpp::Time last_cmd_vel_time_;
+
+  // === CSV Logging ===
+  bool csv_log_enabled_;
+  std::string csv_log_path_;
+  std::ofstream csv_file_;
+  std::mutex csv_mutex_;
 
   // === Methods ===
   void declareParameters();
@@ -94,6 +103,8 @@ private:
   // === Utilities ===
   void sendVelocityCommand(double linear_x, double angular_z);
   void transformImuData(int16_t imu_raw[6]) const;
+  void logToCsv(const std::string& direction, const std::string& type,
+                const std::vector<std::string>& values);
 };
 
 }  // namespace rpi_serial_bridge

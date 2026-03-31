@@ -2,14 +2,16 @@
 <CycloneDDS xmlns="https://cdds.io/config">
     <Domain id="any">
         <General>
+            <!-- wlan0 = RPi WiFi 인터페이스 이름으로 고정 -->
             <Interfaces>
-                <NetworkInterface address="192.168.0.33"/>
+                <NetworkInterface name="wlan0" />
             </Interfaces>
             <AllowMulticast>true</AllowMulticast>
         </General>
         <Discovery>
+            <!-- WSL WiFi IP (eth0): DHCP라면 변경될 수 있음, 가능하면 정적 IP 권장 -->
             <Peers>
-                <Peer address="192.168.0.237"/>
+                <Peer address="192.168.0.105"/>
             </Peers>
         </Discovery>
     </Domain>

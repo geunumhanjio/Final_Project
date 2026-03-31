@@ -30,11 +30,13 @@ def generate_launch_description():
         description='"slam" | "localization" | "none"'
     )
 
-    # rviz_mode == 'localization' 이면 navigation.rviz, 그 외엔 slam.rviz
+    # localization / hector 모드 → navigation.rviz (Nav2 패널 포함)
+    # slam / none 모드 → slam.rviz
     rviz_config = PathJoinSubstitution([
         pkg_share, 'config', 'rviz',
         PythonExpression([
-            '"navigation.rviz" if "', LaunchConfiguration('rviz_mode'), '" == "localization" else "slam.rviz"'
+            '"navigation.rviz" if "', LaunchConfiguration('rviz_mode'),
+            '" in ("localization", "hector") else "slam.rviz"'
         ])
     ])
 

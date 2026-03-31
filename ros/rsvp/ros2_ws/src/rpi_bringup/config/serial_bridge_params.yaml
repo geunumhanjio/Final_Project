@@ -1,0 +1,22 @@
+serial_bridge_node:
+    ros__parameters:
+      serial_port: "/dev/serial0"
+      baud_rate: 115200
+
+      wheel_base: 0.125
+      wheel_radius: 0.0329
+      encoder_ticks_per_rev: 3840
+
+      imu_accel_scale: 0.000598
+      imu_gyro_scale: 0.000133
+      imu_transform_enabled: false
+
+      odom_frame_id: "odom"
+      base_frame_id: "base_footprint"
+      imu_frame_id: "imu_link"
+
+      cmd_vel_repeat_rate: 5.0
+      odom_data_type: "ticks"
+
+      # EKF(WSL)가 odom→base_footprint TF를 담당 → TF 충돌 방지
+      publish_tf: false

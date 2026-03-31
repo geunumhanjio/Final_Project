@@ -30,8 +30,8 @@ ydlidar_ros2_driver_node:
     support_motor_dtr: true
     angle_max: 180.0
     angle_min: -180.0
-    range_max: 64.0
-    range_min: 0.01
+    range_max: 10.0    # YDLiDAR X4 스펙 최대 10m (64.0은 노이즈 데이터 유입 가능)
+    range_min: 0.12    # X4 스펙 최소 0.12m
     frequency: 10.0
     invalid_range_is_inf: false
     debug: false
