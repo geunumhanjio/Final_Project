@@ -16,6 +16,13 @@ void StreamManager::loadConfig()
     QString ip = ConfigManager::instance().getCameraIp();
     QString port = ConfigManager::instance().getCameraPort();
     bool useCustomCCTV = ConfigManager::instance().getUseCustomCCTV();
+    bool useRtsps = ConfigManager::instance().getUseRtsps(); // [New]
+
+    // [New] If RTSPS mode, override scheme and port
+    QString scheme = useRtsps ? "rtsps" : "rtsp";
+    if (useRtsps) port = "8322"; // Guide recommends 8322 for RTSPS
+
+    qDebug() << "[StreamManager] Loading config | Mode:" << scheme << "IP:" << ip << "Port:" << port << "UseCustomCCTV:" << useCustomCCTV;
 
     qDebug() << "[StreamManager] Loading config with IP:" << ip << "Port:" << port << "UseCustomCCTV:" << useCustomCCTV;
 
@@ -27,6 +34,15 @@ void StreamManager::loadConfig()
         
         // 가져온 변수 사용
         if (useCustomCCTV) {
+            // Checked: rtsps?://admin:5hanwha!@IP:PORT/ID/H.264/media.smp
+            QString url = QString("%1://admin:5hanwha!@%2:%3/%4/H.264/media.smp")
+                              .arg(scheme, ip, port).arg(i);
+            config.urlLow = url;
+            config.urlHigh = url; 
+        } else {
+            // Unchecked: rtsps?://IP:PORT/ch<ID+1>
+            config.urlLow = QString("%1://%2:%3/ch%4").arg(scheme, ip, port).arg(i+1);
+            config.urlHigh = QString("%1://%2:%3/ch%4_fhd").arg(scheme, ip, port).arg(i+1);
             // Checked: rtsp://admin:5hanwha!@IP:PORT/ID/H.264/media.smp
             // ID is 0-based index
             QString url = QString("rtsp://admin:5hanwha!@%1:%2/%3/H.264/media.smp")

@@ -13,6 +13,7 @@ public:
     explicit OsdWidget(QWidget *parent = nullptr);
 
     enum Metric {
+        Protocol,    // [New] RTSP or RTSPS
         PacketLoss,
         Jitter,
         Bitrate,

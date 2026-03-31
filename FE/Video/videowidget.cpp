@@ -3,6 +3,7 @@
 #include <QDebug>
 #include <QApplication>
 #include <QMutexLocker>
+#include "Gst/GstQualityMonitor.hpp"
 #include <QFile>
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
@@ -25,11 +26,15 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     m_osdWidget = new OsdWidget(this);
     m_osdWidget->hide(); // 초기엔 숨김 처리 안함(비어있으면 안그려짐), 필요시 토글
 
+    m_pinger = new RtspPinger(this); // [New]
+
     // [New] 글로벌 애플리케이션 포커스 상태 변경 감지
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
         if (state != Qt::ApplicationActive) {
             if (m_osdWidget) m_osdWidget->hide();
         } else {
+            // 앱이 다시 활성화되었을 때, 이 위젯이 보이고 최소화 상태가 아닐 때만 OSD 표시
+            if (m_osdWidget && this->isVisible() && !this->window()->isMinimized()) {
             if (m_osdWidget && this->isVisible()) {
                 bool anyVisible = false;
                 for (int i = 0; i < OsdWidget::MetricCount; ++i) {
@@ -39,6 +44,11 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
                     }
                 }
                 if (anyVisible) m_osdWidget->show();
+                syncOverlayPosition();
+            }
+        }
+    });
+
                 
                 QPoint globalPos = this->mapToGlobal(QPoint(0, 0));
                 m_osdWidget->setGeometry(globalPos.x(), globalPos.y(), this->width(), this->height());
@@ -55,6 +65,8 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     m_statsTimer = new QTimer(this);
     connect(m_statsTimer, &QTimer::timeout, this, &VideoWidget::extractGstStats);
     m_statsTimer->start(1000); // 1Hz update
+
+    m_statsClock.start(); // Start the clock for rate measurements
 
     pipeline = nullptr;
     cropper = nullptr;
@@ -75,6 +87,29 @@ bool VideoWidget::setPipeline(GstElement *p) {
     
     pipeline = p;
     if (!pipeline) return false;
+
+    // [New] Start Pinger for RTT measurement
+    GstElement *src = gst_bin_get_by_name(GST_BIN(pipeline), "src");
+    if (src) {
+        gchar *location = nullptr;
+        g_object_get(src, "location", &location, NULL);
+        if (location) {
+            m_pinger->startPinger(QString::fromUtf8(location));
+            g_free(location);
+        }
+        gst_object_unref(src);
+    }
+
+    // [New] Attach Pad Probe to Sink to count actual rendered frames
+    GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
+    if (sink) {
+        GstPad *sinkpad = gst_element_get_static_pad(sink, "sink");
+        if (sinkpad) {
+            gst_pad_add_probe(sinkpad, GST_PAD_PROBE_TYPE_BUFFER, sinkPadProbe, this, nullptr);
+            gst_object_unref(sinkpad);
+        }
+        gst_object_unref(sink);
+    }
 
     // Check for cropper
     cropper = gst_bin_get_by_name(GST_BIN(pipeline), "crop");
@@ -100,6 +135,8 @@ void VideoWidget::stop()
 {
     m_isPlaying = false;
     
+    if (m_pinger) m_pinger->stop(); // [New] Stop pinger when stream stops
+
     if (busTimer->isActive()) busTimer->stop();
 
     if (cropper) { gst_object_unref(cropper); cropper = nullptr; }

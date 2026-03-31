@@ -75,6 +75,9 @@ set(PROJECT_SOURCES
         Video/videowidget.h Video/videowidget.cpp
         Video/livevideowidget.h Video/livevideowidget.cpp
         Video/recordedvideowidget.h Video/recordedvideowidget.cpp
+        Video/rtsppinger.h Video/rtsppinger.cpp
+        Video/Gst/GstQualityMonitor.hpp Video/Gst/GstQualityMonitor.cpp
+        Video/Gst/GstStatsCollector.hpp
         Components/videocard.h Components/videocard.cpp
         Network/streammanager.h Network/streammanager.cpp
         Network/rosbridgeclient.h Network/rosbridgeclient.cpp
@@ -88,6 +91,8 @@ set(PROJECT_SOURCES
 # 4. 실행 파일 생성
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(VEDA_QT_1 MANUAL_FINALIZATION ${PROJECT_SOURCES}
+        Components/full_underbar.h Components/full_underbar.cpp
+        resources.qrc)
         Components/full_underbar.h Components/full_underbar.cpp)
 else()
     if(ANDROID)
@@ -109,6 +114,7 @@ if(MSVC)
     target_link_libraries(VEDA_QT_1 PRIVATE
         "${GST_ROOT}/lib/gstreamer-1.0.lib"
         "${GST_ROOT}/lib/gstvideo-1.0.lib"
+        "${GST_ROOT}/lib/gstrtp-1.0.lib"
         "${GST_ROOT}/lib/gobject-2.0.lib"
         "${GST_ROOT}/lib/glib-2.0.lib"
         "${GST_ROOT}/lib/gstapp-1.0.lib"
@@ -119,6 +125,7 @@ else()
     target_link_libraries(VEDA_QT_1 PRIVATE
         "${GST_ROOT}/lib/libgstreamer-1.0.dll.a"
         "${GST_ROOT}/lib/libgstvideo-1.0.dll.a"
+        "${GST_ROOT}/lib/libgstrtp-1.0.dll.a"
         "${GST_ROOT}/lib/libgobject-2.0.dll.a"
         "${GST_ROOT}/lib/libglib-2.0.dll.a"
         "${GST_ROOT}/lib/libgstapp-1.0.dll.a"

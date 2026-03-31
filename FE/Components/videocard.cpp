@@ -320,6 +320,7 @@ void VideoCard::showSettingsMenu()
             cbAll->setChecked(allChecked);
             cbAll->blockSignals(false);
             
+            Q_UNUSED(anyChecked);
             // Emit signal to dynamically connect to camera server WebSocket
             emit streamStatsRequested(m_channelId, anyChecked);
         });

@@ -16,6 +16,10 @@ public:
     explicit CameraControlClient(QObject *parent = nullptr);
     ~CameraControlClient();
 
+    void connectToServer(const QString &cameraIp);
+
+    // Connects to ws://[cameraIp]:9000 and sends the command
+    void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
     // Connects persistently for receiving STREAM_STATS
     void connectToServer(const QString &cameraIp); // [New]
 
@@ -31,6 +35,7 @@ signals:
     void errorOccurred(QString error);
     void videoReceived(QString url);
     void recordingListReceived(QJsonArray list);
+
     
     // [New] Stream Stats
     void streamStatsReceived(int channelId, double fps, double bitrateKbps, double proxyLatencyMs);
