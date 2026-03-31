@@ -94,16 +94,17 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     btnZoomOut = new QPushButton("Zoom Out", this);
     btnRectZoom = new QPushButton("Box Zoom", this);
     btnRectZoom->setCheckable(true);
-
-    btnControlMode = new QPushButton("Start Control", this);
+    
+    btnControlMode = new QPushButton("🎯 조종모드", this);
     btnControlMode->setCheckable(true);
     btnControlMode->setObjectName("controlModeBtn");
     btnControlMode->setStyleSheet(
         "#controlModeBtn { color: #F59E0B; border: 1px solid #F59E0B; border-radius: 6px; font-weight: bold; background: transparent; }"
         "#controlModeBtn:checked { background-color: #F59E0B; color: white; }"
-        "#controlModeBtn:hover { background-color: rgba(245, 158, 11, 0.1); }");
-
-    btnResetZoom = new QPushButton("Reset", this);
+        "#controlModeBtn:hover { background-color: rgba(245, 158, 11, 0.1); }"
+    );
+    
+    btnResetZoom = new QPushButton("⟲ Reset", this);
     btnResetZoom->setObjectName("resetBtn");
     btnResetZoom->setStyleSheet(
         "#resetBtn { background-color: #0EA5E9; color: white; border-radius: 8px; font-weight: bold; }"
@@ -113,10 +114,7 @@ FullUnderBar::FullUnderBar(QWidget *parent) : QWidget(parent)
     connect(btnZoomOut, &QPushButton::clicked, this, &FullUnderBar::reqZoomOut);
     connect(btnRectZoom, &QPushButton::toggled, this, &FullUnderBar::reqRectZoom);
     connect(btnResetZoom, &QPushButton::clicked, this, &FullUnderBar::reqResetZoom);
-    connect(btnControlMode, &QPushButton::toggled, this, [this](bool checked) {
-        updateControlModeButtonText(checked);
-        emit reqControlMode(checked);
-    });
+    connect(btnControlMode, &QPushButton::toggled, this, &FullUnderBar::reqControlMode);
 
     connect(btnRecord, &QPushButton::toggled, [this](bool checked) {
         btnRecord->setText(checked ? "STOP" : "REC");
@@ -186,9 +184,10 @@ void FullUnderBar::setMode(bool isFile)
 {
     m_isFileMode = isFile;
     playbackContainer->setVisible(isFile);
-    btnRecord->setVisible(!isFile);
-    btnControlMode->setVisible(!isFile);
-
+    btnRecord->setVisible(!isFile); // Show Record button only in Live mode
+    btnControlMode->setVisible(!isFile); // Show Control Mode button only in Live mode
+    
+    // Reset Record Button state when switching modes
     if (isFile && btnRecord->isChecked()) {
         btnRecord->setChecked(false);
     }

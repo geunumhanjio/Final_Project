@@ -29,6 +29,7 @@ public:
     void playUrl(const QString &url, int latency = 200);
     void stop();
     VideoWidget* videoWidget() const { return m_videoWidget; }
+    void updateStreamStats(double fps, double bitrateKbps, double proxyLatencyMs); // [New]
 
     // UI Setters
     void setChannelName(const QString &name);
@@ -44,10 +45,7 @@ public:
 signals:
     void fullScreenRequested();
     void recordRequested(int channelId, bool start);
-    void goalRequested(QPointF normalizedStart, double yaw);
-    void goalInteractionStarted();
-    void goalCommitted();
-    void goalOverlayCommitted(QPointF normalizedStart, QPointF normalizedEnd);
+    void streamStatsRequested(int channelId, bool start); // [New]
 
 private slots:
     void toggleRecord();

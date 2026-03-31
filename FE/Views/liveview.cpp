@@ -42,35 +42,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
 
         // Connect record signal
         connect(cctvWidgets[i], &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
-        connect(cctvWidgets[i], &VideoCard::goalInteractionStarted, this, &LiveView::goalInteractionStarted);
-        connect(cctvWidgets[i], &VideoCard::goalCommitted, this, &LiveView::goalCommitted);
-        connect(cctvWidgets[i], &VideoCard::goalOverlayCommitted, this, [this, i](const QPointF &normalizedStart, const QPointF &normalizedEnd) {
-            if (i == 1) {
-                qDebug().noquote() << QStringLiteral("[LiveView] Channel 2 CALIBRATION_CLICK x1=%1 y1=%2 x2=%3 y2=%4")
-                                          .arg(normalizedStart.x(), 0, 'f', 4)
-                                          .arg(normalizedStart.y(), 0, 'f', 4)
-                                          .arg(normalizedEnd.x(), 0, 'f', 4)
-                                          .arg(normalizedEnd.y(), 0, 'f', 4);
-                emit calibrationClickRequested(i, normalizedStart.x(), normalizedStart.y(),
-                                               normalizedEnd.x(), normalizedEnd.y());
-            }
-            emit videoGoalOverlayCommitted(i, normalizedStart, normalizedEnd);
-        });
-        connect(cctvWidgets[i], &VideoCard::goalRequested, this, [this, i](const QPointF &normalizedStart, double yaw) {
-            if (i == 1) {
-                return;
-            }
-
-            bool ok = false;
-            const QPointF worldPoint = quadrantToWorld(i, normalizedStart, &ok);
-            if (ok) {
-                qDebug().noquote() << QStringLiteral("x: %1  y: %2  angle: %3")
-                                          .arg(worldPoint.x(), 0, 'f', 3)
-                                          .arg(worldPoint.y(), 0, 'f', 3)
-                                          .arg(yaw, 0, 'f', 3);
-                emit goalPoseRequested(worldPoint.x(), worldPoint.y(), yaw);
-            }
-        });
+        connect(cctvWidgets[i], &VideoCard::streamStatsRequested, this, &LiveView::streamStatsRequested); // [New]
         
         gridLayout->addWidget(cctvWidgets[i], i / 2, i % 2);
     }
@@ -100,6 +72,7 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     
     // Connect record signal
     connect(rcCarCamWidget, &VideoCard::recordRequested, this, &LiveView::recordCommandRequested);
+    connect(rcCarCamWidget, &VideoCard::streamStatsRequested, this, &LiveView::streamStatsRequested); // [New]
 
     rightLayout->addWidget(rcCarCamWidget);
 
@@ -315,158 +288,22 @@ void LiveView::stopAll() {
     streamStarted = false; // [Fix] Reset flag so showEvent restarts streams
 }
 
-void LiveView::clearGoalOverlays()
+void LiveView::updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs)
 {
-    for (int i = 0; i < 4; ++i) {
-        if (cctvWidgets[i]) {
-            cctvWidgets[i]->clearGoalOverlay();
+    // Check CCTV Widgets (Channels 1-4)
+    for (int i = 0; i < 4; i++) {
+        if (channelId == i + 1) {
+            if (cctvWidgets[i]) {
+                cctvWidgets[i]->updateStreamStats(fps, bitrateKbps, proxyLatencyMs);
+            }
+            return;
         }
     }
 
-    if (rcCarCamWidget) {
-        rcCarCamWidget->clearGoalOverlay();
-    }
-
-    if (slamMapWidget) {
-        slamMapWidget->clearGoalOverlay();
-    }
-}
-
-void LiveView::clearPathOverlay()
-{
-    if (slamMapWidget) {
-        slamMapWidget->clearPathOverlay();
-    }
-}
-
-void LiveView::clearPatrolOverlay()
-{
-    if (slamMapWidget) {
-        slamMapWidget->clearPatrolOverlay();
-    }
-}
-
-QVector<QPointF> LiveView::patrolPoints() const
-{
-    if (!slamMapWidget) {
-        return {};
-    }
-
-    return slamMapWidget->patrolPoints();
-}
-
-void LiveView::setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd)
-{
-    for (int i = 0; i < 4; ++i) {
-        if (!cctvWidgets[i]) {
-            continue;
-        }
-
-        if (i == channelIndex) {
-            cctvWidgets[i]->setCommittedGoalOverlay(normalizedStart, normalizedEnd);
-        } else {
-            cctvWidgets[i]->clearGoalOverlay();
+    // Check RC Car Widget (Channel 9)
+    if (channelId == 9) {
+        if (rcCarCamWidget) {
+            rcCarCamWidget->updateStreamStats(fps, bitrateKbps, proxyLatencyMs);
         }
     }
-}
-
-void LiveView::clearVideoGoalOverlay()
-{
-    for (int i = 0; i < 4; ++i) {
-        if (cctvWidgets[i]) {
-            cctvWidgets[i]->clearGoalOverlay();
-        }
-    }
-}
-
-void LiveView::updateMap(const QJsonObject &data)
-{
-    const QJsonObject info = data.value("info").toObject();
-    m_mapWidthCells = info.value("width").toInt();
-    m_mapHeightCells = info.value("height").toInt();
-    m_mapResolution = info.value("resolution").toDouble();
-    const QJsonObject origin = info.value("origin").toObject();
-    m_mapOrigin = QPointF(origin.value("x").toDouble(), origin.value("y").toDouble());
-
-    if (slamMapWidget) {
-        slamMapWidget->setMapData(data);
-    }
-}
-
-void LiveView::updateOdom(const QJsonObject &data)
-{
-    if (slamMapWidget) {
-        slamMapWidget->setOdomData(data);
-    }
-}
-
-void LiveView::updatePath(const QJsonObject &data)
-{
-    if (slamMapWidget) {
-        slamMapWidget->setPathData(data);
-    }
-}
-
-void LiveView::setGoalTargetingEnabled(bool enabled)
-{
-    m_goalTargetingEnabled = enabled;
-
-    for (int i = 0; i < 4; ++i) {
-        if (cctvWidgets[i]) {
-            cctvWidgets[i]->setGoalTargetingEnabled(enabled);
-        }
-    }
-
-    if (rcCarCamWidget) {
-        rcCarCamWidget->setGoalTargetingEnabled(false);
-    }
-
-    if (slamMapWidget) {
-        slamMapWidget->setGoalTargetingEnabled(enabled);
-    }
-}
-
-void LiveView::setPatrolPlanningEnabled(bool enabled)
-{
-    if (slamMapWidget) {
-        slamMapWidget->setPatrolPlanningEnabled(enabled);
-    }
-}
-
-void LiveView::setPatrolAddPointMode(bool enabled)
-{
-    if (slamMapWidget) {
-        slamMapWidget->setPatrolAddPointMode(enabled);
-    }
-}
-
-QPointF LiveView::quadrantToWorld(int index, const QPointF &normalizedPoint, bool *ok) const
-{
-    if (ok) {
-        *ok = false;
-    }
-
-    if (m_mapWidthCells <= 0 || m_mapHeightCells <= 0 || m_mapResolution <= 0.0 || index < 0 || index > 3) {
-        return QPointF();
-    }
-
-    const double fullWidth = m_mapWidthCells * m_mapResolution;
-    const double fullHeight = m_mapHeightCells * m_mapResolution;
-    const double halfWidth = fullWidth * 0.5;
-    const double halfHeight = fullHeight * 0.5;
-    const double clampedX = qBound(0.0, normalizedPoint.x(), 1.0);
-    const double clampedY = qBound(0.0, normalizedPoint.y(), 1.0);
-
-    const bool isRight = (index == 1 || index == 3);
-    const bool isBottom = (index == 2 || index == 3);
-
-    const double quadrantMinX = m_mapOrigin.x() + (isRight ? halfWidth : 0.0);
-    const double quadrantMinY = m_mapOrigin.y() + (isBottom ? 0.0 : halfHeight);
-    const double worldX = quadrantMinX + (clampedX * halfWidth);
-    const double worldY = quadrantMinY + ((1.0 - clampedY) * halfHeight);
-
-    if (ok) {
-        *ok = true;
-    }
-    return QPointF(worldX, worldY);
 }

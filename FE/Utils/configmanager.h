@@ -19,94 +19,21 @@ public:
 
     // 기본값 설정
     void loadDefaults() {
-        bool changed = false;
-
-        const auto ensureString = [this, &changed](const QString &key, const QString &value) {
-            if (m_settings->value(key).toString().trimmed().isEmpty()) {
-                m_settings->setValue(key, value);
-                changed = true;
-            }
-        };
-
-        const auto ensureValue = [this, &changed](const QString &key, const QVariant &value) {
-            if (!m_settings->contains(key)) {
-                m_settings->setValue(key, value);
-                changed = true;
-            }
-        };
-
-        ensureString(QStringLiteral("Network/CameraIP"), QStringLiteral("192.168.0.39"));
-        ensureString(QStringLiteral("Network/CameraPort"), QStringLiteral("8554"));
-        ensureString(QStringLiteral("Network/RobotIP"), QStringLiteral("192.168.0.237"));
-
-        const QString loginServerUrl = normalizeLoginServerInput(m_settings->value(QStringLiteral("Auth/LoginServerUrl")).toString());
-        if (loginServerUrl.isEmpty() || loginServerUrl == QStringLiteral("127.0.0.1")) {
-            m_settings->setValue(QStringLiteral("Auth/LoginServerUrl"), QStringLiteral("192.168.0.110"));
-            changed = true;
-        }
-
-        ensureValue(QStringLiteral("Network/CustomCCTVUsername"), QStringLiteral("admin"));
-        ensureValue(QStringLiteral("Network/CustomCCTVPassword"), QStringLiteral("5hanwha!"));
-        ensureValue(QStringLiteral("Control/LinearX"), 0.30);
-        ensureValue(QStringLiteral("Control/AngularZ"), 0.50);
-        ensureValue(QStringLiteral("Control/ManualControl"), true);
-        ensureValue(QStringLiteral("Navigation/AutoSpeed"), 0.15);
-        ensureValue(QStringLiteral("UI/DarkTheme"), true);
-        ensureValue(QStringLiteral("Auth/RememberUser"), false);
-
-        if (changed) {
-            emit configChanged();
-        }
+        if(getCameraIp().isEmpty()) setCameraIp("192.168.0.39");
+        if(getCameraPort().isEmpty()) setCameraPort("8554");
+        if(getRobotIp().isEmpty()) setRobotIp("ws://192.168.0.237:9090");
+        // getUseCustomCCTV defaults to false if not set
+        // getUseRtsps defaults to false if not set
+        // getUseCustomCCTV defaults to false if not set, handled by QSettings default value
     }
 
     // Getter
     QString getCameraIp() const { return m_settings->value("Network/CameraIP", "192.168.0.39").toString(); }
     QString getCameraPort() const { return m_settings->value("Network/CameraPort", "8554").toString(); }
-    QString getCustomCctvUsername() const {
-        const QString userName = m_settings->value("Network/CustomCCTVUsername", "admin").toString().trimmed();
-        return userName.isEmpty() ? QStringLiteral("admin") : userName;
-    }
-    QString getCustomCctvPassword() const {
-        const QString password = m_settings->value("Network/CustomCCTVPassword", "5hanwha!").toString();
-        return password.isEmpty() ? QStringLiteral("5hanwha!") : password;
-    }
-    QString getRobotIp() const { return getRobotWsUrl(); }
-    QString getRobotHost() const {
-        const QString host = extractRobotHost(getRobotSettingValue());
-        return host.isEmpty() ? QStringLiteral("192.168.0.237") : host;
-    }
-    QString getRobotWsUrl() const {
-        return QString("ws://%1:9090").arg(getRobotHost());
-    }
-    QString getRobotRtspUrl() const {
-        return QString("rtsp://%1:9554/camera").arg(getRobotHost());
-    }
-    QString getRobotRtspIspUrl() const {
-        return QString("rtsp://%1:9554/camera_isp").arg(getRobotHost());
-    }
-    QString getLoginServerUrl() const {
-        return normalizeLoginServerInput(m_settings->value("Auth/LoginServerUrl", "192.168.0.110").toString());
-    }
-    QString getActiveUserId() const {
-        return m_settings->value("Auth/ActiveUserId").toString().trimmed();
-    }
-    QString getActiveUserEmail() const {
-        return m_settings->value("Auth/ActiveUserEmail").toString().trimmed();
-    }
-    QString getActiveAuthMode() const {
-        return m_settings->value("Auth/ActiveAuthMode").toString().trimmed();
-    }
-    bool getRememberUser() const { return m_settings->value("Auth/RememberUser", false).toBool(); }
-    QString getRememberedUserId() const {
-        return getRememberUser() ? m_settings->value("Auth/RememberedUserId").toString().trimmed() : QString();
-    }
-    bool getDarkTheme() const { return m_settings->value("UI/DarkTheme", true).toBool(); }
+    QString getRobotIp() const { return m_settings->value("Network/RobotIP", "ws://192.168.0.237:9090").toString(); }
     bool getUseCustomCCTV() const { return m_settings->value("Network/UseCustomCCTV", false).toBool(); }
     bool getUseRtsps() const { return m_settings->value("Network/UseRtsps", false).toBool(); } // [New]
-    bool getManualControl() const { return m_settings->value("Control/ManualControl", true).toBool(); }
-    double getManualLinearX() const { return clampManualValue(m_settings->value("Control/LinearX", 0.30).toDouble(), 0.30); }
-    double getManualAngularZ() const { return clampManualValue(m_settings->value("Control/AngularZ", 0.50).toDouble(), 0.50); }
-    double getAutoNavSpeed() const { return clampManualValue(m_settings->value("Navigation/AutoSpeed", 0.15).toDouble(), 0.15); }
+    bool getManualControl() const { return m_settings->value("Control/ManualControl", false).toBool(); }
 
     // Setter (저장)
     void setCameraIp(const QString &ip) {
@@ -117,53 +44,8 @@ public:
         m_settings->setValue("Network/CameraPort", port);
         emit configChanged();
     }
-    void setCustomCctvUsername(const QString &userName) {
-        m_settings->setValue("Network/CustomCCTVUsername", userName.trimmed());
-        emit configChanged();
-    }
-    void setCustomCctvPassword(const QString &password) {
-        m_settings->setValue("Network/CustomCCTVPassword", password);
-        emit configChanged();
-    }
     void setRobotIp(const QString &ip) {
         m_settings->setValue("Network/RobotIP", ip);
-        emit configChanged();
-    }
-    void setLoginServerUrl(const QString &url) {
-        m_settings->setValue("Auth/LoginServerUrl", normalizeLoginServerInput(url));
-        emit configChanged();
-    }
-    void setActiveUserId(const QString &userId) {
-        m_settings->setValue("Auth/ActiveUserId", userId.trimmed());
-        emit configChanged();
-    }
-    void setActiveUserEmail(const QString &email) {
-        m_settings->setValue("Auth/ActiveUserEmail", email.trimmed());
-        emit configChanged();
-    }
-    void setActiveAuthMode(const QString &authMode) {
-        m_settings->setValue("Auth/ActiveAuthMode", authMode.trimmed());
-        emit configChanged();
-    }
-    void clearActiveLogin() {
-        m_settings->remove("Auth/ActiveUserId");
-        m_settings->remove("Auth/ActiveUserEmail");
-        m_settings->remove("Auth/ActiveAuthMode");
-        emit configChanged();
-    }
-    void setRememberUser(bool remember) {
-        m_settings->setValue("Auth/RememberUser", remember);
-        if (!remember) {
-            m_settings->remove("Auth/RememberedUserId");
-        }
-        emit configChanged();
-    }
-    void setRememberedUserId(const QString &id) {
-        m_settings->setValue("Auth/RememberedUserId", id.trimmed());
-        emit configChanged();
-    }
-    void setDarkTheme(bool dark) {
-        m_settings->setValue("UI/DarkTheme", dark);
         emit configChanged();
     }
     void setUseCustomCCTV(bool use) {
@@ -176,18 +58,6 @@ public:
     }
     void setManualControl(bool use) {
         m_settings->setValue("Control/ManualControl", use);
-        emit configChanged();
-    }
-    void setManualLinearX(double value) {
-        m_settings->setValue("Control/LinearX", normalizeManualValue(value));
-        emit configChanged();
-    }
-    void setManualAngularZ(double value) {
-        m_settings->setValue("Control/AngularZ", normalizeManualValue(value));
-        emit configChanged();
-    }
-    void setAutoNavSpeed(double value) {
-        m_settings->setValue("Navigation/AutoSpeed", normalizeManualValue(value));
         emit configChanged();
     }
 

@@ -12,12 +12,30 @@
 #include <QIcon>
 #include <QTimer>
 
-#ifdef Q_OS_WIN
-#include <windows.h>
+int main(int argc, char *argv[])
+{
+    qDebug() << "=== VEDA CCTV System Starting ===";
+
+#ifdef GST_BIN_PATH
+    QString gstBinPath = QString::fromUtf8(GST_BIN_PATH);
+    gstBinPath = QDir::toNativeSeparators(gstBinPath);
+    QByteArray currentPath = qgetenv("PATH");
+    QByteArray newPath = gstBinPath.toLocal8Bit() + ";" + currentPath;
+    qputenv("PATH", newPath);
+
+    qDebug() << "[main] GStreamer bin path:" << gstBinPath;
+
+    QDir binDir(gstBinPath);
+    binDir.cdUp();
+    QString libPath = binDir.absolutePath() + "\\lib\\gstreamer-1.0";
+    qputenv("GST_PLUGIN_PATH", libPath.toLocal8Bit());
+    qDebug() << "[main] GST_PLUGIN_PATH set to:" << libPath;
+#else
+    qWarning() << "[main] GST_BIN_PATH not defined in CMakeLists.txt!";
 #endif
 
-#ifdef Q_OS_WIN
-namespace {
+    qputenv("GST_DEBUG", "1");
+    qDebug() << "[main] GST_DEBUG level set to: 1";
 
 void applyNativeWindowIcon(QWidget *widget)
 {
@@ -25,47 +43,7 @@ void applyNativeWindowIcon(QWidget *widget)
         return;
     }
 
-    const HWND hwnd = reinterpret_cast<HWND>(widget->winId());
-    if (!hwnd) {
-        return;
-    }
-
-    static HICON s_smallIcon = nullptr;
-    static HICON s_bigIcon = nullptr;
-
-    if (!s_smallIcon) {
-        s_smallIcon = static_cast<HICON>(LoadImageW(
-            GetModuleHandleW(nullptr),
-            L"IDI_APP_ICON",
-            IMAGE_ICON,
-            GetSystemMetrics(SM_CXSMICON),
-            GetSystemMetrics(SM_CYSMICON),
-            0));
-    }
-
-    if (!s_bigIcon) {
-        s_bigIcon = static_cast<HICON>(LoadImageW(
-            GetModuleHandleW(nullptr),
-            L"IDI_APP_ICON",
-            IMAGE_ICON,
-            GetSystemMetrics(SM_CXICON),
-            GetSystemMetrics(SM_CYICON),
-            0));
-    }
-
-    if (s_smallIcon) {
-        SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(s_smallIcon));
-    }
-    if (s_bigIcon) {
-        SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(s_bigIcon));
-    }
-}
-
-} // namespace
-#endif
-
-int main(int argc, char *argv[])
-{
+    // GStreamer 초기화 전에 환경 확인
     QApplication a(argc, argv);
     qDebug() << "[main] Qt application created";
 
@@ -81,25 +59,13 @@ int main(int argc, char *argv[])
         qWarning() << "[main] Failed to initialize some system components";
     }
 
-    // Load configuration
-    ConfigManager::instance().loadDefaults();
+    qDebug() << "[main] Initializing GStreamer...";
+    gst_init(&argc, &argv);
+    gst_quality_monitor_register(NULL);
+    qDebug() << "[main] GStreamer Initialized.";
 
-    // Show login dialog
-    LoginDialog loginDialog;
-    if (!appIcon.isNull()) {
-        loginDialog.setWindowIcon(appIcon);
-    }
-#ifdef Q_OS_WIN
-    QTimer::singleShot(0, &loginDialog, [&loginDialog]() {
-        applyNativeWindowIcon(&loginDialog);
-    });
-#endif
-    if (loginDialog.exec() != QDialog::Accepted) {
-        qDebug() << "[main] Login canceled. Exiting application.";
-        return 0;
-    }
+    setupSslContext();
 
-    // Create and show main window
     qDebug() << "[main] Opening main window...";
     MainWindow w;
     if (!appIcon.isNull()) {

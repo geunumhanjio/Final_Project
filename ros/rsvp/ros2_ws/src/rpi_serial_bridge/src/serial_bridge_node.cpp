@@ -307,11 +307,10 @@ void SerialBridgeNode::sendVelocityCommand(double linear_x, double angular_z)
 
   // Twist → 좌/우 바퀴 속도 (m/s)
   
-  const double ANGULAR_GAIN = 6.0;  // 조정 가능
+  const double ANGULAR_GAIN = 4.8;  // 조정 가능
   double angular_scaled = angular_z * ANGULAR_GAIN;
   
-  auto [v_left, v_right] = odom_calc_->twistToWheelVelocities(
-    linear_x, angular_scaled);
+  auto [v_left, v_right] = odom_calc_->twistToWheelVelocities(linear_x, angular_scaled);
 
   //auto [v_left, v_right] = odom_calc_->twistToWheelVelocities(linear_x, angular_z);
 

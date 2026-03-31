@@ -26,33 +26,15 @@ CameraControlClient::~CameraControlClient()
 
 void CameraControlClient::connectToServer(const QString &cameraIp)
 {
-    if (cameraIp.trimmed().isEmpty()) {
-        return;
-    }
-
-    if (m_webSocket.state() == QAbstractSocket::ConnectedState
-        && m_webSocket.requestUrl().host() == cameraIp) {
+    // If different IP, or not connected, establish connection
+    if (m_currentIp != cameraIp || m_webSocket.state() == QAbstractSocket::UnconnectedState) {
+        m_webSocket.close();
         m_currentIp = cameraIp;
-        return;
+        m_isConnecting = true;
+        QString url = QString("ws://%1:9000").arg(cameraIp);
+        qDebug() << "[CameraControl] Persistent connect to" << url;
+        m_webSocket.open(QUrl(url));
     }
-
-    openSocketForHost(cameraIp);
-}
-
-void CameraControlClient::sendCalibrationClick(const QString &cameraIp, double x1, double y1, double x2, double y2)
-{
-    QJsonObject payload;
-    payload["x1"] = x1;
-    payload["y1"] = y1;
-    payload["x2"] = x2;
-    payload["y2"] = y2;
-
-    QJsonObject msg;
-    msg["type"] = "CALIBRATION_CLICK";
-    msg["payload"] = payload;
-
-    const QString jsonString = QJsonDocument(msg).toJson(QJsonDocument::Compact);
-    safeSend(jsonString, cameraIp);
 }
 
 void CameraControlClient::sendRecordCommand(const QString &cameraIp, int channelId, bool start)
@@ -64,6 +46,24 @@ void CameraControlClient::sendRecordCommand(const QString &cameraIp, int channel
 
     QJsonObject msg;
     msg["type"] = "RECORD_CONTROL";
+    msg["payload"] = payload;
+    msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
+
+    QString jsonString = QJsonDocument(msg).toJson(QJsonDocument::Compact);
+    safeSend(jsonString, cameraIp);
+}
+
+void CameraControlClient::requestStreamStats(const QString &cameraIp, int channelId, bool start)
+{
+    // Ensure we are connected
+    connectToServer(cameraIp);
+
+    QJsonObject payload;
+    payload["action"] = start ? "start" : "stop";
+    payload["channel_id"] = channelId;
+
+    QJsonObject msg;
+    msg["type"] = "REQUEST_STREAM_STATS";
     msg["payload"] = payload;
     msg["timestamp"] = QDateTime::currentMSecsSinceEpoch() / 1000.0;
 
@@ -94,10 +94,19 @@ void CameraControlClient::requestDownload(const QString &cameraIp, const QString
 
 void CameraControlClient::safeSend(const QString &jsonString, const QString &ip)
 {
-    const QString trimmedIp = ip.trimmed();
-    if (trimmedIp.isEmpty()) {
-        qWarning() << "[CameraControl] Ignored command because camera IP is empty.";
-        return;
+    QString url = QString("ws://%1:9000").arg(ip);
+    m_currentIp = ip; // Keep track of latest IP
+    
+    // If connected to the same IP, assume good state and send
+    if (m_webSocket.state() == QAbstractSocket::ConnectedState) {
+        if (m_webSocket.requestUrl().host() == ip) {
+            m_webSocket.sendTextMessage(jsonString);
+            qDebug() << "[CameraControl] Sent command to" << url;
+            return;
+        } else {
+            qDebug() << "[CameraControl] Switching host from" << m_webSocket.requestUrl().host() << "to" << ip;
+            m_webSocket.close();
+        }
     }
 
     m_pendingCommands.enqueue({trimmedIp, jsonString});
@@ -119,13 +128,6 @@ void CameraControlClient::onDisconnected()
     
     emit disconnected(); 
     
-    if (!m_pendingCommands.isEmpty()) {
-        QTimer::singleShot(0, this, [this]() {
-            processPendingCommands();
-        });
-        return;
-    }
-
     // Auto Reconnect logic
     if (!m_currentIp.isEmpty()) {
         qDebug() << "[CameraControl] Auto reconnecting to" << m_currentIp << "in 3 seconds...";
@@ -151,6 +153,18 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
 
     QJsonObject obj = doc.object();
     QString msgType = obj["type"].toString();
+
+    // [New] Stream Stats Parsing
+    if (msgType == "STREAM_STATS") {
+        QJsonObject payload = obj["payload"].toObject();
+        int channelId = payload["channel_id"].toInt();
+        double fps = payload["fps"].toDouble();
+        double bitrateKbps = payload["bitrate_kbps"].toDouble();
+        double proxyLatencyMs = payload["proxy_latency_ms"].toDouble();
+        
+        emit streamStatsReceived(channelId, fps, bitrateKbps, proxyLatencyMs);
+        return;
+    }
 
     if (msgType == "RECORD_FINISHED") {
         QJsonObject payload = obj["payload"].toObject();

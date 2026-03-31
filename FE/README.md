@@ -1,296 +1,154 @@
-# 🤖 누비고 — VEDA Qt Frontend
+# VEDA_QT_1 - CCTV 통합 관제 및 지능형 로봇 제어 시스템
 
-> **RC 로봇 통합 관제 시스템** — 실시간 CCTV 스트리밍, 자율주행 네비게이션, 원격 제어를 하나의 Qt 데스크톱 앱으로 통합한 프론트엔드입니다.
-
----
-
-## 📋 목차
-
-- [프로젝트 개요](#-프로젝트-개요)
-- [주요 기능](#-주요-기능)
-- [시스템 아키텍처](#-시스템-아키텍처)
-- [디렉터리 구조](#-디렉터리-구조)
-- [의존성](#-의존성)
-- [빌드 방법](#-빌드-방법)
-- [실행 환경 설정](#-실행-환경-설정)
-- [네트워크 프로토콜](#-네트워크-프로토콜)
+**Qt 6 (C++)** + **GStreamer** 기반의 고성능 CCTV 관제 및 ROS2 로봇 제어 통합 시스템입니다.
+다수의 RTSP 카메라 스트림을 실시간으로 모니터링하고, 영상 성능 지표를 WebSocket으로 수신하며, ROS2 로봇을 원격으로 수동·자율 제어합니다.
 
 ---
 
-## 🎯 프로젝트 개요
+## ✨ 핵심 기능
 
-**누비고 프로그램**은 RC 로봇 차량을 운용하기 위한 Qt6 기반 Windows 데스크톱 애플리케이션입니다.  
-GStreamer를 통해 최대 4채널 RTSP 영상을 실시간으로 수신하고, ROS2 Bridge를 통해 로봇을 원격 제어합니다.
+### 1. 다채널 실시간 영상 관제 (Live View)
+- **4분할 CCTV 그리드 + RC카 카메라**: 총 5채널을 동시에 스트리밍
+- **스마트 줌 & 팬**: 더블클릭 → 전체화면, 마우스 휠(Zoom) / 드래그(Pan) / 사각형 선택(Rect Zoom)
+- **RTSP Auto-Reconnect**: 서버 다운 또는 네트워크 단절 시 Watchdog 타이머가 감지 후 **3초 간격으로 무한 자동 재연결** — 서버 복구 시 화면 자동 복원
+- **녹화 제어 & 다운로드**: 채널별 원격 녹화 시작/정지, 완료 후 로컬 다운로드 및 재생
 
-| 항목 | 내용 |
-|------|------|
-| **언어** | C++17 |
-| **프레임워크** | Qt 6 (Widgets, WebSockets, Network) |
-| **빌드 시스템** | CMake 3.16+ |
-| **영상 처리** | GStreamer 1.0 (RTSP), OpenCV (FRUC, 선택) |
-| **통신** | WebSocket (ROS2 Bridge, Camera Control) |
-| **플랫폼** | Windows 10/11 (MSVC / MinGW) |
+### 2. 실시간 OSD 성능 지표 오버레이
+- **5가지 지표**: Packet Loss · Jitter · FPS · Bitrate · Latency 를 영상 위에 반투명 오버레이로 표시
+- **⚙ 팝업 메뉴 선택**: 각 영상 카드의 톱니바퀴 버튼 클릭 → 체크박스로 원하는 지표 개별 On/Off (`All` 일괄 전환 포함)
+- **즉시 요청 방식**: 지표를 하나라도 체크하는 순간 서버에 **`REQUEST_STREAM_STATS` JSON 요청**을 자동으로 보내고, 이후 서버로부터 실시간 데이터를 수신해 즉시 표시
+
+```json
+// 요청 JSON 예시 (체크 시 자동 전송)
+{ "type": "REQUEST_STREAM_STATS", "payload": { "channel_id": 1, "action": "start" } }
+
+// 수신 JSON 예시 (STREAM_STATS)
+{
+  "type": "STREAM_STATS",
+  "payload": { "channel_id": 1, "fps": 30.01, "bitrate_kbps": 2450.75, "proxy_latency_ms": 0.005 }
+}
+```
+
+- **듀얼 소스 하이브리드**:
+  - `Packet Loss & Jitter` → GStreamer `rtpjitterbuffer` 내부 통계 실시간 연산
+  - `FPS · Bitrate · Latency` → WebSocket `STREAM_STATS` 서버 수신값 파싱 (Mbps 환산, `0.00x` ms 포맷)
+- **오버레이 위치 동기화**: 창 이동/포커스 변경 시 OSD가 영상 위에 정확히 따라붙음
+
+### 3. ROS2 로봇 원격 제어 (WebSocket & JSON)
+- **수동 주행 (WASD)**: 키보드 WASD → 10Hz 주기 `cmd_vel` 발행 (키를 떼면 자동 정지)
+- **자율 주행 (Goal Pose)**: 전체화면에서 마우스 드래그로 목적지·방향(빨간 화살표) 지정 → `goal_pose` 발행
+- **모드 전환**: 수동 / 자율 / 인물추종 / 순찰 모드 (`mode_control`)
+- **비상 정지**: 클릭 한 번으로 `emergency_stop` 발행
+- **동적 IP 설정**: 설정 창에서 ROS2 브릿지 주소 변경 시 앱 재시작 없이 즉시 재연결 (`onConfigChanged`)
+
+### 4. 시스템 설정 & 테마
+- **`settings.ini` 기반** (싱글톤 `ConfigManager`): 카메라 IP·포트, ROS2 WebSocket 주소, 수동 제어 허용 여부 등 UI에서 편집 후 영구 저장
+- **다크 / 라이트 테마**: 상단 바에서 실시간 토글, `style/theme_dark.qss` / `style/theme_light.qss`로 분리
 
 ---
 
-## ✨ 주요 기능
+## 🛠 시스템 요구 사항
 
-### 📹 실시간 영상 (Live View)
-- **4채널 동시 RTSP 스트리밍** — GStreamer 파이프라인으로 저지연 재생
-- **풀스크린 뷰** — 선택 채널 전체화면 확장, OSD 오버레이 지원
-- **스트림 품질 모니터링** — FPS / 비트레이트 / 레이턴시 실시간 표시
-- **RTSP 핑어** — 채널별 연결 상태 자동 감지
+| 항목 | 요구 사항 |
+|------|-----------|
+| OS | Windows 10 / 11 (64-bit) |
+| Compiler | MSVC 2019+ 또는 MinGW 64-bit |
+| Qt | Qt 6.x — Widgets, WebSockets 모듈 필수 |
+| CMake | 3.16 이상 |
+| GStreamer | 1.16 이상 (MSVC 64-bit) — Runtime + Development 패키지 모두 설치 |
 
-### 🚗 로봇 제어
-| 모드 | 설명 |
-|------|------|
-| **Manual** | WASD 키보드로 직접 속도 제어 (cmd_vel 발행) |
-| **Auto** | 맵 클릭으로 목표 지점 설정, Nav2 자율주행 |
-| **Control** | 영상 위에 화살표 드래그로 이동 방향 지시 |
-| **Patrol** | 다중 웨이포인트 순찰 경로 설정 및 실행 |
+> **GStreamer 다운로드**: https://gstreamer.freedesktop.org/download/
+> MSVC 64-bit 버전 (`gstreamer-1.0-msvc-x86_64-*.msi`) Runtime + Development 둘 다 설치하세요.
 
-- **카메라 틸트** — 방향키로 틸트 각도 실시간 조절 (–30° ~ +30°)
-- **긴급 정지** — 사이드바 버튼으로 즉각 정지 명령 발행
+---
 
-### 🗺️ SLAM 맵 뷰
-- ROS2로부터 수신한 점유 격자 맵 실시간 렌더링
-- 로봇 현재 위치(odometry) 및 계획된 경로 시각화
-- 맵 클릭으로 Nav2 Goal 설정
+## 🚀 빌드 및 실행
 
-### 📼 영상 녹화 및 다운로드
-- 채널별 녹화 시작 / 정지
-- 서버 저장 녹화 목록 조회 및 파일 다운로드
-- FRUC(OpenCV DNN 보간)를 이용한 프레임레이트 업스케일 (선택 기능)
+```bash
+# 1. 클론
+git clone https://github.com/geunumhanjio/Final_Project.git
+cd Final_Project/FE
+```
 
-### 🔐 인증
-- 로그인 다이얼로그 (TLS WebSocket, 서버 인증서 검증)
-- 세션 관리 / 자동 재연결 / 로그아웃
+1. **Qt Creator**에서 `CMakeLists.txt` 열기
+2. 키트 선택: `Desktop Qt 6.x.x MSVC 64bit`
+3. **Run CMake** → 빌드 후 ▶ 실행
 
 ---
 
 ## 🏛️ 시스템 아키텍처
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   MainWindow (Qt)                   │
-│  ┌──────────┐  ┌──────────────────┐  ┌───────────┐  │
-│  │  TopBar  │  │  CentralStack    │  │  Sidebar  │  │
-│  └──────────┘  │  ┌────────────┐  │  └───────────┘  │
-│                │  │  LiveView  │  │                  │
-│                │  │ (4x VideoCard)│                  │
-│                │  ├────────────┤  │                  │
-│                │  │FullScreen  │  │                  │
-│                │  │    View    │  │                  │
-│                │  ├────────────┤  │                  │
-│                │  │Playback    │  │                  │
-│                │  │    View    │  │                  │
-│                │  └────────────┘  │                  │
-│                └──────────────────┘                  │
-└─────────────────────────────────────────────────────┘
-         │                        │
-         ▼                        ▼
-  RosBridgeClient        CameraControlClient
-  (ws://robot:9090)      (ws://camera:9000)
-         │                        │
-         ▼                        ▼
-    ROS2 Bridge              Camera Server
-   (Nav2, SLAM, Odom)     (RTSP, 녹화, 캘리브레이션)
-```
-
----
-
-## 📁 디렉터리 구조
-
-```
+```text
 FE/
-├── main.cpp                    # 앱 진입점, GStreamer DLL 초기화
-├── mainwindow.{h,cpp}          # 메인 윈도우, 키 입력 처리
-├── mainwindow_ui.cpp           # UI 레이아웃 구성
-├── mainwindow_session.cpp      # 세션/인증 로직
+├── main.cpp                     # 앱 진입점, GStreamer 전역 초기화
+├── mainwindow.cpp / .h          # 메인 윈도우 컨트롤러
+│                                  • 전역 키 이벤트 필터 (WASD 로봇 제어)
+│                                  • LiveView / FullScreenView / Settings 라우팅
+│                                  • STREAM_STATS 신호 → UI 라우팅 연결
+│                                  • ROS2 IP 동적 재연결 (onConfigChanged)
+│                                  • OSD 체크 시 requestStreamStats() 자동 호출
+├── CMakeLists.txt               # 빌드 구성, GStreamer / Qt 링킹
+├── style/
+│   ├── theme_dark.qss           # 다크 테마
+│   └── theme_light.qss          # 라이트 테마
 │
-├── Components/                 # 재사용 UI 컴포넌트
-│   ├── topbar                  # 상단 타이틀바, 테마 전환
-│   ├── sidebar                 # 좌측 사이드바 (모드/채널 선택)
-│   ├── videocard               # 단일 CCTV 카드 (OSD, 설정)
-│   ├── slammapwidget           # SLAM 맵 렌더링 위젯
-│   ├── osdwidget               # OSD 오버레이 (FPS/비트레이트)
-│   ├── settingswidget          # 전체 설정 페이지
-│   └── logindialog             # 로그인 다이얼로그
+├── Views/
+│   ├── liveview.cpp / .h        # 4채널 CCTV + RC카 분할 그리드
+│   │                              • 채널별 streamStatsRequested 신호 상위 전달
+│   │                              • STREAM_STATS → 각 VideoCard 라우팅
+│   ├── playbackview.cpp / .h    # 녹화 목록 · 다운로드 · 로컬 재생
+│   └── fullscreenview.cpp / .h  # 전체화면 뷰
+│                                  • Smart Zoom / Pan / Rect Zoom
+│                                  • Goal Pose ControlOverlay (마우스 드래그)
+│                                  • OSD 체크 시 streamStatsRequested 신호 발행
+│                                  • STREAM_STATS OSD 갱신
 │
-├── Views/                      # 메인 페이지 뷰
-│   ├── liveview                # 4채널 라이브 뷰
-│   ├── fullscreenview          # 풀스크린 + 제어 오버레이
-│   └── playbackview            # 녹화 영상 재생 뷰
+├── Components/
+│   ├── videocard.cpp / .h       # 개별 영상 카드 래퍼
+│   │                              • 호버 시 상단 오버레이 표시
+│   │                              • ⚙ 팝업 메뉴 → OSD 지표 체크박스 (All 포함)
+│   │                              • 체크 시 streamStatsRequested(channelId, bool) 발행
+│   │                              • updateStreamStats() → OsdWidget 값 갱신
+│   ├── osdwidget.cpp / .h       # 반투명 OSD 렌더러
+│   │                              • setMetricValue() / setMetricVisible()
+│   │                              • Packet Loss · Jitter · FPS · Bitrate · Latency
+│   ├── full_underbar.cpp / .h   # 전체화면 하단 바 (재생 제어 / 줌 버튼)
+│   ├── sidebar.cpp / .h         # 좌측 채널·카테고리 내비게이션
+│   ├── topbar.cpp / .h          # 상단 바 (로고, 시간, 테마 토글, 설정 버튼)
+│   └── settingswidget.h         # 시스템 설정 다이얼로그 (Header-only UI)
+│                                  • 카메라 IP / RTSP 포트 / ROS2 WS 주소 편집
 │
-├── Video/                      # 영상 처리 레이어
-│   ├── videowidget             # GStreamer 파이프라인 관리
-│   ├── livevideowidget         # 라이브 스트림 위젯
-│   ├── recordedvideowidget     # 녹화 재생 위젯
-│   ├── rtsppinger              # RTSP 연결 상태 감지
-│   ├── frucvideoprocessor      # OpenCV FRUC 처리 (선택)
-│   └── Gst/
-│       ├── GstQualityMonitor   # GStreamer 품질 모니터
-│       └── GstStatsCollector   # 스트림 통계 수집
+├── Video/
+│   ├── videowidget.cpp / .h     # GStreamer 파이프라인 베이스 클래스
+│   │                              • GstBus 폴링, Crop, OSD 위치 동기화
+│   │                              • Packet Loss / Jitter 실시간 연산
+│   ├── livevideowidget.cpp / .h # RTSP 라이브 스트리밍 파이프라인
+│   │                              • rtspsrc → rtph264depay → avdec_h264 → videosink
+│   │                              • Watchdog + 3초 간격 Auto-Reconnect
+│   └── recordedvideowidget.cpp / .h # 로컬 파일(.mp4 등) 재생 파이프라인
 │
-├── Network/                    # 네트워크 클라이언트
-│   ├── rosbridgeclient         # ROS2 Bridge WebSocket 클라이언트
-│   ├── cameracontrolclient     # 카메라 서버 제어 클라이언트
-│   ├── authmanager             # 인증/세션 관리
-│   └── streammanager           # 스트림 URL 관리
+├── Network/
+│   ├── cameracontrolclient.cpp / .h  # 카메라 서버 WebSocket 클라이언트 (포트 9000)
+│   │                              • connectToServer(): 상시 연결 유지 + 자동 재연결
+│   │                              • requestStreamStats(): OSD 체크 시 즉시 요청
+│   │                              • STREAM_STATS JSON 파싱 → streamStatsReceived 신호
+│   │                              • 녹화 제어 (RECORD_CONTROL)
+│   │                              • 녹화 목록 조회 (GET_RECORDINGS)
+│   │                              • 파일 다운로드 (DOWNLOAD_FILE, 바이너리 전송)
+│   ├── rosbridgeclient.cpp / .h  # ROS2 rosbridge WebSocket 클라이언트
+│   │                              • sendCmdVel() / sendGoalPose()
+│   │                              • sendModeControl() / sendEmergencyStop()
+│   └── streammanager.cpp / .h   # 카메라별 RTSP URL 동적 생성기
 │
-├── Utils/                      # 유틸리티
-│   ├── configmanager           # 앱 설정 (JSON 기반)
-│   ├── constants               # 전역 상수 정의
-│   ├── channelcatalog          # 채널 정보 카탈로그
-│   ├── goaloverlaycontroller   # 목표 지점 오버레이 제어
-│   ├── applicationinitializer  # 앱 초기화 시퀀스
-│   ├── jsonutils               # JSON 파싱 헬퍼
-│   └── framelessconfirmdialog  # 프레임리스 확인 다이얼로그
-│
-├── assets/
-│   ├── fonts/                  # Pretendard 폰트
-│   └── icons/                  # 앱 아이콘
-├── style/                      # QSS 테마 파일 (Light / Dark)
-├── env/                        # 환경설정 (서버 인증서 등)
-└── CMakeLists.txt              # 빌드 설정
+└── Utils/
+    └── configmanager.h          # QSettings 기반 .ini 설정 관리자
+                                   (Header-only Singleton)
+                                   • getCameraIp/Port / getRobotIp / setRobotIp
+                                   • configChanged 신호 → 실시간 설정 반영
 ```
 
 ---
 
-## 📦 의존성
+## 📝 라이선스
 
-### 필수
-
-| 라이브러리 | 버전 | 용도 |
-|-----------|------|------|
-| [Qt](https://www.qt.io/) | 6.x | UI 프레임워크, WebSocket, Network |
-| [GStreamer](https://gstreamer.freedesktop.org/) | 1.0 | RTSP 영상 수신 및 디코딩 |
-
-### 선택 (FRUC 기능)
-
-| 라이브러리 | 버전 | 용도 |
-|-----------|------|------|
-| [OpenCV](https://opencv.org/) | 4.x | 프레임 보간(FRUC) 처리 |
-
----
-
-## 🔨 빌드 방법
-
-### 1. 사전 요구사항 설치
-
-- **Qt 6** — [Qt Online Installer](https://www.qt.io/download)에서 설치
-  - 컴포넌트: `Qt Widgets`, `Qt WebSockets`, `Qt Network`
-- **GStreamer 1.0** — [공식 사이트](https://gstreamer.freedesktop.org/download/)에서 Windows 바이너리 설치
-  - MSVC 빌드: `C:/Program Files/gstreamer/1.0/msvc_x86_64`
-  - MinGW 빌드: `C:/Program Files/gstreamer/1.0/mingw_x86_64`
-- **CMake** 3.16 이상
-- **컴파일러**: MSVC 2022 또는 MinGW
-
-### 2. CMake 구성 및 빌드
-
-```bash
-# 소스 디렉터리로 이동
-cd FE
-
-# CMake 구성 (MSVC 예시)
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-# 빌드
-cmake --build build --config Release
-```
-
-### 3. OpenCV(FRUC) 포함 빌드 (선택)
-
-```bash
-cmake -B build \
-  -DVEDA_ENABLE_FRUC=ON \
-  -DOPENCV_ROOT="C:/opencv" \
-  -DCMAKE_BUILD_TYPE=Release
-
-cmake --build build --config Release
-```
-
-> FRUC 없이 빌드하려면 `-DVEDA_ENABLE_FRUC=OFF`
-
-### 4. Qt Creator에서 빌드
-
-1. Qt Creator에서 `FE/CMakeLists.txt` 열기
-2. Kit 선택 (Qt 6 + MSVC 또는 MinGW)
-3. **빌드** → **실행**
-
----
-
-## ⚙️ 실행 환경 설정
-
-앱 실행 전 아래 환경변수 또는 경로가 설정되어 있어야 합니다.
-
-### GStreamer PATH 설정
-
-```powershell
-# PowerShell (MSVC)
-$env:PATH += ";C:\Program Files\gstreamer\1.0\msvc_x86_64\bin"
-
-# 또는 시스템 환경변수에 영구 등록
-[Environment]::SetEnvironmentVariable("PATH", $env:PATH + ";C:\Program Files\gstreamer\1.0\msvc_x86_64\bin", "Machine")
-```
-
-### 서버 연결 설정
-
-앱 실행 시 로그인 다이얼로그에서 아래 정보를 입력합니다.
-
-| 항목 | 설명 | 예시 |
-|------|------|------|
-| 서버 IP | 로봇 서버(ROS2 Bridge) 주소 | `192.168.1.100` |
-| 카메라 IP | 카메라 서버 주소 | `192.168.1.101` |
-| 사용자 ID / PW | 인증 정보 | — |
-
----
-
-## 🌐 네트워크 프로토콜
-
-### ROS2 Bridge (포트 9090)
-
-`RosBridgeClient`가 `ws://[robot_ip]:9090`에 연결하여 ROS2 토픽을 송수신합니다.
-
-| 방향 | 토픽 / 기능 | 설명 |
-|------|------------|------|
-| 발행 | `/cmd_vel` | 선속도 / 각속도 (WASD 제어) |
-| 발행 | `/camera_tilt` | 카메라 틸트 각도 |
-| 발행 | `/nav/goto` | 단일 목표 지점 Nav2 |
-| 발행 | `/nav/patrol` | 순찰 경로 |
-| 발행 | `/nav/cancel` | 내비게이션 취소 |
-| 구독 | `/map` | SLAM 점유 격자 맵 |
-| 구독 | `/odom` | 로봇 위치/속도 |
-| 구독 | `/plan` | 계획된 경로 |
-| 구독 | `/nav_status` | 내비게이션 상태 |
-| 구독 | `/fall_alert` | 낙상 감지 알림 |
-
-### Camera Control Server (포트 9000)
-
-`CameraControlClient`가 `ws://[camera_ip]:9000`에 연결합니다.
-
-| 명령 | 설명 |
-|------|------|
-| `RECORD_START` / `RECORD_STOP` | 채널별 녹화 제어 |
-| `REQUEST_RECORDINGS` | 녹화 목록 조회 |
-| `REQUEST_DOWNLOAD` | 파일 다운로드 (바이너리) |
-| `CALIBRATION_CLICK` | 캘리브레이션 좌표 전송 |
-| `REQUEST_STREAM_STATS` | FPS / 비트레이트 / 레이턴시 요청 |
-
----
-
-## 🎨 테마
-
-- **Dark / Light** 테마 전환 지원 (상단바 버튼)
-- QSS 스타일시트 기반 (`style/` 디렉터리)
-- Pretendard 폰트 번들 포함
-
----
-
-## 🏫 프로젝트 정보
-
-본 프로젝트는 **VEDA (Vehicle & Embedded Development Academy)** 교육 과정의 최종 프로젝트로 개발되었습니다.
-
----
-
-*© 2026 VEDA Final Project Team*
+본 프로젝트는 **VEDA AIoT 프로젝트 (근엄한조)** 의 일환으로 개발되었습니다.

@@ -20,8 +20,14 @@ public:
     void connectToServer(const QString &cameraIp);
 
     // Connects to ws://[cameraIp]:9000 and sends the command
+    void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
+    // Connects persistently for receiving STREAM_STATS
+    void connectToServer(const QString &cameraIp); // [New]
+
+    // Connects to ws://[cameraIp]:9000 and sends the command
     void sendCalibrationClick(const QString &cameraIp, double x1, double y1, double x2, double y2);
     void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
+    void requestStreamStats(const QString &cameraIp, int channelId, bool start); // [New]
     void requestRecordings(const QString &cameraIp);
     void requestDownload(const QString &cameraIp, const QString &filename);
 
@@ -31,8 +37,11 @@ signals:
     void errorOccurred(QString error);
     void videoReceived(QString url);
     void recordingListReceived(QJsonArray list);
-    void slamMappingErrorReceived(QString reason, double normalizedX, double normalizedY);
 
+    
+    // [New] Stream Stats
+    void streamStatsReceived(int channelId, double fps, double bitrateKbps, double proxyLatencyMs);
+    
     // File Transfer Signals
     void downloadProgress(qint64 received, qint64 total);
     void downloadFinished(QString filePath);
@@ -51,7 +60,7 @@ private:
     };
 
     QWebSocket m_webSocket;
-    QQueue<PendingCommand> m_pendingCommands;
+    QString m_pendingCommand;
     QString m_currentIp; // [New]
     bool m_isConnecting;
 

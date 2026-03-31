@@ -250,12 +250,7 @@ set(PROJECT_SOURCES
         Views/playbackview.h Views/playbackview.cpp
         Utils/applicationinitializer.h Utils/applicationinitializer.cpp
         Utils/configmanager.h
-        Utils/channelcatalog.h Utils/channelcatalog.cpp
-        Utils/goaloverlaycontroller.h Utils/goaloverlaycontroller.cpp
-        Utils/framelessconfirmdialog.h Utils/framelessconfirmdialog.cpp
-        Utils/jsonutils.h Utils/jsonutils.cpp
-        Components/settingswidget.h Components/settingswidget.cpp
-        Components/logindialog.h Components/logindialog.cpp
+        Components/settingswidget.h
         Components/osdwidget.h Components/osdwidget.cpp # [New]
 )
 
@@ -276,6 +271,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(VEDA_QT_1 MANUAL_FINALIZATION ${PROJECT_SOURCES}
         Components/full_underbar.h Components/full_underbar.cpp
         resources.qrc)
+        Components/full_underbar.h Components/full_underbar.cpp)
 else()
     if(ANDROID)
         add_library(VEDA_QT_1 SHARED ${PROJECT_SOURCES})
@@ -313,7 +309,6 @@ if(MSVC)
         "${GST_ROOT}/lib/gstreamer-1.0.lib"
         "${GST_ROOT}/lib/gstvideo-1.0.lib"
         "${GST_ROOT}/lib/gstrtp-1.0.lib"
-        "${GST_ROOT}/lib/gstrtsp-1.0.lib"
         "${GST_ROOT}/lib/gobject-2.0.lib"
         "${GST_ROOT}/lib/glib-2.0.lib"
         "${GST_ROOT}/lib/gstapp-1.0.lib"
@@ -325,7 +320,6 @@ else()
         "${GST_ROOT}/lib/libgstreamer-1.0.dll.a"
         "${GST_ROOT}/lib/libgstvideo-1.0.dll.a"
         "${GST_ROOT}/lib/libgstrtp-1.0.dll.a"
-        "${GST_ROOT}/lib/libgstrtsp-1.0.dll.a"
         "${GST_ROOT}/lib/libgobject-2.0.dll.a"
         "${GST_ROOT}/lib/libglib-2.0.dll.a"
         "${GST_ROOT}/lib/libgstapp-1.0.dll.a"

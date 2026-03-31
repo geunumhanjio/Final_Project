@@ -29,9 +29,8 @@ MainWindow::MainWindow(QWidget *parent)
     ConfigManager::instance().loadDefaults();
     m_isDark = ConfigManager::instance().getDarkTheme();
     m_rosClient = new RosBridgeClient(this);
-    m_currentRobotWsUrl = ConfigManager::instance().getRobotIp();
-    m_rosClient->connectToHost(m_currentRobotWsUrl);
-
+    m_rosClient->connectToHost(ConfigManager::instance().getRobotIp()); // [Modified] Use config
+    
     qDebug() << "[MainWindow] Initializing CameraControlClient...";
     m_cameraClient = new CameraControlClient(this);
 
@@ -44,29 +43,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_inputTimer = new QTimer(this);
     connect(m_inputTimer, &QTimer::timeout, this, &MainWindow::processInput);
-
-    m_cameraTiltTimer = new QTimer(this);
-    m_cameraTiltTimer->setInterval(100);
-    connect(m_cameraTiltTimer, &QTimer::timeout, this, &MainWindow::processCameraTiltInput);
-
+    
+    // Listen to config changes
     connect(&ConfigManager::instance(), &ConfigManager::configChanged, this, &MainWindow::onConfigChanged);
-    connect(&AuthManager::instance(), &AuthManager::userProfileResolved, this,
-            [this](const QString &userId, const QString &email) {
-                if (!userId.trimmed().isEmpty()
-                    && userId.trimmed() == ConfigManager::instance().getActiveUserId()) {
-                    ConfigManager::instance().setActiveUserEmail(email);
-                }
-            });
-    connect(&AuthManager::instance(), &AuthManager::authenticationRequired, this,
-            [this](const QString &message) {
-                if (!reopenLoginDialog(message)) {
-                    close();
-                }
-            });
-
-    if (AuthManager::instance().isAuthenticated()) {
-        AuthManager::instance().fetchCurrentUserProfile();
-    }
 }
 
 MainWindow::~MainWindow()
@@ -101,18 +80,12 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
     return QMainWindow::eventFilter(obj, event);
 }
 
-bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress)
-{
-    if (m_robotMode != Sidebar::ManualMode) {
-        return false;
-    }
-    if (!ConfigManager::instance().getManualControl()) {
-        qWarning() << "[Control] Manual control was disabled in settings. Re-enabling WASD input.";
-        ConfigManager::instance().setManualControl(true);
-    }
-    if (event->isAutoRepeat()) {
-        return false;
-    }
+// [New] Shared WASD Logic
+bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress) {
+    if (!ConfigManager::instance().getManualControl()) return false;
+    if (event->isAutoRepeat()) return false;
+    
+    int key = event->key();
 
     const int key = event->key();
     if (isPress) {
@@ -282,21 +255,119 @@ void MainWindow::stopManualMotion()
 
 void MainWindow::requestEmergencyStop()
 {
-    stopManualMotion();
-    clearAllGoalOverlays();
+    qDebug() << "[MainWindow] initConnections Started...";
+    
+    // [New] Connect STREAM_STATS from WebSocket to UI components
+    if (m_cameraClient) {
+        connect(m_cameraClient, &CameraControlClient::streamStatsReceived, this, [=](int channelId, double fps, double bitrateKbps, double proxyLatencyMs){
+            if (m_livePage) m_livePage->updateStreamStats(channelId, fps, bitrateKbps, proxyLatencyMs);
+            if (m_fullPage) m_fullPage->updateStreamStats(channelId, fps, bitrateKbps, proxyLatencyMs);
+        });
+        
+        // [New] Request STREAM_STATS on OSD Check
+        connect(m_livePage, &LiveView::streamStatsRequested, [=](int channelId, bool start) {
+            ConfigManager::instance().loadDefaults();
+            QString ip = ConfigManager::instance().getCameraIp();
+            m_cameraClient->requestStreamStats(ip, channelId, start);
+        });
+        connect(m_fullPage, &FullScreenView::streamStatsRequested, [=](int channelId, bool start) {
+            ConfigManager::instance().loadDefaults();
+            QString ip = ConfigManager::instance().getCameraIp();
+            m_cameraClient->requestStreamStats(ip, channelId, start);
+        });
+    }
 
-    if (m_livePage) {
-        m_livePage->clearPathOverlay();
-    }
-    if (m_robotMode == Sidebar::PatrolMode && m_livePage) {
-        m_livePage->clearPatrolOverlay();
-    }
-    if (m_robotMode == Sidebar::PatrolMode && m_sidebar) {
-        m_sidebar->setPatrolAddPointActive(false);
-    }
+    connect(m_topBar, &TopBar::sidebarToggled, [=](){ m_sidebar->setVisible(!m_sidebar->isVisible()); });
+    connect(m_topBar, &TopBar::modeChanged, [=](int index){
+        m_centralStack->setCurrentIndex(index);
+        // [New] Switch Sidebar Context
+        // Index 0: Live -> SidebarMode::Live
+        // Index 1: Playback -> SidebarMode::Playback
+        // Others: Maybe default to Live or Hide?
+        if (index == 1) {
+            m_sidebar->setMode(Sidebar::Playback);
+        } else {
+            m_sidebar->setMode(Sidebar::Live);
+        }
+    });
+    connect(m_topBar, &TopBar::themeToggled, this, &MainWindow::toggleTheme);
+    connect(m_sidebar, &Sidebar::channelStateChanged, m_livePage, &LiveView::setChannelVisible);
+    
+    // [New] Sidebar Category Selection -> Filter Playback List
+    connect(m_sidebar, &Sidebar::categorySelected, m_playbackPage, &PlaybackView::filterRecordings);
+    
+    // Connect Recording Navigation
+    connect(m_livePage, &LiveView::recordCommandRequested, [=](int channelId, bool start){
+        // 1. Get Camera IP (Assume all cameras share the same NVR/IP for now as per ConfigManager)
+        ConfigManager::instance().loadDefaults();
+        QString ip = ConfigManager::instance().getCameraIp();
 
-    clearGoalTracking();
-    deactivateControlSession();
+        // 2. Send Command to Camera Server (Port 9000)
+        m_cameraClient->sendRecordCommand(ip, channelId, start);
+        
+        // 3. Feedback
+        if (start) {
+            qDebug() << "[Recording] Started on Channel" << channelId;
+        } else {
+            qDebug() << "[Recording] Stopped on Channel" << channelId;
+            // Note: Playback update is now handled by videoReceived signal
+        }
+    });
+
+    // [New] Connect Playback View
+    if (m_cameraClient) {
+        // 1. Refresh Button -> Request Recordings
+        connect(m_playbackPage, &PlaybackView::refreshRequested, [=](){
+             ConfigManager::instance().loadDefaults();
+             QString ip = ConfigManager::instance().getCameraIp();
+             m_cameraClient->requestRecordings(ip);
+        });
+
+        // 2. Received List -> Update UI
+        connect(m_cameraClient, &CameraControlClient::recordingListReceived, m_playbackPage, &PlaybackView::updateList);
+
+        // [New] Video Received (Recording Finished) -> Auto Refresh
+        connect(m_cameraClient, &CameraControlClient::videoReceived, [=](QString url){
+            qDebug() << "[MainWindow] Recording finished at:" << url << "- Refreshing list.";
+            if (m_playbackPage) emit m_playbackPage->refreshRequested();
+        });
+
+        // 3. Play Video (Check Local -> Download -> Play)
+        connect(m_playbackPage, &PlaybackView::playRequested, [=](const QString &filename){
+            qDebug() << "[MainWindow] playRequested signal received for:" << filename;
+            QString savePath = QStandardPaths::writableLocation(QStandardPaths::DownloadLocation);
+            QString localFilePath = savePath + "/" + filename;
+            
+            QFileInfo fileInfo(localFilePath);
+            if (fileInfo.exists() && fileInfo.size() > 1024) {
+                qDebug() << "[MainWindow] Found valid local file:" << localFilePath << "Size:" << fileInfo.size();
+                
+                // [Mod] Keep background RTSP streams running (No stopAll)
+                // m_livePage->stopAll(); 
+
+                m_returnToWidget = m_playbackPage; // [Mod] Return to PlaybackView on close
+                m_fullPage->play(localFilePath, 0); 
+                m_centralStack->setCurrentWidget(m_fullPage);
+            } else {
+                if (fileInfo.exists()) {
+                     qDebug() << "[MainWindow] Found invalid/small file (" << fileInfo.size() << "bytes). Deleting to re-download.";
+                     QFile::remove(localFilePath);
+                }
+                qDebug() << "[MainWindow] File not found local, requesting download:" << filename;
+                ConfigManager::instance().loadDefaults();
+                QString ip = ConfigManager::instance().getCameraIp();
+                m_cameraClient->requestDownload(ip, filename);
+            }
+        });
+        
+        // 4. Download Progress
+        connect(m_cameraClient, &CameraControlClient::downloadProgress, m_playbackPage, &PlaybackView::updateDownloadProgress);
+        
+        // 5. Download Finished -> Add to List (No Auto Play)
+        connect(m_cameraClient, &CameraControlClient::downloadFinished, [=](const QString &filePath){
+            qDebug() << "[MainWindow] Download Finished:" << filePath;
+            m_playbackPage->addLocalItem(filePath);
+        });
 
     if (m_rosClient) {
         m_rosClient->sendNavCancel();
@@ -428,26 +499,17 @@ void MainWindow::applySharedVideoGoalOverlay()
                                             m_sharedVideoGoalStartNormalized,
                                             m_sharedVideoGoalEndNormalized);
         }
-        return;
-    }
+    });
 
-    if (m_livePage) {
-        m_livePage->clearVideoGoalOverlay();
-    }
-    if (m_fullPage) {
-        m_fullPage->clearVideoGoalOverlay();
-    }
-}
+    // [New] Connect Goal Pose
+    connect(m_fullPage, &FullScreenView::reqGoalPose, [=](double x, double y, double theta){
+        if (m_rosClient) {
+            qDebug() << "[MainWindow] Sending Goal Pose -> x:" << x << "y:" << y << "theta:" << theta;
+            m_rosClient->sendGoalPose(x, y, theta);
+        }
+    });
 
-void MainWindow::setSharedVideoGoalOverlay(int channelIndex,
-                                           const QPointF &normalizedStart,
-                                           const QPointF &normalizedEnd)
-{
-    m_hasSharedVideoGoalOverlay = true;
-    m_sharedVideoGoalChannelIndex = channelIndex;
-    m_sharedVideoGoalStartNormalized = normalizedStart;
-    m_sharedVideoGoalEndNormalized = normalizedEnd;
-    applySharedVideoGoalOverlay();
+    qDebug() << "[MainWindow] initConnections Completed.";
 }
 
 void MainWindow::clearSharedVideoGoalOverlay()
@@ -584,4 +646,12 @@ void MainWindow::applyRobotMode(Sidebar::RobotMode mode)
 
     m_fullPage->setControlModeAvailable(m_robotMode == Sidebar::ControlMode);
     m_fullPage->setRobotModeSelection(static_cast<int>(m_robotMode));
+}
+
+void MainWindow::onConfigChanged() {
+    QString newIp = ConfigManager::instance().getRobotIp();
+    // Reconnect ROS2 Client if IP Changed
+    qDebug() << "[MainWindow] Config changed. Updating Robot IP to:" << newIp;
+    m_rosClient->disconnect();
+    m_rosClient->connectToHost(newIp);
 }

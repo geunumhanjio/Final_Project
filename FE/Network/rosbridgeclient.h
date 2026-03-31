@@ -20,15 +20,8 @@ public:
     void connectToHost(const QString &url);
     void disconnect();
     void sendCmdVel(double linear, double angular);
-    void sendCameraTilt(double angle);
-    void sendModeControl(const QString &mode);
-    void sendTrackingEnable(bool enabled);
-    void sendNavGoto(double x, double y, double yaw);
-    void sendNavPatrol(const QString &route);
-    void sendNavQueue(const QVector<QPointF> &waypoints);
-    void sendNavSetSpeed(double speed);
-    void sendNavCancel();
     void sendGoalPose(double x, double y, double theta, const QString &frame_id = "map");
+    void emergencyStop();
 
 signals:
     void connected();

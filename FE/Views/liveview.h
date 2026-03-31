@@ -18,22 +18,12 @@ public:
     bool isRcCarCameraFocused() const;
     void setChannelVisible(int index, bool visible);
     void stopAll();
-    void clearGoalOverlays();
-    void clearPathOverlay();
-    void clearPatrolOverlay();
-    QVector<QPointF> patrolPoints() const;
-    void setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd);
-    void clearVideoGoalOverlay();
+    void updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs); // [New]
 
 signals:
     void requestFullScreen(int index, QString url);
     void recordCommandRequested(int channelId, bool start);
-    void goalPoseRequested(double x, double y, double yaw);
-    void calibrationClickRequested(int channelIndex, double x1, double y1, double x2, double y2);
-    void goalInteractionStarted();
-    void goalCommitted();
-    void patrolPointsChanged(int count);
-    void videoGoalOverlayCommitted(int channelIndex, QPointF normalizedStart, QPointF normalizedEnd);
+    void streamStatsRequested(int channelId, bool start); // [New]
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;

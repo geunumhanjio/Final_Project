@@ -28,26 +28,14 @@ public:
     explicit FullScreenView(QWidget *parent = nullptr);
     void play(const QString &url, int index);
     void stop();
-    void setControlModeAvailable(bool available);
-    void setControlModeChecked(bool checked);
-    void setRobotModeSelection(int mode);
-    void setVideoGoalOverlay(int channelIndex, const QPointF &normalizedStart, const QPointF &normalizedEnd);
-    void clearVideoGoalOverlay();
-    void setMapGeometry(const QPointF &origin, int widthCells, int heightCells, double resolution);
-    void clearGoalOverlay();
+    void updateStreamStats(int channelId, double fps, double bitrateKbps, double proxyLatencyMs); // [New]
+ // Theme Support
 
 signals:
     void closeRequested();
     void recordRequested(int channelId, bool start); // [New]
-    void controlModeRequested(bool enabled);
-    void robotModeSelectionRequested(int mode);
-    void emergencyStopRequested();
     void reqGoalPose(double x, double y, double theta);
-    void calibrationClickRequested(int channelIndex, double x1, double y1, double x2, double y2);
-    void goalInteractionStarted();
-    void goalCommitted();
-    void videoGoalOverlayCommitted(int channelIndex, QPointF normalizedStart, QPointF normalizedEnd);
-    void videoGoalOverlayClearRequested();
+    void streamStatsRequested(int channelId, bool start); // [New]
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -88,12 +76,12 @@ private:
     // [수정] QRubberBand* -> QWidget* 으로 변경
     QWidget *rubberBand;
 
-    GoalArrowOverlayWidget *controlOverlay;
+    QWidget *controlOverlay;
     QTimer *syncTimer; // [New]
     void syncOverlayPosition(); // [New]
 
     bool isSettingDirection;
-    QPointF goalStartPos;
+    QPoint goalStartPos;
 
     QPoint originPoint;
     bool isDrawing;
