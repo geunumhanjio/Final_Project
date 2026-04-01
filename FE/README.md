@@ -293,4 +293,4 @@ $env:PATH += ";C:\Program Files\gstreamer\1.0\msvc_x86_64\bin"
 
 ---
 
-*© 2026 VEDA Final Project Team*
+*2026 VEDA Final Project*
