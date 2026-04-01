@@ -8,6 +8,7 @@
 #include <QJsonArray>
 #include <QFile>
 #include <QDir>
+#include <QQueue>
 
 class CameraControlClient : public QObject
 {
@@ -16,10 +17,15 @@ public:
     explicit CameraControlClient(QObject *parent = nullptr);
     ~CameraControlClient();
 
+    void connectToServer(const QString &cameraIp);
+
+    // Connects to ws://[cameraIp]:9000 and sends the command
+    void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
     // Connects persistently for receiving STREAM_STATS
     void connectToServer(const QString &cameraIp); // [New]
 
     // Connects to ws://[cameraIp]:9000 and sends the command
+    void sendCalibrationClick(const QString &cameraIp, double x1, double y1, double x2, double y2);
     void sendRecordCommand(const QString &cameraIp, int channelId, bool start);
     void requestStreamStats(const QString &cameraIp, int channelId, bool start); // [New]
     void requestRecordings(const QString &cameraIp);
@@ -31,6 +37,7 @@ signals:
     void errorOccurred(QString error);
     void videoReceived(QString url);
     void recordingListReceived(QJsonArray list);
+
     
     // [New] Stream Stats
     void streamStatsReceived(int channelId, double fps, double bitrateKbps, double proxyLatencyMs);
@@ -47,6 +54,11 @@ private slots:
     void onBinaryMessageReceived(const QByteArray &message); // [New]
 
 private:
+    struct PendingCommand {
+        QString cameraIp;
+        QString payload;
+    };
+
     QWebSocket m_webSocket;
     QString m_pendingCommand;
     QString m_currentIp; // [New]
@@ -60,6 +72,8 @@ private:
     
     // Helper to ensure command delivery
     void safeSend(const QString &jsonString, const QString &ip);
+    void processPendingCommands();
+    void openSocketForHost(const QString &ip);
 };
 
 #endif // CAMERACONTROLCLIENT_H

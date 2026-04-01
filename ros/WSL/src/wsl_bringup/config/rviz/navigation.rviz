@@ -1,0 +1,78 @@
+Panels:
+  - Class: rviz_common/Displays
+    Name: Displays
+  - Class: rviz_common/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz_default_plugins/Grid
+      Name: Grid
+      Alpha: 0.5
+      Cell Size: 1
+      Color: 160; 160; 164
+    - Class: rviz_default_plugins/RobotModel
+      Name: RobotModel
+      Description Topic:
+        Value: /robot_description
+    - Class: rviz_default_plugins/TF
+      Name: TF
+      Enabled: false
+    - Class: rviz_default_plugins/LaserScan
+      Name: LaserScan
+      Topic:
+        Value: /scan
+      Color Transformer: Intensity
+      Size (m): 0.03
+    - Class: rviz_default_plugins/Map
+      Name: Map
+      Topic:
+        Value: /map
+      Alpha: 0.7
+    - Class: rviz_default_plugins/Map
+      Name: Costmap (Local)
+      Topic:
+        Value: /local_costmap/costmap
+      Alpha: 0.45
+      Color Scheme: costmap
+    - Class: rviz_default_plugins/Map
+      Name: Costmap (Global)
+      Topic:
+        Value: /global_costmap/costmap
+      Alpha: 0.45
+      Color Scheme: costmap
+    - Class: rviz_default_plugins/Path
+      Name: Global Plan
+      Topic:
+        Value: /plan
+      Color: 0; 128; 0
+    - Class: rviz_default_plugins/Path
+      Name: Local Plan
+      Topic:
+        Value: /local_plan
+      Color: 0; 0; 255
+    - Class: rviz_default_plugins/PoseWithCovariance
+      Name: Initial Pose
+      Topic:
+        Value: /initialpose
+    - Class: rviz_default_plugins/Odometry
+      Name: Odometry
+      Topic:
+        Value: /odometry/filtered
+      Keep: 100
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+  Tools:
+    - Class: rviz_default_plugins/Interact
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/SetInitialPose
+    - Class: rviz_default_plugins/SetGoal
+  Value: true
+  Views:
+    Current:
+      Class: rviz_default_plugins/Orbit
+      Distance: 10
+      Name: Current View
+      Target Frame: base_link

@@ -22,6 +22,8 @@ public:
     void setMode(bool isFile); // True: Playback, False: Live
     void updateTime(qint64 currentMs, qint64 totalMs);
     void setPlaying(bool isPlaying);
+    void setControlModeAvailable(bool available);
+    void setControlModeChecked(bool checked);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -41,6 +43,8 @@ signals:
     void reqSkipBackward();
 
 private:
+    void updateControlModeButtonText(bool checked);
+
     QPushButton *btnZoomIn;
     QPushButton *btnZoomOut;
     QPushButton *btnRectZoom;

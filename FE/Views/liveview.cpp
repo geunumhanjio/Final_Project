@@ -1,6 +1,8 @@
 #include "liveview.h"
+#include "channelcatalog.h"
 #include "streammanager.h"
 #include "configmanager.h"
+#include <QApplication>
 #include <QDebug>
 #include <QTimer>
 #include <QShowEvent>
@@ -26,9 +28,10 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     for(int i = 0; i < 4; i++) {
         cctvWidgets[i] = new VideoCard(this);
         cctvWidgets[i]->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-        cctvWidgets[i]->setMinimumSize(320, 240);
-        cctvWidgets[i]->setChannelName(QString("Channel %1 - Camera").arg(i+1));
-        cctvWidgets[i]->setChannelId(i + 1); // 1-based ID
+        cctvWidgets[i]->setMinimumWidth(280);
+        cctvWidgets[i]->setMinimumHeight(0);
+        cctvWidgets[i]->setChannelName(ChannelCatalog::liveCardTitleForIndex(i));
+        cctvWidgets[i]->setChannelId(ChannelCatalog::liveRecordChannelIdForIndex(i));
         
         // Connect internal fullscreen button signal
         connect(cctvWidgets[i], &VideoCard::fullScreenRequested, [=](){
@@ -56,17 +59,14 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     // 2-1. RC Car Camera (VideoCard)
     rcCarCamWidget = new VideoCard(this);
     rcCarCamWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
-    rcCarCamWidget->setMinimumSize(320, 240);
-    rcCarCamWidget->setChannelName("RC Car - Front Cam");
-    rcCarCamWidget->setChannelId(9); // ID 9 for RC Car (Avoid conflict with High Quality ID 5)
+    rcCarCamWidget->setMinimumWidth(280);
+    rcCarCamWidget->setMinimumHeight(0);
+    rcCarCamWidget->setChannelName(ChannelCatalog::liveCardTitleForIndex(4));
+    rcCarCamWidget->setChannelId(ChannelCatalog::liveRecordChannelIdForIndex(4));
 
     // Connect internal fullscreen button signal for RC Car
     connect(rcCarCamWidget, &VideoCard::fullScreenRequested, [=](){
-            // Use current IP/Port settings to construct URL
-            ConfigManager::instance().loadDefaults();
-            QString ip = ConfigManager::instance().getCameraIp();
-            QString port = ConfigManager::instance().getCameraPort();
-            QString url = QString("rtsp://%1:%2/robot_cam").arg(ip, port);
+            QString url = ConfigManager::instance().getRobotRtspIspUrl();
             emit requestFullScreen(4, url); // Index 4 for RC Car
     });
     
@@ -97,11 +97,14 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
     headerLayout->addWidget(slamTitle);
         
     // Content
-    slamMapWidget = new QLabel("RC Car - SLAM Lidar Map", slamCard);
+    slamMapWidget = new SlamMapWidget(slamCard);
     slamMapWidget->setObjectName("SensorValue");
-    slamMapWidget->setAlignment(Qt::AlignCenter);
-    slamMapWidget->setStyleSheet("background-color: transparent; font-size: 14px;"); 
+    slamMapWidget->setStyleSheet("background-color: transparent;"); 
     slamMapWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    connect(slamMapWidget, &SlamMapWidget::goalInteractionStarted, this, &LiveView::goalInteractionStarted);
+    connect(slamMapWidget, &SlamMapWidget::goalCommitted, this, &LiveView::goalCommitted);
+    connect(slamMapWidget, &SlamMapWidget::goalRequested, this, &LiveView::goalPoseRequested);
+    connect(slamMapWidget, &SlamMapWidget::patrolPointsChanged, this, &LiveView::patrolPointsChanged);
         
     slamLayout->addWidget(slamHeader);
     slamLayout->addWidget(slamMapWidget);
@@ -118,6 +121,24 @@ LiveView::LiveView(QWidget *parent) : QWidget(parent)
 
     // Connect to StreamManager config change
     connect(&StreamManager::instance(), &StreamManager::configLoaded, this, &LiveView::refreshStreams);
+}
+
+bool LiveView::isRcCarCameraFocused() const
+{
+    if (!rcCarCamWidget) {
+        return false;
+    }
+
+    QWidget *focusWidget = QApplication::focusWidget();
+    qDebug() << "[LiveView] isRcCarCameraFocused checking. Current focusWidget:" << focusWidget;
+    while (focusWidget) {
+        if (focusWidget == rcCarCamWidget) {
+            return true;
+        }
+        focusWidget = focusWidget->parentWidget();
+    }
+
+    return false;
 }
 
 void LiveView::refreshStreams()
@@ -170,20 +191,7 @@ void LiveView::initCCTVStreams()
     }
 
     // Start RC Car Stream
-    QString ip = ConfigManager::instance().getCameraIp();
-    // QString port = ConfigManager::instance().getCameraPort();
-    // [Mod] Use specific URL for RC Car as requested
-    QString rcUrl = QString("rtsp://%1:9554/camera").arg(ip); 
-    // If exact IP is required regardless of config: QString rcUrl = "rtsp://192.168.0.237:9554/camera";
-    // Assuming IP might match config, but port/path is different. 
-    // Let's stick to the requested URL exactly to be safe, or use IP from config if it matches?
-    // User said: "rtsp://192.168.0.237:9554/camera 이 주소로..."
-    // I will use ConfigManager IP if it matches 192.168.0.237 usually, but to be safe and exact:
-    bool useConfigIp = (ip == "192.168.0.237"); // Just logical check, not code
-    // I will simply set it to the hardcoded string or usage of IP if they want dynamic.
-    // Given the request is specific:
-    rcUrl = "rtsp://192.168.0.237:9554/camera";
-    
+    const QString rcUrl = ConfigManager::instance().getRobotRtspUrl();
     QTimer::singleShot(400, this, [this, rcUrl]() {
         if(rcCarCamWidget) {
             rcCarCamWidget->playUrl(rcUrl, 200);

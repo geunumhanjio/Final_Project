@@ -1,0 +1,15 @@
+# rpi_params.yaml
+# 라즈베리파이 노드 파라미터 설정
+# 변경 후 colcon build 없이 바로 반영됩니다.
+
+camera_node:
+  ros__parameters:
+    camera: 0
+    width: 640
+    height: 480
+    format: "RGB888"
+
+serial_bridge_node:
+  ros__parameters:
+    serial_port: "/dev/serial0"
+    baud_rate: 115200

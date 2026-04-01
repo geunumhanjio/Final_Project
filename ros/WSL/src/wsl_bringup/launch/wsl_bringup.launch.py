@@ -1,0 +1,160 @@
+#!/usr/bin/env python3
+"""
+wsl_bringup.launch.py
+=====================
+WSL 전체 시스템 메인 런처
+
+사용법:
+  # SLAM 모드 (기본 - 새 맵 생성)
+  ros2 launch wsl_bringup wsl_bringup.launch.py
+
+  # Localization 모드 (기존 맵 사용)
+  ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=localization
+
+  # RViz2 + rqt 함께 실행
+  ros2 launch wsl_bringup wsl_bringup.launch.py use_rviz:=true use_rqt:=true
+
+  # SLAM + RViz2
+  ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=slam use_rviz:=true
+
+  # 네비게이션 없이 통신 레이어만
+  ros2 launch wsl_bringup wsl_bringup.launch.py nav_mode:=none
+
+  # RTSP/웹소켓 없이 네비만
+  ros2 launch wsl_bringup wsl_bringup.launch.py use_rtsp:=false use_websocket:=false nav_mode:=localization use_rviz:=true
+
+새 패키지 추가 시:
+  1. DeclareLaunchArgument('use_xxx', ...) 추가
+  2. IncludeLaunchDescription(..., condition=IfCondition('use_xxx')) 추가
+  3. wsl_bringup/launch/xxx.launch.py 단독 런처 생성
+"""
+
+from launch import LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    LogInfo,
+)
+from launch.conditions import IfCondition, LaunchConfigurationEquals
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.substitutions import FindPackageShare
+
+
+def generate_launch_description():
+    pkg_share = FindPackageShare('wsl_bringup')
+
+    # ── Launch Arguments ───────────────────────────────────────────────────────
+    args = [
+        DeclareLaunchArgument(
+            'use_rtsp',
+            default_value='true',
+            description='Enable RTSP bridge (video streaming)'
+        ),
+        DeclareLaunchArgument(
+            'use_websocket',
+            default_value='true',
+            description='Enable WebSocket bridge (Qt communication)'
+        ),
+        DeclareLaunchArgument(
+            'use_robot_core',
+            default_value='true',
+            description='Enable robot_description + EKF localization'
+        ),
+        DeclareLaunchArgument(
+            'nav_mode',
+            default_value='slam',
+            description='"slam" = 새 맵 생성 | "localization" = 기존 맵 사용 | "none" = 비활성화'
+        ),
+        DeclareLaunchArgument(
+            'use_rviz',
+            default_value='false',
+            description='Launch RViz2 for visualization'
+        ),
+        DeclareLaunchArgument(
+            'use_rqt',
+            default_value='false',
+            description='Launch rqt for debugging'
+        ),
+    ]
+
+    # ── Helper: include from wsl_bringup/launch/ ───────────────────────────────
+    def local_include(launch_file, extra_args=None, condition=None):
+        kwargs = dict(
+            source=PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', launch_file])
+            ]),
+        )
+        if extra_args:
+            kwargs['launch_arguments'] = extra_args.items()
+        inc = IncludeLaunchDescription(**kwargs)
+        if condition is not None:
+            inc = IncludeLaunchDescription(
+                PythonLaunchDescriptionSource([
+                    PathJoinSubstitution([pkg_share, 'launch', launch_file])
+                ]),
+                launch_arguments=(extra_args or {}).items(),
+                condition=condition,
+            )
+        return inc
+
+    # ── Includes ───────────────────────────────────────────────────────────────
+    includes = [
+        # 로그
+        LogInfo(msg=['[wsl_bringup] Starting WSL system...']),
+        LogInfo(msg=['[wsl_bringup] nav_mode = ', LaunchConfiguration('nav_mode')]),
+
+        # RTSP 브릿지
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'rtsp_bridge.launch.py'])
+            ]),
+            condition=IfCondition(LaunchConfiguration('use_rtsp')),
+        ),
+
+        # WebSocket 브릿지
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'websocket_bridge.launch.py'])
+            ]),
+            condition=IfCondition(LaunchConfiguration('use_websocket')),
+        ),
+
+        # Robot Description + EKF
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'robot_core.launch.py'])
+            ]),
+            condition=IfCondition(LaunchConfiguration('use_robot_core')),
+        ),
+
+        # SLAM (새 맵 생성)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'slam_mapping.launch.py'])
+            ]),
+            condition=LaunchConfigurationEquals('nav_mode', 'slam'),
+        ),
+
+        # Localization (기존 맵 사용)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'navigation.launch.py'])
+            ]),
+            condition=LaunchConfigurationEquals('nav_mode', 'localization'),
+        ),
+
+        # RViz2 / rqt
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource([
+                PathJoinSubstitution([pkg_share, 'launch', 'rviz2.launch.py'])
+            ]),
+            launch_arguments={
+                'use_rviz':   LaunchConfiguration('use_rviz'),
+                'use_rqt':    LaunchConfiguration('use_rqt'),
+                'rviz_mode':  LaunchConfiguration('nav_mode'),
+            }.items(),
+        ),
+    ]
+
+    return LaunchDescription(args + includes)

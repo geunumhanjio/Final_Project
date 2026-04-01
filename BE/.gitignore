@@ -1,0 +1,10 @@
+/tests/
+*.md
+/docs/
+/docs/*.md
+/login/.secrets/
+todo.txt
+/build/
+.vscode/
+*.html
+/dummy/

@@ -2,7 +2,7 @@
 QMainWindow, QWidget {
     background-color: #101622;
     color: #f1f5f9;
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Pretendard';
 }
 
 /* Scrollbar */

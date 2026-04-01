@@ -1,6 +1,7 @@
 #include "cameracontrolclient.h"
 #include <QDebug>
 #include <QDateTime>
+#include <QFileInfo>
 #include <QStandardPaths> // [New]
 #include <QTimer> // [Fix] Include QTimer for singleShot
 
@@ -108,19 +109,8 @@ void CameraControlClient::safeSend(const QString &jsonString, const QString &ip)
         }
     }
 
-    // If connecting or unconnected, queue the command
-    m_pendingCommand = jsonString;
-    
-    // Only call open if not already connecting to the same target
-    // But QWebSocket doesn't expose 'target' while connecting easily.
-    // Simplest approach: If not Connected, call open (it handles state checks mostly, but we'll reset)
-    if (m_webSocket.state() != QAbstractSocket::ConnectingState) {
-        m_isConnecting = true;
-        qDebug() << "[CameraControl] Connecting to" << url;
-        m_webSocket.open(QUrl(url));
-    } else {
-        qDebug() << "[CameraControl] Already connecting, queued command.";
-    }
+    m_pendingCommands.enqueue({trimmedIp, jsonString});
+    processPendingCommands();
 }
 
 void CameraControlClient::onConnected()
@@ -128,12 +118,7 @@ void CameraControlClient::onConnected()
     qDebug() << "[CameraControl] Connected!";
     m_isConnecting = false;
     emit connected();
-
-    if (!m_pendingCommand.isEmpty()) {
-        m_webSocket.sendTextMessage(m_pendingCommand); // Direct send
-        qDebug() << "[CameraControl] Sent pending command:" << m_pendingCommand;
-        m_pendingCommand.clear();
-    }
+    processPendingCommands();
 }
 
 void CameraControlClient::onDisconnected()
@@ -194,6 +179,18 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
         qDebug() << "[CameraControl] Recording List Received:" << list.size() << "items";
         emit recordingListReceived(list);
     }
+    else if (msgType == "SLAM_MAPPING_ERROR") {
+        const QJsonObject payload = obj["payload"].toObject();
+        const QString reason = payload["reason"].toString().trimmed();
+        const double normalizedX = payload["normalized_x"].toDouble();
+        const double normalizedY = payload["normalized_y"].toDouble();
+
+        qWarning().noquote() << QStringLiteral("[CameraControl] SLAM_MAPPING_ERROR reason=%1 normalized_x=%2 normalized_y=%3")
+                                    .arg(reason.isEmpty() ? QStringLiteral("unknown") : reason)
+                                    .arg(normalizedX, 0, 'f', 4)
+                                    .arg(normalizedY, 0, 'f', 4);
+        emit slamMappingErrorReceived(reason, normalizedX, normalizedY);
+    }
     // [New] File Transfer Protocol
     else if (msgType == "FILE_TRANSFER_START") {
         QJsonObject payload = obj["payload"].toObject();
@@ -208,6 +205,7 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
         if (m_downloadFile.open(QIODevice::WriteOnly)) {
             m_isDownloading = true;
             qDebug() << "[Downloader] Start receiving:" << filename << "Expected Size:" << m_totalFileSize;
+            emit downloadProgress(0, m_totalFileSize);
         } else {
             qCritical() << "[Downloader] Error opening file:" << m_downloadFile.errorString();
             emit errorOccurred("File open failed: " + m_downloadFile.errorString());
@@ -220,6 +218,7 @@ void CameraControlClient::onTextMessageReceived(const QString &message)
             m_isDownloading = false;
             QString filePath = m_downloadFile.fileName();
             qDebug() << "[Downloader] File Saved:" << filePath << "Size:" << QFileInfo(filePath).size();
+            emit downloadProgress(m_totalFileSize, m_totalFileSize);
             emit downloadFinished(filePath);
         } else {
             qWarning() << "[Downloader] Received COMPLETE signal but not downloading!";
@@ -247,8 +246,87 @@ void CameraControlClient::onBinaryMessageReceived(const QByteArray &message)
         qCritical() << "[Downloader] Write Error:" << m_downloadFile.errorString();
     } else {
         m_receivedSize += written;
-        // emit downloadProgress(m_receivedSize, m_totalFileSize); // Reduce spam
+        emit downloadProgress(m_receivedSize, m_totalFileSize);
     }
     
     // Optional: Flush every X bytes or just rely on OS
+}
+
+void CameraControlClient::processPendingCommands()
+{
+    if (m_pendingCommands.isEmpty()) {
+        return;
+    }
+
+    const QString desiredIp = m_pendingCommands.head().cameraIp;
+    const QString currentHost = m_webSocket.requestUrl().host();
+    const auto socketState = m_webSocket.state();
+
+    if (socketState == QAbstractSocket::ConnectedState) {
+        if (currentHost == desiredIp) {
+            while (!m_pendingCommands.isEmpty()
+                   && m_webSocket.state() == QAbstractSocket::ConnectedState
+                   && m_pendingCommands.head().cameraIp == desiredIp) {
+                const PendingCommand command = m_pendingCommands.dequeue();
+                m_webSocket.sendTextMessage(command.payload);
+                qDebug() << "[CameraControl] Sent queued command to" << QString("ws://%1:9000").arg(desiredIp);
+            }
+
+            if (!m_pendingCommands.isEmpty()) {
+                openSocketForHost(m_pendingCommands.head().cameraIp);
+            }
+            return;
+        }
+
+        openSocketForHost(desiredIp);
+        return;
+    }
+
+    if (socketState == QAbstractSocket::ConnectingState) {
+        if (m_currentIp != desiredIp) {
+            m_webSocket.abort();
+        }
+        return;
+    }
+
+    openSocketForHost(desiredIp);
+}
+
+void CameraControlClient::openSocketForHost(const QString &ip)
+{
+    const QString trimmedIp = ip.trimmed();
+    if (trimmedIp.isEmpty()) {
+        return;
+    }
+
+    const QString url = QString("ws://%1:9000").arg(trimmedIp);
+    const QString currentHost = m_webSocket.requestUrl().host();
+
+    if (m_webSocket.state() == QAbstractSocket::ConnectedState) {
+        m_currentIp = trimmedIp;
+        if (currentHost == trimmedIp) {
+            return;
+        }
+
+        qDebug() << "[CameraControl] Switching host from" << currentHost << "to" << trimmedIp;
+        m_webSocket.abort();
+        return;
+    }
+
+    if (m_webSocket.state() == QAbstractSocket::ConnectingState) {
+        if (currentHost == trimmedIp || m_currentIp == trimmedIp) {
+            m_currentIp = trimmedIp;
+            return;
+        }
+
+        m_currentIp = trimmedIp;
+        qDebug() << "[CameraControl] Cancelling pending connection from" << currentHost << "to" << trimmedIp;
+        m_webSocket.abort();
+        return;
+    }
+
+    m_currentIp = trimmedIp;
+    m_isConnecting = true;
+    qDebug() << "[CameraControl] Connecting to" << url;
+    m_webSocket.open(QUrl(url));
 }

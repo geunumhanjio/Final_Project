@@ -1,29 +1,33 @@
 #include "mainwindow.h"
+
+#include "authmanager.h"
+#include "configmanager.h"
 #include "fullscreenview.h"
-#include "settingswidget.h"
-#include "playbackview.h" // [New]
-#include <QCloseEvent>
+#include "jsonutils.h"
+#include "constants.h"
+
 #include <QApplication>
-#include <QFile>
-#include <QDir>
-#include <QDir>
-#include <QStandardPaths> 
-#include <QLineEdit> // [New]
-#include <QTextEdit> // [New]
-#include <QPlainTextEdit> // [New]
+#include <QDateTime>
+#include <QDebug>
+#include <QJsonDocument>
+#include <QLineEdit>
+#include <QPlainTextEdit>
+#include <QTextEdit>
+#include <cmath>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-    this->setWindowTitle("CCTV 통합 관제 시스템 - 근엄한조");
-    this->resize(1280, 720);
-    m_isDark = true; // Default to dark
-    
-    // [New] Install global event filter for WASD
+    setWindowFlag(Qt::FramelessWindowHint, true);
+    setAttribute(Qt::WA_TranslucentBackground, true);
+    setWindowTitle(QString(Constants::App::WINDOW_TITLE));
+    resize(Constants::App::DEFAULT_WIDTH, Constants::App::DEFAULT_HEIGHT);
+
     qApp->installEventFilter(this);
 
-    // [Fix] Initialize Clients BEFORE initConnections
     qDebug() << "[MainWindow] Initializing RosBridgeClient...";
+    ConfigManager::instance().loadDefaults();
+    m_isDark = ConfigManager::instance().getDarkTheme();
     m_rosClient = new RosBridgeClient(this);
     m_rosClient->connectToHost(ConfigManager::instance().getRobotIp()); // [Modified] Use config
     
@@ -32,10 +36,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     initUI();
     initConnections();
-    
-    // Load initial theme
-    loadTheme("style/theme_dark.qss");
-    
+    updateTopBarUserInfo();
+
+    loadTheme(m_isDark ? QStringLiteral("style/theme_dark.qss")
+                       : QStringLiteral("style/theme_light.qss"));
+
     m_inputTimer = new QTimer(this);
     connect(m_inputTimer, &QTimer::timeout, this, &MainWindow::processInput);
     
@@ -43,30 +48,35 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&ConfigManager::instance(), &ConfigManager::configChanged, this, &MainWindow::onConfigChanged);
 }
 
-MainWindow::~MainWindow() { }
+MainWindow::~MainWindow()
+{
+    stopBackgroundWorkers();
+}
 
-// [New] Global Event Filter for WASD
-bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
+bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+{
     if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
-        QKeyEvent *ke = static_cast<QKeyEvent*>(event);
-        int key = ke->key();
+        auto *keyEvent = static_cast<QKeyEvent *>(event);
+        const int key = keyEvent->key();
 
-        // Check for WASD keys
-        if (key == Qt::Key_W || key == Qt::Key_S || key == Qt::Key_A || key == Qt::Key_D) {
-            
-            // [Check] Is user typing in a text field?
-            QWidget *focusW = QApplication::focusWidget();
-            if (focusW) {
-                if (qobject_cast<QLineEdit*>(focusW) || qobject_cast<QTextEdit*>(focusW) || qobject_cast<QPlainTextEdit*>(focusW)) {
-                    // Let the text widget handle it
-                    return false; 
-                }
+        QWidget *focusWidget = QApplication::focusWidget();
+        if (focusWidget) {
+            if (qobject_cast<QLineEdit *>(focusWidget)
+                || qobject_cast<QTextEdit *>(focusWidget)
+                || qobject_cast<QPlainTextEdit *>(focusWidget)) {
+                return false;
             }
+        }
 
-            // Handle Robot Control
-            return handleWasdKey(ke, event->type() == QEvent::KeyPress);
+        if (key == Qt::Key_W || key == Qt::Key_S || key == Qt::Key_A || key == Qt::Key_D) {
+            return handleWasdKey(keyEvent, event->type() == QEvent::KeyPress);
+        }
+
+        if (key == Qt::Key_Up || key == Qt::Key_Down) {
+            return handleCameraTiltKey(keyEvent, event->type() == QEvent::KeyPress);
         }
     }
+
     return QMainWindow::eventFilter(obj, event);
 }
 
@@ -77,117 +87,173 @@ bool MainWindow::handleWasdKey(QKeyEvent *event, bool isPress) {
     
     int key = event->key();
 
+    const int key = event->key();
     if (isPress) {
         if (!m_pressedKeys.contains(key)) {
             m_pressedKeys.insert(key);
             if (!m_inputTimer->isActive()) {
-                m_inputTimer->start(100); 
-                processInput(); 
-            }
-        }
-    } else {
-        if (m_pressedKeys.contains(key)) {
-            m_pressedKeys.remove(key);
-            if (m_pressedKeys.isEmpty()) {
-                m_inputTimer->stop();
-                m_rosClient->sendCmdVel(0.0, 0.0);
-                qDebug() << "[Control] STOP";
-            } else {
+                m_inputTimer->start(100);
                 processInput();
             }
         }
-    }
-    return true; // Consume event
-}
-
-void MainWindow::keyPressEvent(QKeyEvent *event) {
-    // Other keys usually handled by shortcuts or specific widgets.
-    // WASD is now handled by eventFilter.
-    QMainWindow::keyPressEvent(event);
-}
-
-void MainWindow::keyReleaseEvent(QKeyEvent *event) {
-    QMainWindow::keyReleaseEvent(event);
-}
-
-void MainWindow::processInput() {
-    double linear = 0.0;
-    double angular = 0.0;
-    
-    if (m_pressedKeys.contains(Qt::Key_W)) linear += 0.3;
-    if (m_pressedKeys.contains(Qt::Key_S)) linear -= 0.3;
-    if (m_pressedKeys.contains(Qt::Key_A)) angular += 0.5;
-    if (m_pressedKeys.contains(Qt::Key_D)) angular -= 0.5;
-    
-    m_rosClient->sendCmdVel(linear, angular);
-    // qDebug() << "[Control] Linear:" << linear << "Angular:" << angular;
-}
-
-void MainWindow::loadTheme(const QString &relativePath)
-{
-    // Use application directory to ensure correct path
-    QString appDir = QCoreApplication::applicationDirPath();
-    QString fullPath = QDir(appDir).filePath(relativePath);
-    
-    // Fallback: Check if we are in build dir and styles are in source
-    if (!QFile::exists(fullPath)) {
-        // Try going up one level (common in build dirs)
-        fullPath = QDir(appDir).filePath("../" + relativePath);
-        if (!QFile::exists(fullPath)) {
-             // Try absolute path if known (Debug fallback)
-             fullPath = "D:/work/QT_prac/VEDA_QT_1/FE/" + relativePath; 
+    } else if (m_pressedKeys.contains(key)) {
+        m_pressedKeys.remove(key);
+        if (m_pressedKeys.isEmpty()) {
+            m_inputTimer->stop();
+            if (m_rosClient) {
+                m_rosClient->sendCmdVel(0.0, 0.0);
+            }
+            qDebug() << "[Control] STOP";
+        } else {
+            processInput();
         }
     }
 
-    QFile file(fullPath);
-    if(file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QString styleSheet = QLatin1String(file.readAll());
-        qApp->setStyleSheet(styleSheet);
-        qDebug() << "Theme loaded from:" << fullPath;
-        file.close();
-    } else {
-        qDebug() << "FAILED to load theme from:" << fullPath;
+    return true;
+}
+
+bool MainWindow::handleCameraTiltKey(QKeyEvent *event, bool isPress)
+{
+    if (!m_rosClient) {
+        return false;
+    }
+    if (event->isAutoRepeat()) {
+        return true;
+    }
+
+    const int key = event->key();
+    if (isPress) {
+        if (!m_pressedTiltKeys.contains(key)) {
+            m_pressedTiltKeys.insert(key);
+            if (!m_cameraTiltTimer->isActive()) {
+                m_cameraTiltTimer->start();
+                processCameraTiltInput();
+            }
+        }
+    } else if (m_pressedTiltKeys.contains(key)) {
+        m_pressedTiltKeys.remove(key);
+        if (m_pressedTiltKeys.isEmpty()) {
+            stopCameraTiltInput();
+        } else {
+            processCameraTiltInput();
+        }
+    }
+
+    return true;
+}
+
+void MainWindow::processCameraTiltInput()
+{
+    if (!m_rosClient || !m_cameraTiltTimer) {
+        return;
+    }
+
+    int direction = 0;
+    if (m_pressedTiltKeys.contains(Qt::Key_Up)) {
+        direction -= 1;
+    }
+    if (m_pressedTiltKeys.contains(Qt::Key_Down)) {
+        direction += 1;
+    }
+
+    if (direction == 0) {
+        return;
+    }
+
+    constexpr double tiltStep = 5.0;
+    m_cameraTiltAngle += tiltStep * static_cast<double>(direction);
+
+    if (m_cameraTiltAngle < 0.0) {
+        m_cameraTiltAngle = 0.0;
+    } else if (m_cameraTiltAngle > 180.0) {
+        m_cameraTiltAngle = 180.0;
+    }
+
+    m_rosClient->sendCameraTilt(m_cameraTiltAngle);
+    qDebug() << "[CameraTilt] angle:" << m_cameraTiltAngle;
+}
+
+void MainWindow::stopCameraTiltInput()
+{
+    m_pressedTiltKeys.clear();
+    if (m_cameraTiltTimer) {
+        m_cameraTiltTimer->stop();
     }
 }
 
-void MainWindow::initUI()
+void MainWindow::keyPressEvent(QKeyEvent *event)
 {
-    // this->setStyleSheet("QMainWindow { background-color: #222222; }"); // Handled by QSS now
-    m_topBar = new TopBar(this);
-    this->setMenuWidget(m_topBar);
-    m_sidebar = new Sidebar("채널 목록", this);
-    this->addDockWidget(Qt::LeftDockWidgetArea, m_sidebar);
-    
-    qDebug() << "[MainWindow] Creating Central Stack...";
-    m_centralStack = new QStackedWidget(this);
-    this->setCentralWidget(m_centralStack);
-
-    qDebug() << "[MainWindow] Creating LiveView...";
-    m_livePage = new LiveView(this);
-    
-    qDebug() << "[MainWindow] Creating PlaybackView...";
-    m_playbackPage = new PlaybackView(this); // [Modified]
-    
-    qDebug() << "[MainWindow] Creating SettingsWidget...";
-    m_settingsPage = new SettingsWidget(this);
-    
-    qDebug() << "[MainWindow] Creating FullScreenView...";
-    m_fullPage = new FullScreenView(this);
-    
-    qDebug() << "[MainWindow] Adding widgets to stack...";
-
-    m_settingsPage->setStyleSheet("color:white; font-size:20px;");
-    // m_playbackPage styling removed as it is now VideoWidget
-    // m_settingsPage->setAlignment(Qt::AlignCenter); // SettingsWidget is not a QLabel
-
-    m_centralStack->addWidget(m_livePage);
-    m_centralStack->addWidget(m_playbackPage);
-    m_centralStack->addWidget(m_settingsPage);
-    m_centralStack->addWidget(m_fullPage);
-    qDebug() << "[MainWindow] initUI Completed.";
+    QMainWindow::keyPressEvent(event);
 }
 
-void MainWindow::initConnections()
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    updateFallAlertPosition();
+    if (m_fallAlertPanel && m_fallAlertPanel->isVisible()) {
+        m_fallAlertPanel->raise();
+    }
+}
+
+void MainWindow::keyReleaseEvent(QKeyEvent *event)
+{
+    QMainWindow::keyReleaseEvent(event);
+}
+
+void MainWindow::processInput()
+{
+    double linear = 0.0;
+    double angular = 0.0;
+    const double linearStep = ConfigManager::instance().getManualLinearX();
+    const double angularStep = ConfigManager::instance().getManualAngularZ();
+
+    if (m_pressedKeys.contains(Qt::Key_W)) {
+        linear += linearStep;
+    }
+    if (m_pressedKeys.contains(Qt::Key_S)) {
+        linear -= linearStep;
+    }
+    if (m_pressedKeys.contains(Qt::Key_A)) {
+        angular += angularStep;
+    }
+    if (m_pressedKeys.contains(Qt::Key_D)) {
+        angular -= angularStep;
+    }
+
+    if (m_rosClient) {
+        m_rosClient->sendCmdVel(linear, angular);
+    }
+}
+
+void MainWindow::syncRobotModeToBackend(bool sendIdleMotion)
+{
+    if (!m_rosClient) {
+        return;
+    }
+
+    const bool isManualMode = (m_robotMode == Sidebar::ManualMode);
+    const bool isTrackingMode = (m_robotMode == Sidebar::AutoMode);
+    m_rosClient->sendModeControl(isManualMode ? QStringLiteral("manual")
+                                              : QStringLiteral("auto"));
+    m_rosClient->sendTrackingEnable(isTrackingMode);
+
+    if (sendIdleMotion && isManualMode) {
+        m_rosClient->sendCmdVel(0.0, 0.0);
+    }
+}
+
+void MainWindow::stopManualMotion()
+{
+    m_pressedKeys.clear();
+    if (m_inputTimer) {
+        m_inputTimer->stop();
+    }
+    if (m_rosClient) {
+        m_rosClient->sendCmdVel(0.0, 0.0);
+    }
+}
+
+void MainWindow::requestEmergencyStop()
 {
     qDebug() << "[MainWindow] initConnections Started...";
     
@@ -303,51 +369,135 @@ void MainWindow::initConnections()
             m_playbackPage->addLocalItem(filePath);
         });
 
-    } else {
-        qCritical() << "[MainWindow] m_cameraClient is NULL in initConnections!";
+    if (m_rosClient) {
+        m_rosClient->sendNavCancel();
+        m_rosClient->sendCmdVel(0.0, 0.0);
     }
 
-    connect(m_livePage, &LiveView::requestFullScreen, [=](int index, QString url){
-        if (index <= 4 && !url.isEmpty()) {
-            qDebug() << "Full Screen Request:" << url;
-            
-            m_returnToWidget = m_livePage; // [Mod] Return to LiveView on close
-            m_centralStack->setCurrentWidget(m_fullPage);
-            m_fullPage->play(url, index);
-        }
-    });
+    qDebug() << "[MainWindow] Emergency stop requested - cleared goal overlays and canceled active navigation.";
+}
 
-    connect(m_fullPage, &FullScreenView::closeRequested, [=](){
-        m_fullPage->stop();
-        // [Mod] Return to previous widget (Live or Playback)
-        if (m_returnToWidget) {
-            m_centralStack->setCurrentWidget(m_returnToWidget);
-        } else {
-            m_centralStack->setCurrentWidget(m_livePage); // Default check
+void MainWindow::clearAllGoalOverlays()
+{
+    clearSharedVideoGoalOverlay();
+    if (m_livePage) {
+        m_livePage->clearGoalOverlays();
+    }
+    if (m_fullPage) {
+        m_fullPage->clearGoalOverlay();
+    }
+}
+
+void MainWindow::armGoalTracking(const QPointF &goalPosition, double goalYaw)
+{
+    m_hasActiveGoal = true;
+    m_activeGoalPosition = goalPosition;
+    m_activeGoalYaw = goalYaw;
+    m_goalArrivalStableCount = 0;
+}
+
+void MainWindow::clearGoalTracking()
+{
+    m_hasActiveGoal = false;
+    m_activeGoalPosition = QPointF();
+    m_activeGoalYaw = 0.0;
+    m_goalArrivalStableCount = 0;
+}
+
+void MainWindow::handleGoalOdomUpdate(const QJsonObject &data)
+{
+    if (!m_hasActiveGoal) {
+        return;
+    }
+
+    bool ok = false;
+    const QPointF robotPosition = JsonUtils::extractPoint(data, &ok);
+    if (!ok) {
+        return;
+    }
+
+    const double distance = std::hypot(robotPosition.x() - m_activeGoalPosition.x(),
+                                       robotPosition.y() - m_activeGoalPosition.y());
+    const double linearSpeed = JsonUtils::extractLinearSpeed(data);
+    const double angularSpeed = JsonUtils::extractAngularSpeed(data);
+    constexpr double kGoalDistanceToleranceMeters = 0.20;
+    constexpr double kGoalLinearSpeedTolerance = 0.05;
+    constexpr double kGoalAngularSpeedTolerance = 0.10;
+    constexpr int kRequiredStableSamples = 3;
+
+    if (distance <= kGoalDistanceToleranceMeters
+        && linearSpeed <= kGoalLinearSpeedTolerance
+        && angularSpeed <= kGoalAngularSpeedTolerance) {
+        ++m_goalArrivalStableCount;
+    } else {
+        m_goalArrivalStableCount = 0;
+    }
+
+    if (m_goalArrivalStableCount >= kRequiredStableSamples) {
+        qDebug() << "[MainWindow] Goal reached by odom -> pos:" << robotPosition
+                 << "goal:" << m_activeGoalPosition
+                 << "linearSpeed:" << linearSpeed
+                 << "angularSpeed:" << angularSpeed;
+        clearAllGoalOverlays();
+        clearGoalTracking();
+    }
+}
+
+void MainWindow::handleGoalNavStatus(const QJsonObject &data)
+{
+    if (!m_hasActiveGoal || !JsonUtils::hasSuccessStatus(data)) {
+        return;
+    }
+
+    qDebug() << "[MainWindow] Goal reached by nav_status:"
+             << QJsonDocument(data).toJson(QJsonDocument::Compact);
+    clearAllGoalOverlays();
+    clearGoalTracking();
+}
+
+void MainWindow::handleGoalNavFeedback(const QJsonObject &data)
+{
+    if (!m_hasActiveGoal || !JsonUtils::hasSuccessStatus(data)) {
+        return;
+    }
+
+    qDebug() << "[MainWindow] Goal reached by nav_feedback:"
+             << QJsonDocument(data).toJson(QJsonDocument::Compact);
+    clearAllGoalOverlays();
+    clearGoalTracking();
+}
+
+void MainWindow::finalizePatrolPath()
+{
+    if (!m_rosClient || m_robotMode != Sidebar::PatrolMode || !m_livePage) {
+        return;
+    }
+
+    const QVector<QPointF> points = m_livePage->patrolPoints();
+    if (points.isEmpty()) {
+        return;
+    }
+
+    m_livePage->setPatrolAddPointMode(false);
+    if (m_sidebar) {
+        m_sidebar->setPatrolAddPointActive(false);
+    }
+
+    m_rosClient->sendNavQueue(points);
+}
+
+void MainWindow::applySharedVideoGoalOverlay()
+{
+    if (m_hasSharedVideoGoalOverlay) {
+        if (m_livePage) {
+            m_livePage->setVideoGoalOverlay(m_sharedVideoGoalChannelIndex,
+                                            m_sharedVideoGoalStartNormalized,
+                                            m_sharedVideoGoalEndNormalized);
         }
-    });
-    
-    // [New] Connect FullScreenView Recording
-    connect(m_fullPage, &FullScreenView::recordRequested, [=](int index, bool start){
-        // Map Native Index (0-3 for CCTV, 4 for RC Car) to High Quality IDs
-        // CCTV: 0->5, 1->6, 2->7, 3->8
-        // RC Car: 4->9
-        
-        int actualChannelId;
-        if (index < 4) {
-            actualChannelId = index + 5;
-        } else {
-            actualChannelId = 9;
-        }
-        
-        ConfigManager::instance().loadDefaults();
-        QString ip = ConfigManager::instance().getCameraIp();
-        
-        // Use m_cameraClient directly
-        if (m_cameraClient) {
-            m_cameraClient->sendRecordCommand(ip, actualChannelId, start);
-             if (start) qDebug() << "[FullScreen] Recording Started on Channel" << actualChannelId;
-             else qDebug() << "[FullScreen] Recording Stopped on Channel" << actualChannelId;
+        if (m_fullPage) {
+            m_fullPage->setVideoGoalOverlay(m_sharedVideoGoalChannelIndex,
+                                            m_sharedVideoGoalStartNormalized,
+                                            m_sharedVideoGoalEndNormalized);
         }
     });
 
@@ -362,19 +512,140 @@ void MainWindow::initConnections()
     qDebug() << "[MainWindow] initConnections Completed.";
 }
 
-void MainWindow::closeEvent(QCloseEvent *event)
+void MainWindow::clearSharedVideoGoalOverlay()
 {
-    if (m_livePage) m_livePage->stopAll(); 
-    if (m_fullPage) m_fullPage->stop();
-    event->accept();
+    m_hasSharedVideoGoalOverlay = false;
+    m_sharedVideoGoalChannelIndex = -1;
+    m_sharedVideoGoalStartNormalized = QPointF();
+    m_sharedVideoGoalEndNormalized = QPointF();
+    applySharedVideoGoalOverlay();
 }
 
-void MainWindow::toggleTheme()
+void MainWindow::showFallAlert(const QJsonObject &data)
 {
-    m_isDark = !m_isDark;
-    QString qssPath = m_isDark ? "style/theme_dark.qss" : "style/theme_light.qss";
-    loadTheme(qssPath);
-    // [Mod] Removed manual updateTheme calls
+    const QJsonObject alertData = data.value(QStringLiteral("data")).isObject()
+        ? data.value(QStringLiteral("data")).toObject()
+        : data;
+
+    if (!alertData.contains(QStringLiteral("detected"))) {
+        return;
+    }
+
+    const QJsonValue detectedValue = alertData.value(QStringLiteral("detected"));
+    const bool detected = detectedValue.isBool()
+        ? detectedValue.toBool()
+        : (detectedValue.toString().trimmed().compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0);
+
+    if (!detected) {
+        hideFallAlert();
+        return;
+    }
+
+    qDebug() << "[MainWindow] fall_alert detected:" << QJsonDocument(alertData).toJson(QJsonDocument::Compact);
+
+    const double angleDeg = alertData.value(QStringLiteral("angle_deg")).toDouble();
+    const double timestampSeconds = alertData.value(QStringLiteral("timestamp")).toDouble();
+
+    QDateTime alertTime = timestampSeconds > 0.0
+        ? QDateTime::fromMSecsSinceEpoch(static_cast<qint64>(std::llround(timestampSeconds * 1000.0)))
+        : QDateTime();
+    if (!alertTime.isValid()) {
+        alertTime = QDateTime::currentDateTime();
+    }
+
+    if (m_topBar) {
+        m_topBar->appendFallAlertLog(
+            QStringLiteral("%1 | Angle %2 deg | 쓰러짐 감지")
+                .arg(alertTime.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")))
+                .arg(QString::number(angleDeg, 'f', 1)));
+    }
+
+    hideFallAlert();
+}
+
+void MainWindow::hideFallAlert()
+{
+    if (m_fallAlertPanel) {
+        m_fallAlertPanel->hide();
+    }
+}
+
+void MainWindow::updateFallAlertPosition()
+{
+    if (!m_fallAlertPanel || !m_centralStack) {
+        return;
+    }
+
+    const int rightMargin = 24;
+    const int topMargin = 24;
+    const int x = qMax(0, m_centralStack->width() - m_fallAlertPanel->width() - rightMargin);
+    m_fallAlertPanel->move(x, topMargin);
+}
+
+void MainWindow::deactivateControlSession()
+{
+    if (m_sidebar) {
+        m_sidebar->setControlButtonActive(false);
+    }
+    if (m_livePage) {
+        m_livePage->setGoalTargetingEnabled(false);
+    }
+    if (m_fullPage) {
+        m_fullPage->setControlModeChecked(false);
+        m_fullPage->setControlModeAvailable(m_robotMode == Sidebar::ControlMode);
+    }
+}
+
+void MainWindow::updateSidebarForCurrentPage()
+{
+    if (!m_sidebar || !m_centralStack || !m_fullPage) {
+        return;
+    }
+
+    const bool isFullScreenPage = (m_centralStack->currentWidget() == m_fullPage);
+    if (isFullScreenPage) {
+        if (!m_sidebarForcedHiddenForFullScreen) {
+            m_sidebarVisibleBeforeFullScreen = m_sidebar->isVisible();
+            m_sidebarForcedHiddenForFullScreen = true;
+        }
+
+        if (m_sidebar->isVisible()) {
+            m_sidebar->hide();
+        }
+        return;
+    }
+
+    if (m_sidebarForcedHiddenForFullScreen) {
+        m_sidebar->setVisible(m_sidebarVisibleBeforeFullScreen);
+        m_sidebarForcedHiddenForFullScreen = false;
+    }
+}
+
+void MainWindow::applyRobotMode(Sidebar::RobotMode mode)
+{
+    m_robotMode = mode;
+
+    if (m_robotMode != Sidebar::ManualMode) {
+        stopManualMotion();
+    }
+    syncRobotModeToBackend(m_robotMode == Sidebar::ManualMode);
+
+    clearAllGoalOverlays();
+    const bool controlActive = (m_robotMode == Sidebar::ControlMode) && m_sidebar->isControlButtonActive();
+    m_livePage->setGoalTargetingEnabled(controlActive);
+    m_livePage->setPatrolPlanningEnabled(m_robotMode == Sidebar::PatrolMode);
+
+    if (m_robotMode != Sidebar::PatrolMode) {
+        m_livePage->clearPatrolOverlay();
+        m_livePage->setPatrolAddPointMode(false);
+        if (m_sidebar) {
+            m_sidebar->setPatrolPointCount(0);
+            m_sidebar->setPatrolAddPointActive(false);
+        }
+    }
+
+    m_fullPage->setControlModeAvailable(m_robotMode == Sidebar::ControlMode);
+    m_fullPage->setRobotModeSelection(static_cast<int>(m_robotMode));
 }
 
 void MainWindow::onConfigChanged() {

@@ -1,8 +1,10 @@
 #include "videowidget.h"
+#include <cmath>
 #include <QVBoxLayout>
 #include <QDebug>
 #include <QApplication>
 #include <QMutexLocker>
+#include "Gst/GstQualityMonitor.hpp"
 #include <QFile>
 
 VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
@@ -10,7 +12,8 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     setAttribute(Qt::WA_NativeWindow);
     setAttribute(Qt::WA_StyledBackground, true);
     this->setStyleSheet("background-color: black;");
-    setMinimumSize(160, 120);
+    setMinimumWidth(160);
+    setMinimumHeight(0);
     setFocusPolicy(Qt::NoFocus);
 
     QVBoxLayout *layout = new QVBoxLayout(this);
@@ -25,11 +28,15 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     m_osdWidget = new OsdWidget(this);
     m_osdWidget->hide(); // 초기엔 숨김 처리 안함(비어있으면 안그려짐), 필요시 토글
 
+    m_pinger = new RtspPinger(this); // [New]
+
     // [New] 글로벌 애플리케이션 포커스 상태 변경 감지
     connect(qApp, &QGuiApplication::applicationStateChanged, this, [this](Qt::ApplicationState state) {
         if (state != Qt::ApplicationActive) {
             if (m_osdWidget) m_osdWidget->hide();
         } else {
+            // 앱이 다시 활성화되었을 때, 이 위젯이 보이고 최소화 상태가 아닐 때만 OSD 표시
+            if (m_osdWidget && this->isVisible() && !this->window()->isMinimized()) {
             if (m_osdWidget && this->isVisible()) {
                 bool anyVisible = false;
                 for (int i = 0; i < OsdWidget::MetricCount; ++i) {
@@ -39,6 +46,11 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
                     }
                 }
                 if (anyVisible) m_osdWidget->show();
+                syncOverlayPosition();
+            }
+        }
+    });
+
                 
                 QPoint globalPos = this->mapToGlobal(QPoint(0, 0));
                 m_osdWidget->setGeometry(globalPos.x(), globalPos.y(), this->width(), this->height());
@@ -56,11 +68,15 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
     connect(m_statsTimer, &QTimer::timeout, this, &VideoWidget::extractGstStats);
     m_statsTimer->start(1000); // 1Hz update
 
+    m_statsClock.start(); // Start the clock for rate measurements
+
     pipeline = nullptr;
     cropper = nullptr;
     m_isPlaying = false;
     sourceWidth = 0; // [Mod] Init to 0 to detect valid resolution
     sourceHeight = 0;
+    sourcePixelAspectNum = 1;
+    sourcePixelAspectDen = 1;
     currentCropRect = QRectF(0.0, 0.0, 1.0, 1.0); 
 
     busTimer = new QTimer(this);
@@ -69,12 +85,41 @@ VideoWidget::VideoWidget(QWidget *parent) : QWidget(parent)
 
 VideoWidget::~VideoWidget() { stop(); }
 
+void VideoWidget::onGstError(const QString &errorText, const QString &debugText)
+{
+    Q_UNUSED(errorText);
+    Q_UNUSED(debugText);
+}
+
 // Protected Helper to set Pipeline from Subclass
 bool VideoWidget::setPipeline(GstElement *p) {
     if (pipeline) stop(); // Clear existing if any
     
     pipeline = p;
     if (!pipeline) return false;
+
+    // [New] Start Pinger for RTT measurement
+    GstElement *src = gst_bin_get_by_name(GST_BIN(pipeline), "src");
+    if (src) {
+        gchar *location = nullptr;
+        g_object_get(src, "location", &location, NULL);
+        if (location) {
+            m_pinger->startPinger(QString::fromUtf8(location));
+            g_free(location);
+        }
+        gst_object_unref(src);
+    }
+
+    // [New] Attach Pad Probe to Sink to count actual rendered frames
+    GstElement *sink = gst_bin_get_by_name(GST_BIN(pipeline), "sink");
+    if (sink) {
+        GstPad *sinkpad = gst_element_get_static_pad(sink, "sink");
+        if (sinkpad) {
+            gst_pad_add_probe(sinkpad, GST_PAD_PROBE_TYPE_BUFFER, sinkPadProbe, this, nullptr);
+            gst_object_unref(sinkpad);
+        }
+        gst_object_unref(sink);
+    }
 
     // Check for cropper
     cropper = gst_bin_get_by_name(GST_BIN(pipeline), "crop");
@@ -100,6 +145,8 @@ void VideoWidget::stop()
 {
     m_isPlaying = false;
     
+    if (m_pinger) m_pinger->stop(); // [New] Stop pinger when stream stops
+
     if (busTimer->isActive()) busTimer->stop();
 
     if (cropper) { gst_object_unref(cropper); cropper = nullptr; }
@@ -115,6 +162,8 @@ void VideoWidget::stop()
     // Reset Resolution
     sourceWidth = 0; 
     sourceHeight = 0;
+    sourcePixelAspectNum = 1;
+    sourcePixelAspectDen = 1;
 }
 
 void VideoWidget::updateSourceResolution() {
@@ -129,6 +178,17 @@ void VideoWidget::updateSourceResolution() {
             if (gst_structure_get_int(str, "width", &w) && gst_structure_get_int(str, "height", &h)) {
                 sourceWidth = w;
                 sourceHeight = h;
+                int parNum = 1;
+                int parDen = 1;
+                if (gst_structure_has_field(str, "pixel-aspect-ratio")) {
+                    gst_structure_get_fraction(str, "pixel-aspect-ratio", &parNum, &parDen);
+                }
+                if (parNum <= 0 || parDen <= 0) {
+                    parNum = 1;
+                    parDen = 1;
+                }
+                sourcePixelAspectNum = parNum;
+                sourcePixelAspectDen = parDen;
                 qDebug() << "[VideoWidget] Source resolution updated:" << w << "x" << h;
                 
                 // Re-apply current crop if valid
@@ -152,7 +212,12 @@ void VideoWidget::showPlaceholder(const QString &text) {
 void VideoWidget::applyCrop(const QRectF &rect)
 {
     QMutexLocker locker(&cropMutex);
-    currentCropRect = rect; 
+    const double requestedWidth = qBound(0.0, rect.width(), 1.0);
+    const double requestedHeight = qBound(0.0, rect.height(), 1.0);
+    const double requestedX = qBound(0.0, rect.x(), qMax(0.0, 1.0 - requestedWidth));
+    const double requestedY = qBound(0.0, rect.y(), qMax(0.0, 1.0 - requestedHeight));
+    const QRectF requestedRect(requestedX, requestedY, requestedWidth, requestedHeight);
+    currentCropRect = requestedRect;
 
     // Allow crop adjustment even if paused, as long as pipeline exists
     if (!cropper) {
@@ -169,13 +234,28 @@ void VideoWidget::applyCrop(const QRectF &rect)
         }
     }
 
-    int left = static_cast<int>(rect.left() * sourceWidth);
-    int right = static_cast<int>((1.0 - rect.right()) * sourceWidth);
-    int top = static_cast<int>(rect.top() * sourceHeight);
-    int bottom = static_cast<int>((1.0 - rect.bottom()) * sourceHeight);
+    const int visibleWidth = qBound(1,
+                                    static_cast<int>(std::lround(requestedRect.width() * sourceWidth)),
+                                    qMax(1, sourceWidth));
+    const int visibleHeight = qBound(1,
+                                     static_cast<int>(std::lround(requestedRect.height() * sourceHeight)),
+                                     qMax(1, sourceHeight));
 
-    left = qMax(0, left); right = qMax(0, right);
-    top = qMax(0, top); bottom = qMax(0, bottom);
+    const int maxLeft = qMax(0, sourceWidth - visibleWidth);
+    const int maxTop = qMax(0, sourceHeight - visibleHeight);
+    const int left = qBound(0,
+                            static_cast<int>(std::lround(requestedRect.x() * sourceWidth)),
+                            maxLeft);
+    const int top = qBound(0,
+                           static_cast<int>(std::lround(requestedRect.y() * sourceHeight)),
+                           maxTop);
+    const int right = qMax(0, sourceWidth - left - visibleWidth);
+    const int bottom = qMax(0, sourceHeight - top - visibleHeight);
+
+    currentCropRect = QRectF(static_cast<double>(left) / static_cast<double>(sourceWidth),
+                             static_cast<double>(top) / static_cast<double>(sourceHeight),
+                             static_cast<double>(visibleWidth) / static_cast<double>(sourceWidth),
+                             static_cast<double>(visibleHeight) / static_cast<double>(sourceHeight));
 
     // Debug
     // qDebug() << "Crop:" << left << right << top << bottom;
@@ -191,8 +271,13 @@ void VideoWidget::applyCrop(const QRectF &rect)
 void VideoWidget::panView(qreal dx, qreal dy) {
     if (currentCropRect.width() >= 1.0 && currentCropRect.height() >= 1.0) return;
 
-    qreal percentX = dx / (qreal)this->width();
-    qreal percentY = dy / (qreal)this->height();
+    const QRectF displayRect = getVideoDisplayRect();
+    if (displayRect.width() <= 0.0 || displayRect.height() <= 0.0) {
+        return;
+    }
+
+    qreal percentX = dx / static_cast<qreal>(displayRect.width());
+    qreal percentY = dy / static_cast<qreal>(displayRect.height());
 
     qreal newX = currentCropRect.x() - percentX;
     qreal newY = currentCropRect.y() - percentY;
@@ -205,6 +290,86 @@ void VideoWidget::panView(qreal dx, qreal dy) {
 
 void VideoWidget::resetCrop() {
     applyCrop(QRectF(0, 0, 1, 1));
+}
+
+QRectF VideoWidget::getVideoDisplayRect() const
+{
+    const QRectF widgetRect = rect();
+    if (widgetRect.isEmpty()) {
+        return widgetRect;
+    }
+
+    QRectF cropRect;
+    {
+        QMutexLocker locker(&cropMutex);
+        cropRect = currentCropRect;
+    }
+
+    const double cropWidth = cropRect.width() > 0.0 ? cropRect.width() : 1.0;
+    const double cropHeight = cropRect.height() > 0.0 ? cropRect.height() : 1.0;
+    const double pixelAspect = (sourcePixelAspectDen > 0)
+                                   ? (static_cast<double>(sourcePixelAspectNum) / static_cast<double>(sourcePixelAspectDen))
+                                   : 1.0;
+    const double contentWidth = static_cast<double>(sourceWidth > 0 ? sourceWidth : widgetRect.width()) * cropWidth * pixelAspect;
+    const double contentHeight = static_cast<double>(sourceHeight > 0 ? sourceHeight : widgetRect.height()) * cropHeight;
+
+    QSizeF contentSize(contentWidth, contentHeight);
+    contentSize.scale(widgetRect.size(), Qt::KeepAspectRatio);
+
+    const QPointF topLeft((widgetRect.width() - contentSize.width()) * 0.5,
+                          (widgetRect.height() - contentSize.height()) * 0.5);
+    return QRectF(topLeft, contentSize);
+}
+
+QPointF VideoWidget::widgetPointToVideoNormalized(const QPointF &widgetPoint, bool *ok) const
+{
+    if (ok) {
+        *ok = false;
+    }
+
+    const QRectF displayRect = getVideoDisplayRect();
+    if (displayRect.isEmpty() || !displayRect.contains(widgetPoint)) {
+        return QPointF();
+    }
+
+    QRectF cropRect;
+    {
+        QMutexLocker locker(&cropMutex);
+        cropRect = currentCropRect;
+    }
+
+    const double localX = (widgetPoint.x() - displayRect.left()) / displayRect.width();
+    const double localY = (widgetPoint.y() - displayRect.top()) / displayRect.height();
+    const QPointF normalized(cropRect.x() + (localX * cropRect.width()),
+                             cropRect.y() + (localY * cropRect.height()));
+
+    if (ok) {
+        *ok = true;
+    }
+    return normalized;
+}
+
+QPointF VideoWidget::videoNormalizedToWidgetPoint(const QPointF &normalizedPoint) const
+{
+    const QRectF displayRect = getVideoDisplayRect();
+    if (displayRect.isEmpty()) {
+        return QPointF();
+    }
+
+    QRectF cropRect;
+    {
+        QMutexLocker locker(&cropMutex);
+        cropRect = currentCropRect;
+    }
+
+    if (cropRect.width() <= 0.0 || cropRect.height() <= 0.0) {
+        return QPointF();
+    }
+
+    const double localX = (normalizedPoint.x() - cropRect.x()) / cropRect.width();
+    const double localY = (normalizedPoint.y() - cropRect.y()) / cropRect.height();
+    return QPointF(displayRect.left() + (localX * displayRect.width()),
+                   displayRect.top() + (localY * displayRect.height()));
 }
 
 void VideoWidget::pollGstBus()
@@ -226,6 +391,27 @@ void VideoWidget::pollGstBus()
                 }
             } break;
         case GST_MESSAGE_ERROR:
+        {
+            GError *error = nullptr;
+            gchar *debugInfo = nullptr;
+            gst_message_parse_error(msg, &error, &debugInfo);
+
+            const QString errorText = error ? QString::fromUtf8(error->message) : QStringLiteral("Unknown GStreamer error");
+            const QString debugText = debugInfo ? QString::fromUtf8(debugInfo) : QString();
+            qWarning() << "[VideoWidget] GST error:" << errorText << debugText;
+            onGstError(errorText, debugText);
+
+            if (error) {
+                g_error_free(error);
+            }
+            if (debugInfo) {
+                g_free(debugInfo);
+            }
+
+            m_isPlaying = false;
+            startRetryTimer();
+            break;
+        }
         case GST_MESSAGE_EOS:
             m_isPlaying = false; 
             startRetryTimer(); // Calls virtual method (overridden by Live/Recorded)
@@ -233,6 +419,13 @@ void VideoWidget::pollGstBus()
         }
         gst_message_unref(msg);
     }
+
+    // Keep trying until caps are ready so overlay coordinate mapping can use
+    // the real video aspect ratio instead of the widget rect fallback.
+    if (m_isPlaying && (sourceWidth <= 0 || sourceHeight <= 0)) {
+        updateSourceResolution();
+    }
+
     gst_object_unref(bus);
 }
 
@@ -369,4 +562,13 @@ GstBusSyncReply VideoWidget::busSyncHandler(GstBus *bus, GstMessage *msg, gpoint
         return GST_BUS_DROP;
     }
     return GST_BUS_PASS;
+}
+
+// [New] Pad probe callback to count actual rendered frames
+GstPadProbeReturn VideoWidget::sinkPadProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data) {
+    VideoWidget *self = static_cast<VideoWidget*>(user_data);
+    if (info->type & GST_PAD_PROBE_TYPE_BUFFER) {
+        self->m_actualFrameCount++;
+    }
+    return GST_PAD_PROBE_OK;
 }

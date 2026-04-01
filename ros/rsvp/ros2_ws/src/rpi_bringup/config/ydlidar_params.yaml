@@ -1,0 +1,38 @@
+# ydlidar_params.yaml
+# YDLiDAR X4 파라미터 설정
+#
+# [포트 변경 방법]
+# 방법 1 (권장): udev rule 설정 후 port: "/dev/ydlidar" 고정
+#   -> scripts/find_lidar_port.sh 참고
+#
+# 방법 2: 런타임 오버라이드
+#   ros2 launch rpi_bringup rpi_bringup.launch.py lidar_port:=/dev/ttyUSB1
+#
+# 방법 3: 이 파일에서 직접 수정 (기존 방식)
+#   port 값을 변경 후 저장 (빌드 불필요 - install 경로의 yaml이 사용됨)
+ydlidar_ros2_driver_node:
+  ros__parameters:
+    port: /dev/ttyUSB0
+    frame_id: laser_frame
+    ignore_array: ""
+    baudrate: 128000
+    lidar_type: 1
+    device_type: 0
+    isSingleChannel: false
+    intensity: false
+    intensity_bit: 0
+    sample_rate: 5
+    abnormal_check_count: 4
+    fixed_resolution: true
+    reversion: false
+    inverted: true
+    auto_reconnect: true
+    support_motor_dtr: true
+    angle_max: 180.0
+    angle_min: -180.0
+    range_max: 64.0
+    range_min: 0.01
+    frequency: 10.0
+    invalid_range_is_inf: false
+    debug: false
+

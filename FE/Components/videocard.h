@@ -7,6 +7,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFrame>
+#include <QPointF>
 #include <QTimer>
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QEnterEvent>
@@ -14,6 +15,8 @@
 #include <QEvent>
 #endif
 #include "videowidget.h"
+
+class GoalArrowOverlayWidget;
 
 class VideoCard : public QWidget
 {
@@ -34,6 +37,10 @@ public:
     void setStreamInfo(const QString &info);
     void showRecIndicator(bool show);
     void setChannelId(int id) { m_channelId = id; }
+    void setGoalTargetingEnabled(bool enabled);
+    bool isGoalTargetingEnabled() const;
+    void clearGoalOverlay();
+    void setCommittedGoalOverlay(const QPointF &normalizedStart, const QPointF &normalizedEnd);
 
 signals:
     void fullScreenRequested();
@@ -50,6 +57,8 @@ protected:
 #else
     void enterEvent(QEvent *event) override;
 #endif
+    bool eventFilter(QObject *watched, QEvent *event) override;
+    void mousePressEvent(QMouseEvent *event) override;
     void leaveEvent(QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void mouseDoubleClickEvent(QMouseEvent *event) override;
@@ -57,6 +66,8 @@ protected:
 private:
     void setupUi();
     void updateOverlayLayout();
+    void syncGoalOverlayPosition();
+    void updateCommittedGoalOverlay();
 
     // Core Components
     VideoWidget *m_videoWidget;
@@ -64,6 +75,7 @@ private:
     // Overlays
     QWidget *m_topOverlay;
     QWidget *m_bottomOverlay; // In-video bottom overlay (e.g. resolution info)
+    GoalArrowOverlayWidget *m_goalOverlay;
     
     // Status Bar (Below video)
     QFrame *m_statusBar;
@@ -82,6 +94,20 @@ private:
     bool m_isHovered;
     bool m_isRecording; // [New] Recording State
     int m_channelId;    // [New] Channel ID
+    bool m_goalTargetingEnabled = false;
+    bool m_isSettingGoalDirection = false;
+    QPointF m_goalStartPos;
+    QPointF m_goalEndPos;
+    bool m_hasCommittedGoalOverlay = false;
+    QPointF m_committedGoalStartNormalized;
+    QPointF m_committedGoalEndNormalized;
+    bool m_hasCommittedGoalLocalCache = false;
+    QPointF m_committedGoalStartLocal;
+    QPointF m_committedGoalEndLocal;
+    QRectF m_committedGoalDisplayRect;
+    QRectF m_committedGoalCropRect;
+    bool m_preserveLocalCommittedGoalOnNextSet = false;
+    QTimer *m_goalOverlaySyncTimer = nullptr;
 };
 
 #endif // VIDEOCARD_H
