@@ -6,6 +6,26 @@
 
 ---
 
+## 👥 팀원 소개
+
+| 이름  | 담당                     |
+|-----|------------------------|
+| 엄도윤 | 팀장, ROS2                 |
+| 김지오 | BSP              |
+| 이정근 | RTSP서버 및 캘리브레이션         |
+| 이한빈 | Qt 클라이언트, 카메라 ISP               |
+
+## 프로젝트 일정
+
+| Order | Type | Schedule | Details |
+| --- | --- | --- | --- |
+| 1 | **`준비`** | `2025.02.02 ~ 02.15` | 프로젝트 주제 선정 및 요구 사항 정리 |
+| 2 | **`개발`** | `2025.02.16 ~ 03.01` | 최우선 기능 개발 |
+| 3 | **`개발`** | `2025.03.02 ~ 03.15` | 차선 순위 기능 개발 |
+| 4 | **`기능 개선`** | `2025.03.16 ~ 03.22` | 1차 QA 및 기능 개선 |
+| 5 | **`기능 개선`** | `2025.03.23 ~ 03.29` | 2차 QA 및 기능 개선 |
+| 6 | **`마감`** | `2025.03.30 ~ 04.02` | 최종 마감 및 문서화 |
+
 ## 🚀 시스템 아키텍처
 
 ```mermaid
@@ -164,16 +184,12 @@ make clean && make
 
 #### 4. ROS2 빌드
 ```bash
-# WSL (Docker 컨테이너 내부)
-cd ros/WSL/docker && docker compose up -d
-docker exec -it wsl_ros2 bash
-cd /root/ros2_ws && colcon build --symlink-install
+cd ros/WSL/ && cd src/
+colcon build --packages-up-to wsl_bringup
 source install/setup.bash
 
-# Raspberry Pi (Docker 컨테이너 내부)
-cd ros/rsvp/docker && docker compose up -d
-docker exec -it rpi_ros2 bash
-cd /root/ros2_ws && colcon build --symlink-install
+cd ../../rsvp/ros2_ws/
+colcon build --packages-select rpi_bringup
 source install/setup.bash
 ```
 
@@ -183,18 +199,18 @@ source install/setup.bash
 
 ### 1. 인프라 준비
 ```bash
-# MySQL 데이터베이스 설정 (기본 DB명: login_server)
+# MySQL 데이터베이스 설정
 sudo mysql -u root -p
-CREATE DATABASE login_server CHARACTER SET utf8mb4;
-CREATE USER 'rokgeun'@'localhost' IDENTIFIED BY 'secure_password';
-GRANT ALL PRIVILEGES ON login_server.* TO 'rokgeun'@'localhost';
+CREATE DATABASE robot_system;
+CREATE USER 'robot_user'@'localhost' IDENTIFIED BY 'secure_password';
+GRANT ALL PRIVILEGES ON robot_system.* TO 'robot_user'@'localhost';
 
-# Go 인증 서버 환경 변수 설정
+# 환경 변수 설정
 export JWT_SECRET="your-secret-key-here"
-export MYSQL_HOST="localhost"
-export MYSQL_DATABASE="login_server"
-export MYSQL_USER="rokgeun"
-export MYSQL_PASSWORD="secure_password"
+export DB_HOST="localhost"
+export DB_NAME="robot_system"
+export DB_USER="robot_user"
+export DB_PASS="secure_password"
 ```
 
 ### 2. 서버 시작 순서
@@ -210,20 +226,18 @@ cd BE/build/ && ./ProxyServer &
 
 #### ROS2 시스템
 ```bash
-# WSL - Docker 컨테이너에서 AI 처리 노드 실행
-docker exec -it wsl_ros2 bash -c \
-  "source /root/ros2_ws/install/setup.bash && \
-   ros2 launch wsl_bringup wsl_bringup.launch.py"
+# WSL - AI 처리 노드
+cd ros/WSL/
+ros2 launch wsl_bringup wsl_bringup.launch.py
 
-# Raspberry Pi - Docker 컨테이너에서 하드웨어 제어 노드 실행
-docker exec -it rpi_ros2 bash -c \
-  "source /root/ros2_ws/install/setup.bash && \
-   ros2 launch rpi_bringup rpi_bringup.launch.py"
+# Raspberry Pi - 하드웨어 제어
+cd ros/rsvp/ros2_ws/
+ros2 launch rpi_bringup rpi_bringup.launch.py
 ```
 
 #### Frontend 애플리케이션
 ```bash
-cd FE/build/ && ./VEDA_QT_1.exe
+cd FE/build/ && ./VedaMonitor
 ```
 
 ### 3. 시스템 상태 확인
@@ -245,9 +259,6 @@ tail -f /var/log/veda-system.log
 
 ### Backend API (Port 8080)
 ```bash
-# 헬스 체크
-curl http://localhost:8080/healthz
-
 # 로그인
 curl -X POST http://localhost:8080/login \
      -H "Content-Type: application/json" \
@@ -476,15 +487,13 @@ git merge --no-ff feature/새기능명
 
 ### 기술 지원
 - **이슈 트래킹**: GitHub Issues
-- **BSP 문서**: `BSP/docs/` 디렉터리 참조
-- **ROS 패키지 문서**: `ros/WSL/src/*/README.md`, `ros/rsvp/ros2_ws/src/*/README.md`
+- **문서**: `/docs` 디렉터리 참조
 
 ### 팀 연락처  
-- **프로젝트 리더**: [연락처]
-- **백엔드 개발**: [연락처] 
-- **프론트엔드 개발**: [연락처]
-- **임베디드 개발**: [연락처]
-- **로봇공학**: [연락처]
+- **프로젝트 리더, ROS2 개발**: [010-3996-6258]/[tkdtlr1998@naver.com]
+- **백엔드 개발**: [010-4817-9640]/[rokgeun@gmail.com] 
+- **프론트엔드 개발**: [010-9239-3421]/[gksqls1103@gmail.com]
+- **BSP 개발**: [010-4737-8997]/[tkjty654@gmail.com]
 
 ---
 
